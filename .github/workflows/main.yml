@@ -105,28 +105,43 @@ jobs:
             bot_token = config.get("TELEGRAM_BOT_TOKEN")
             chat_id = config.get("TELEGRAM_CHAT_ID")
             
+            print("Debug - Bot Token length:", len(bot_token) if bot_token else "None")
+            print("Debug - Chat ID:", chat_id)
+            
             if not bot_token or not chat_id:
                 print("Error: Missing Telegram configuration")
                 sys.exit(1)
             
             message = "✅ Deployment erfolgreich" if status == "success" else "❌ Deployment fehlgeschlagen"
             
-            response = requests.post(
-                f"https://api.telegram.org/bot{bot_token}/sendMessage",
-                json={
-                    "chat_id": chat_id,
-                    "text": message,
-                    "parse_mode": "HTML"
-                }
-            )
+            # Test Telegram API Erreichbarkeit
+            test_response = requests.get(f"https://api.telegram.org/bot{bot_token}/getMe")
+            print("Debug - Telegram API Test Response:", test_response.json())
+            
+            api_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+            payload = {
+                "chat_id": chat_id,
+                "text": message,
+                "parse_mode": "HTML"
+            }
+            
+            print("Debug - API URL:", api_url.replace(bot_token, "BOT_TOKEN"))
+            print("Debug - Payload:", payload)
+            
+            response = requests.post(api_url, json=payload)
             
             if not response.ok:
                 print(f"Error sending message: {response.text}", file=sys.stderr)
+                print("Debug - Response Status Code:", response.status_code)
+                print("Debug - Response Headers:", dict(response.headers))
                 sys.exit(1)
                 
             print("Notification sent successfully")
+            print("Debug - Success Response:", response.json())
+            
         except Exception as e:
             print(f"Error: {str(e)}", file=sys.stderr)
+            print("Debug - Exception type:", type(e).__name__)
             sys.exit(1)
         EOF
         

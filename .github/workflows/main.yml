@@ -105,6 +105,12 @@ jobs:
       with:
         python-version: '3.11'
         
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install requests
+        
     - name: Download artifact
       uses: actions/download-artifact@v3
       with:
@@ -112,11 +118,33 @@ jobs:
         path: dist/
         
     - name: Deploy to production
+      id: deploy
       env:
         CURSOR_SECRET: ${{ secrets.cursor }}
       run: |
+        # Extrahiere die Konfiguration
         echo "$CURSOR_SECRET" > config.json
-        python deploy.py
+        
+        # Erstelle .env Datei
+        python -c "
+        import json
+        with open('config.json') as f:
+            config = json.load(f)
+        with open('.env', 'w') as f:
+            for key, value in config.items():
+                f.write(f'{key}={value}\n')
+        "
+        
+        # Starte den Bot
+        python Trading.py &
+        sleep 10  # Warte kurz um zu sehen ob der Bot startet
+        if ps aux | grep -v grep | grep "Trading.py"; then
+          echo "Bot successfully started"
+          exit 0
+        else
+          echo "Bot failed to start"
+          exit 1
+        fi
 
   notify:
     needs: [deploy]
@@ -124,9 +152,44 @@ jobs:
     if: always()
     
     steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests
+        
     - name: Send notification
       env:
         CURSOR_SECRET: ${{ secrets.cursor }}
+        DEPLOY_STATUS: ${{ needs.deploy.result }}
       run: |
-        echo "$CURSOR_SECRET" > config.json
-        python notify.py 
+        python -c "
+        import json
+        import os
+        import requests
+        
+        # Lade Konfiguration
+        config = json.loads(os.environ['CURSOR_SECRET'])
+        status = os.environ['DEPLOY_STATUS']
+        
+        bot_token = config.get('TELEGRAM_BOT_TOKEN')
+        chat_id = config.get('TELEGRAM_CHAT_ID')
+        
+        if bot_token and chat_id:
+            message = '✅ Deployment erfolgreich abgeschlossen' if status == 'success' else '❌ Deployment fehlgeschlagen'
+            
+            requests.post(
+                f'https://api.telegram.org/bot{bot_token}/sendMessage',
+                json={
+                    'chat_id': chat_id,
+                    'text': message,
+                    'parse_mode': 'HTML'
+                }
+            )
+        " 

@@ -45,25 +45,27 @@ jobs:
         
         # Create .env file
         echo "Creating .env file..."
-        python -c '
-import json
-import sys
-
-try:
-    with open("config.json") as f:
-        config = json.load(f)
-    
-    with open(".env", "w") as f:
-        for key, value in config.items():
-            if isinstance(value, (list, dict)):
-                f.write(f"{key}={json.dumps(value)}\n")
-            else:
-                f.write(f"{key}={value}\n")
-    print("Successfully created .env file")
-except Exception as e:
-    print(f"Error: {str(e)}", file=sys.stderr)
-    sys.exit(1)
-'
+        cat > create_env.py << 'EOF'
+        import json
+        import sys
+        
+        try:
+            with open("config.json") as f:
+                config = json.load(f)
+            
+            with open(".env", "w") as f:
+                for key, value in config.items():
+                    if isinstance(value, (list, dict)):
+                        f.write(f"{key}={json.dumps(value)}\n")
+                    else:
+                        f.write(f"{key}={value}\n")
+            print("Successfully created .env file")
+        except Exception as e:
+            print(f"Error: {str(e)}", file=sys.stderr)
+            sys.exit(1)
+        EOF
+        
+        python create_env.py
         
         # Show .env content (ohne sensitive Daten)
         echo "Checking .env file structure..."
@@ -90,40 +92,42 @@ except Exception as e:
         CURSOR_SECRET: ${{ secrets.cursor }}
         DEPLOY_STATUS: ${{ needs.deploy.result }}
       run: |
-        python -c '
-import json
-import os
-import sys
-import requests
-
-try:
-    config = json.loads(os.environ["CURSOR_SECRET"])
-    status = os.environ["DEPLOY_STATUS"]
-    
-    bot_token = config.get("TELEGRAM_BOT_TOKEN")
-    chat_id = config.get("TELEGRAM_CHAT_ID")
-    
-    if not bot_token or not chat_id:
-        print("Error: Missing Telegram configuration")
-        sys.exit(1)
-    
-    message = "✅ Deployment erfolgreich" if status == "success" else "❌ Deployment fehlgeschlagen"
-    
-    response = requests.post(
-        f"https://api.telegram.org/bot{bot_token}/sendMessage",
-        json={
-            "chat_id": chat_id,
-            "text": message,
-            "parse_mode": "HTML"
-        }
-    )
-    
-    if not response.ok:
-        print(f"Error sending message: {response.text}", file=sys.stderr)
-        sys.exit(1)
+        cat > send_notification.py << 'EOF'
+        import json
+        import os
+        import sys
+        import requests
         
-    print("Notification sent successfully")
-except Exception as e:
-    print(f"Error: {str(e)}", file=sys.stderr)
-    sys.exit(1)
-' 
+        try:
+            config = json.loads(os.environ["CURSOR_SECRET"])
+            status = os.environ["DEPLOY_STATUS"]
+            
+            bot_token = config.get("TELEGRAM_BOT_TOKEN")
+            chat_id = config.get("TELEGRAM_CHAT_ID")
+            
+            if not bot_token or not chat_id:
+                print("Error: Missing Telegram configuration")
+                sys.exit(1)
+            
+            message = "✅ Deployment erfolgreich" if status == "success" else "❌ Deployment fehlgeschlagen"
+            
+            response = requests.post(
+                f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                json={
+                    "chat_id": chat_id,
+                    "text": message,
+                    "parse_mode": "HTML"
+                }
+            )
+            
+            if not response.ok:
+                print(f"Error sending message: {response.text}", file=sys.stderr)
+                sys.exit(1)
+                
+            print("Notification sent successfully")
+        except Exception as e:
+            print(f"Error: {str(e)}", file=sys.stderr)
+            sys.exit(1)
+        EOF
+        
+        python send_notification.py 

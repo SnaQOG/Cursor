@@ -1,0 +1,89 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "build"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trading-bot"
+version = "1.0.0"
+description = "An AI-powered cryptocurrency trading bot with Telegram integration"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "Dominik Diener", email = "dominik.diener@example.com"},
+]
+
+[tool.black]
+line-length = 100
+target-version = ['py39', 'py310', 'py311']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 100
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --cov=src --cov-report=term-missing"
+testpaths = [
+    "tests",
+]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "pass",
+    "raise ImportError",
+]
+ignore_errors = true
+omit = [
+    "tests/*",
+    "setup.py",
+]
+
+[tool.bandit]
+exclude_dirs = ["tests", "docs"]
+targets = ["src"]
+skips = ["B101"]  # Skip assert statements
+
+[tool.flake8]
+max-line-length = 100
+extend-ignore = "E203"
+max-complexity = 10
+exclude = [
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    "*.egg-info",
+] 

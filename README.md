@@ -43,7 +43,7 @@ Ein fortschrittlicher Kryptowährungs-Trading-Bot mit KI-Integration, technische
 
 1. Repository klonen:
 ```bash
-git clone https://github.com/yourusername/trading-bot.git
+git clone https://github.com/SnaQOG/Cursor.git
 cd trading-bot
 ```
 
@@ -237,6 +237,6 @@ Dieses Projekt ist unter der MIT-Lizenz lizenziert - siehe die [LICENSE](LICENSE
 
 ## Kontakt
 
-Ihr Name - [@IhrTwitter](https://twitter.com/IhrTwitter)
+Dominik Diener - [@SnaQOG](https://twitter.com/SnaQOG)
 
-Projekt Link: [https://github.com/IhrUsername/trading-bot](https://github.com/IhrUsername/trading-bot) 
+Projekt Link: [https://github.com/SnaQOG/Cursor](https://github.com/SnaQOG/Cursor)

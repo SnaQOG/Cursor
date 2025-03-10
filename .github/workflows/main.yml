@@ -25,8 +25,46 @@ jobs:
         pip install requests
         
     - name: Debug Secret
+      env:
+        CURSOR_SECRET: ${{ secrets.cursor }}
       run: |
         echo "Secret exists: ${{ secrets.cursor != '' }}"
+        echo "Validating secret format..."
+        python << 'EOF'
+import json
+import os
+import sys
+
+try:
+    secret = os.environ["CURSOR_SECRET"]
+    print(f"Secret length: {len(secret)}")
+    config = json.loads(secret)
+    print("\nConfig keys:", list(config.keys()))
+    print("\nTelegram config:")
+    print(f"- BOT_TOKEN length: {len(config.get('TELEGRAM_BOT_TOKEN', ''))}")
+    print(f"- CHAT_ID: {config.get('TELEGRAM_CHAT_ID', 'Not found')}")
+    
+    # Validate required fields
+    required_fields = [
+        "TELEGRAM_BOT_TOKEN",
+        "TELEGRAM_CHAT_ID",
+        "TRADING_PAIRS",
+        "TRADING_TIMEFRAMES"
+    ]
+    
+    missing = [field for field in required_fields if field not in config]
+    if missing:
+        print(f"\nError: Missing required fields: {missing}")
+        sys.exit(1)
+        
+    print("\nSecret validation successful!")
+except json.JSONDecodeError as e:
+    print(f"\nError: Invalid JSON format - {str(e)}")
+    sys.exit(1)
+except Exception as e:
+    print(f"\nError: {str(e)}")
+    sys.exit(1)
+EOF
         
     - name: Create config and start bot
       env:
@@ -35,13 +73,16 @@ jobs:
         # Create config file
         echo "$CURSOR_SECRET" > config.json
         
-        # Validate JSON format
-        echo "Validating JSON format..."
-        if ! python -c "import json; json.load(open('config.json'))"; then
-          echo "Error: Invalid JSON format in secret"
-          cat config.json
-          exit 1
-        fi
+        # Show config structure (ohne sensitive Daten)
+        echo "Config structure:"
+        python -c "
+import json
+with open('config.json') as f:
+    config = json.load(f)
+    # Zeige Struktur ohne sensitive Werte
+    safe_config = {k: ('***' if k in ['OPENAI_API_KEY', 'GEMINI_API_KEY', 'TELEGRAM_BOT_TOKEN'] else v) for k, v in config.items()}
+    print(json.dumps(safe_config, indent=2))
+"
         
         # Create .env file
         echo "Creating .env file..."
@@ -107,6 +148,7 @@ jobs:
             
             print("Debug - Bot Token length:", len(bot_token) if bot_token else "None")
             print("Debug - Chat ID:", chat_id)
+            print("Debug - Raw config:", json.dumps({k: v if k not in ['OPENAI_API_KEY', 'GEMINI_API_KEY'] else '***' for k, v in config.items()}, indent=2))
             
             if not bot_token or not chat_id:
                 print("Error: Missing Telegram configuration")
@@ -142,6 +184,7 @@ jobs:
         except Exception as e:
             print(f"Error: {str(e)}", file=sys.stderr)
             print("Debug - Exception type:", type(e).__name__)
+            print("Debug - Environment variables:", dict(os.environ))
             sys.exit(1)
         EOF
         

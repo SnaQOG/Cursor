@@ -65,54 +65,51 @@ ROCKS = [
 ]
 
 
-def wake_builder(ship_root):
-    """Schaum am Rumpf, Bugwelle und Kielwasser als Maske in Schiffskoordinaten."""
+def foam_builder(shore_img, shore_map, max_d=12.0):
+    """Schaum aus GN-Attributen 'wake' + 'hull_foam' und Brandung aus dem Fels-Abstandsfeld."""
 
     def fn(nb, wp_t):
-        co = nb.coords("Object", ship_root)
-        x, y, _ = nb.sep(co)
-        ay = nb.math("ABSOLUTE", y)
-        # Rumpfkontakt (Superellipse)
-        d = nb.math("SQRT", nb.math("ADD", nb.math("POWER", nb.math("DIVIDE", x, 16.2), 2.0),
-                                     nb.math("POWER", nb.math("DIVIDE", ay, 5.2), 2.0)))
-        ring_in = nb.node("ShaderNodeMapRange", clamp=True)
-        nb.link(d, ring_in.inputs["Value"])
-        ring_in.inputs["From Min"].default_value = 0.92
-        ring_in.inputs["From Max"].default_value = 1.0
-        ring_out = nb.node("ShaderNodeMapRange", clamp=True)
-        nb.link(d, ring_out.inputs["Value"])
-        ring_out.inputs["From Min"].default_value = 1.35
-        ring_out.inputs["From Max"].default_value = 1.05
-        ring = nb.math("MULTIPLY", ring_in.outputs[0], ring_out.outputs[0])
-        # Bugwellen-Arme: |y| = 0.36 * (15 - x)
-        behind_bow = nb.math("SUBTRACT", 16.5, x)
-        arm_c = nb.math("MULTIPLY", behind_bow, 0.36)
-        arm_d = nb.math("ABSOLUTE", nb.math("SUBTRACT", ay, arm_c))
-        arm_w = nb.math("MULTIPLY_ADD", behind_bow, 0.03, 0.7)
-        arm = nb.math("SUBTRACT", 1.0, nb.math("DIVIDE", arm_d, arm_w))
-        arm = nb.math("MAXIMUM", arm, 0.0)
-        arm = nb.math("MULTIPLY", arm, nb.math("MULTIPLY", nb.math("EXPONENT", nb.math("DIVIDE", behind_bow, -32.0)), 0.75))
-        arm = nb.math("MULTIPLY", arm, nb.math("GREATER_THAN", behind_bow, 0.0))
-        # Kielwasser hinter dem Heck
-        u = nb.math("SUBTRACT", -15.0, x)
-        upos = nb.math("GREATER_THAN", u, -1.0)
-        cw = nb.math("MULTIPLY_ADD", u, 0.07, 3.8)
-        center = nb.math("SUBTRACT", 1.0, nb.math("DIVIDE", ay, cw))
-        center = nb.math("MAXIMUM", center, 0.0)
-        center = nb.math("MULTIPLY", center, nb.math("EXPONENT", nb.math("DIVIDE", nb.math("MAXIMUM", u, 0.0), -38.0)))
-        center = nb.math("MULTIPLY", center, upos)
-        m = nb.math("MAXIMUM", nb.math("MAXIMUM", ring, arm), center)
-        # Aufbrechen mit (driftendem) Rauschen
+        wake = nb.out(nb.node("ShaderNodeAttribute", attribute_name="wake"), "Fac")
+        hf = nb.out(nb.node("ShaderNodeAttribute", attribute_name="hull_foam"), "Fac")
+        shore = shore_factor(nb, shore_img, shore_map, 0.0, 4.5, max_d)
+        m = nb.math("MAXIMUM", nb.math("MAXIMUM", nb.math("MULTIPLY", wake, 0.95), hf), nb.math("MULTIPLY", shore, 0.9))
         n = nb.noise(wp_t, scale=0.55, detail=4, rough=0.65)
-        n2 = nb.noise(wp_t, scale=2.5, detail=2, rough=0.6)
+        n2 = nb.noise(wp_t, scale=2.6, detail=2, rough=0.6)
         nn = nb.math("ADD", nb.out(n, "Fac"), nb.math("MULTIPLY", nb.out(n2, "Fac"), 0.35))
         th = nb.math("SUBTRACT", 1.02, m)
         mr = nb.node("ShaderNodeMapRange", clamp=True)
         nb.link(nb.math("SUBTRACT", nn, th), mr.inputs["Value"])
         mr.inputs["From Min"].default_value = -0.15
         mr.inputs["From Max"].default_value = 0.12
-        return nb.math("MULTIPLY", mr.outputs[0], nb.math("MINIMUM", nb.math("MULTIPLY", m, 1.6), 0.85))
+        return nb.math("MULTIPLY", mr.outputs[0], nb.math("MINIMUM", nb.math("MULTIPLY", m, 1.6), 0.9))
 
+    return fn
+
+
+def shore_factor(nb, img, smap, d0, d1, max_d):
+    """1 an der Fels-Wasserlinie, 0 ab d1 Meter Abstand."""
+    x0, y0, w, h = smap
+    pos = nb.out(nb.node("ShaderNodeNewGeometry"), "Position")
+    x, y, _ = nb.sep(pos)
+    uv = nb.comb(nb.math("DIVIDE", nb.math("SUBTRACT", x, x0), w), nb.math("DIVIDE", nb.math("SUBTRACT", y, y0), h), 0.0)
+    tex = nb.n.new("ShaderNodeTexImage")
+    tex.image = img
+    tex.extension = "EXTEND"
+    tex.interpolation = "Linear"
+    nb.link(uv, tex.inputs["Vector"])
+    d = nb.math("MULTIPLY", nb.sep(nb.out(tex, "Color"))[0], max_d)
+    mr = nb.node("ShaderNodeMapRange", clamp=True)
+    nb.link(d, mr.inputs["Value"])
+    mr.inputs["From Min"].default_value = d1
+    mr.inputs["From Max"].default_value = d0
+    return mr.outputs[0]
+
+
+def shallow_tint(shore_img, shore_map, max_d=12.0):
+    def fn(nb, col):
+        f = shore_factor(nb, shore_img, shore_map, 0.0, 11.0, max_d)
+        f = nb.math("MULTIPLY", nb.math("POWER", f, 1.5), 0.75)
+        return nb.mix(f, col, (0.02, 0.20, 0.19))
     return fn
 
 
@@ -143,60 +140,88 @@ def build(args):
     # Schiff
     root, body, _ = sunny.build()
     sunny.animate(root, body, SHIP_HEADING, tuple(ship_start()), SHIP_SPEED, FPS, frames)
-
-    # Ozean
-    wmat = ocean.water_material("Sea", deep=(0.003, 0.03, 0.045), shallow=(0.02, 0.10, 0.11),
-                                wake_fn=wake_builder(root))
-    ocean.animate_time_value(wmat, FPS, frames)
-    tile, res = 100.0, args.ocean_res
-    x0, y0, nx, ny = -190.0, -10.0, 4, 5  # Kacheln -240..160 / -60..440
-    ocean.make_ocean(x0, y0, nx, ny, tile=tile, res=res, wind=9.5, wave_scale=0.9, chop=1.3, fps=FPS,
-                     frames=frames, mat=wmat, direction_deg=-30, alignment=0.4, foam_coverage=0.25)
-    far = ocean.water_material("FarSea", deep=(0.003, 0.03, 0.045), shallow=(0.02, 0.10, 0.11), far=True)
-    ocean.far_plane(x0 - tile / 2 + 1, x0 - tile / 2 + tile * nx - 1, y0 - tile / 2 + 1, y0 - tile / 2 + tile * ny - 1,
-                    mat=far, z=-0.05)
-
-    # Vegetation (Baum-Varianten, als Collection-Instanzen)
-    leaf = nature.leaf_material("OPLeaves", c1=(0.03, 0.065, 0.012), c2=(0.09, 0.13, 0.025))
-    bark = nature.bark_material("OPBark")
-    variants = [nature.tree_variant(f"OPTree{i}", leaf, bark, height=h, crown_r=cr, n_clusters=nc, leaves_per=90,
-                                    seed=40 + i, leaf_size=0.34)
-                for i, (h, cr, nc) in enumerate(((9, 3.4, 22), (6, 2.6, 16), (3.2, 1.8, 10), (12, 4.0, 26)))]
-    _, subs = nature.make_tree_collection("OPTrees", variants)
-    veg_pts, veg_scale = [], []
+    hull = bpy.data.objects["Hull"]
     rng = np.random.default_rng(77)
 
-    # Felsen
-    rmat = nature.rock_material("SeaRock", c1=(0.085, 0.078, 0.07), c2=(0.27, 0.25, 0.215), c3=(0.21, 0.17, 0.12),
-                                wet_line=1.8, moss=(0.07, 0.10, 0.03), moss_amount=0.25, lichen=0.2)
+    # Felsen (Kalk-Karst): Kavität, Regenfahnen, Ocker-Eisenflecken, Nässe-/Algenband
+    rmat = nature.rock_material("SeaRock", c1=(0.095, 0.088, 0.078), c2=(0.34, 0.32, 0.28), c3=(0.27, 0.22, 0.16),
+                                wet_line=1.8, moss=(0.06, 0.10, 0.03), moss_amount=0.28, lichen=0.22, cavity=0.55,
+                                crack_w=0.1)
+    rocks = []
     for (x, y, r, h, seed, taper) in ROCKS:
         ob = fpv.rock_mesh(f"Rock{seed}", radius=r, height=h + 4, seed=seed, detail=5, taper=taper, mat=rmat,
                            base_z=-4.0, lumpy=0.22, strata=1.0)
         ob.location = (x, y, 0)
         ob.rotation_euler = (0, 0, seed * 1.7)
-        if h >= 12:
-            bpy.context.view_layer.update()
-            me = ob.data
-            mw = ob.matrix_world
-            polys = [(mw @ pl.center, (mw.to_3x3() @ pl.normal).normalized(), pl.area) for pl in me.polygons]
-            cand = [(c, n, a) for (c, n, a) in polys if n.z > 0.45 and c.z > max(5.0, 0.3 * h)]
-            if cand:
-                w = np.array([a * (n.z ** 2) for (_, n, a) in cand])
-                w /= w.sum()
-                nveg = int(min(160, 4 + r * r * 0.25 + h * 0.8))
-                for k in rng.choice(len(cand), size=nveg, p=w):
-                    c, n, a = cand[k]
-                    veg_pts.append((c.x, c.y, c.z - 0.25))
-                    veg_scale.append(rng.uniform(0.55, 1.2))
-        # Vegetation oben auf den großen Felsen
+        rocks.append((ob, r, h))
         if h > 25:
             cap = fpv.rock_mesh(f"RockCap{seed}", radius=r * 0.72, height=3, seed=seed + 100, detail=4, taper=0.6,
                                 mat=None, base_z=h - 3.2, lumpy=0.3)
             cap.location = (x, y, 0)
             cap.data.materials.append(nature.grass_material("CapGrass", c1=(0.04, 0.08, 0.02), c2=(0.12, 0.16, 0.05)))
+    bpy.context.view_layer.update()
 
+    # Tropischer Bewuchs: Palmen, Laubbäume, Büsche (Instanzen) + Lianen
+    leaf = nature.leaf_material("OPLeaves", c1=(0.025, 0.06, 0.012), c2=(0.08, 0.13, 0.025))
+    palm_leaf = nature.leaf_material("PalmLeaf", c1=(0.05, 0.09, 0.015), c2=(0.13, 0.17, 0.035), trans=0.4)
+    bark = nature.bark_material("OPBark")
+    ptrunk = nature.palm_trunk_material()
+    trees = [nature.tree_variant(f"OPTree{i}", leaf, bark, height=h, crown_r=cr, n_clusters=nc, leaves_per=90,
+                                 seed=40 + i, leaf_size=0.36)
+             for i, (h, cr, nc) in enumerate(((9, 3.4, 22), (6, 2.6, 16), (3.0, 1.8, 10)))]
+    palms = [nature.palm_variant(f"OPPalm{i}", palm_leaf, ptrunk, height=hh, n_fronds=nf, frond_len=fl, seed=60 + i,
+                                 lean=ln) for i, (hh, nf, fl, ln) in enumerate(((10, 15, 4.3, 0.2), (13, 16, 4.8, 0.3),
+                                                                                  (7.5, 13, 3.8, 0.12)))]
+    _, subs = nature.make_tree_collection("OPTrees", trees + palms)
+    veg_pts, veg_scale, veg_pick = [], [], []
+    vine_starts = []
+    for ob, r, h in rocks:
+        if h < 12:
+            continue
+        me = ob.data
+        mw = ob.matrix_world
+        n = len(me.polygons)
+        nrm = np.zeros(n * 3)
+        ctr = np.zeros(n * 3)
+        area = np.zeros(n)
+        me.polygons.foreach_get("normal", nrm)
+        me.polygons.foreach_get("center", ctr)
+        me.polygons.foreach_get("area", area)
+        R = np.array(mw.to_3x3())
+        nrm = nrm.reshape(-1, 3) @ R.T
+        ctr = ctr.reshape(-1, 3) @ R.T + np.array(mw.translation)
+        up = np.where((nrm[:, 2] > 0.45) & (ctr[:, 2] > max(5.0, 0.3 * h)))[0]
+        if len(up):
+            w = area[up] * nrm[up, 2] ** 2
+            w /= w.sum()
+            nveg = int(min(170, 4 + r * r * 0.25 + h * 0.8))
+            for k in rng.choice(up, size=nveg, p=w):
+                veg_pts.append(tuple(ctr[k] - np.array([0, 0, 0.25])))
+                veg_scale.append(rng.uniform(0.55, 1.2))
+        wall = np.where((np.abs(nrm[:, 2]) < 0.35) & (ctr[:, 2] > 0.5 * h) & (ctr[:, 2] < 0.95 * h))[0]
+        if len(wall):
+            for k in rng.choice(wall, size=min(len(wall), int(6 + r * 1.2)), replace=False):
+                vine_starts.append((ctr[k], nrm[k]))
     nature.scatter_instances("OPVeg", subs, veg_pts, scales=veg_scale, seed=3)
-    print("vegetation", len(veg_pts))
+    vleaf = nature.leaf_material("VineLeaf", c1=(0.03, 0.07, 0.012), c2=(0.07, 0.12, 0.02))
+    nature.vines_mesh("Vines", vine_starts, rng, vleaf, bark, len_range=(3, 10))
+    print("vegetation", len(veg_pts), "vines", len(vine_starts))
+
+    # Brandung/Flachwasser-Abstandsfeld
+    tile, res = 100.0, args.ocean_res
+    x0, y0, nx, ny = -190.0, -10.0, 4, 5  # Kacheln -240..160 / -60..440
+    shore_img, shore_map = ocean.shore_distance_image([o for o, _, _ in rocks], -250, -70, 170, 450, cell=0.5)
+
+    # Ozean + Geometry-Nodes-Kielspur
+    wmat = ocean.water_material("Sea", deep=(0.003, 0.03, 0.045), shallow=(0.02, 0.10, 0.11),
+                                wake_fn=foam_builder(shore_img, shore_map), color_fn=shallow_tint(shore_img, shore_map))
+    ocean.animate_time_value(wmat, FPS, frames)
+    oc = ocean.make_ocean(x0, y0, nx, ny, tile=tile, res=res, wind=9.5, wave_scale=0.9, chop=1.3, fps=FPS,
+                          frames=frames, mat=wmat, direction_deg=-30, alignment=0.4, foam_coverage=0.25)
+    ocean.ocean_fx_gn(oc, root, hull)
+    far = ocean.water_material("FarSea", deep=(0.003, 0.03, 0.045), shallow=(0.02, 0.10, 0.11), far=True)
+    ocean.far_plane(x0 - tile / 2 + 1, x0 - tile / 2 + tile * nx - 1, y0 - tile / 2 + 1, y0 - tile / 2 + tile * ny - 1,
+                    mat=far, z=-0.05)
 
     # Inseln am Horizont
     imat = nature.rock_material("IslandRock", c1=(0.08, 0.075, 0.065), c2=(0.22, 0.2, 0.17), c3=(0.15, 0.13, 0.11),

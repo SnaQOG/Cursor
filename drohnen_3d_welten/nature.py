@@ -330,3 +330,145 @@ def ajisa_variant(name, leaf_mat, bark_mat, height=8.0, crown_r=3.2, leaves=2600
     ob_c = bpy.data.objects.new(name + "_c", core_me)
     return ob_t, ob_l, ob_c
 
+
+
+def palm_variant(name, leaf_mat, trunk_mat, height=11.0, n_fronds=15, frond_len=4.2, seed=0, lean=0.18):
+    """Kokospalme: gebogener, geringelter Stamm; Wedel mit hängenden Fiederblättchen."""
+    rng = np.random.default_rng(seed)
+    # Stamm entlang einer gebogenen Bahn
+    n = 24
+    ts = np.linspace(0, 1, n)
+    ldir = np.array([np.cos(seed * 1.7), np.sin(seed * 1.7), 0.0])
+    path = np.stack([ldir[0] * lean * height * ts ** 1.6, ldir[1] * lean * height * ts ** 1.6, height * ts], 1)
+    verts, faces = [], []
+    sides = 10
+    for i, t in enumerate(ts):
+        r = 0.22 * (1 - 0.35 * t) * (1 + 0.25 * np.exp(-t * 12))
+        for k in range(sides):
+            a = 2 * np.pi * k / sides
+            verts.append(tuple(path[i] + np.array([np.cos(a) * r, np.sin(a) * r, 0])))
+    for i in range(n - 1):
+        for k in range(sides):
+            k2 = (k + 1) % sides
+            faces.append((i * sides + k, i * sides + k2, (i + 1) * sides + k2, (i + 1) * sides + k))
+    tme = bpy.data.meshes.new(name + "_trunk")
+    tme.from_pydata(verts, [], faces)
+    for p in tme.polygons:
+        p.use_smooth = True
+    tme.materials.append(trunk_mat)
+    # Wedel
+    top = path[-1]
+    lv, lf = [], []
+    for f in range(n_fronds):
+        az = 2 * np.pi * f / n_fronds + rng.uniform(-0.2, 0.2)
+        el = rng.uniform(-0.1, 0.55) if f % 3 else rng.uniform(0.4, 0.9)
+        L = frond_len * rng.uniform(0.8, 1.15)
+        hdir = np.array([np.cos(az), np.sin(az), 0.0])
+        side = np.array([-np.sin(az), np.cos(az), 0.0])
+        m = 22
+        rib = []
+        for j in range(m):
+            s = j / (m - 1)
+            d = s * L
+            p = top + hdir * d * np.cos(el) + np.array([0, 0, d * np.sin(el) - 0.55 * d * d / L])
+            rib.append(p)
+        rib = np.array(rib)
+        for j in range(1, m - 1):
+            s = j / (m - 1)
+            tang = rib[j + 1] - rib[j - 1]
+            tang /= np.linalg.norm(tang)
+            ll = 0.95 * (1 - s ** 1.4) * (0.4 + s * 0.8) * L / 4.2
+            for sg in (-1, 1):
+                dirl = side * sg * 0.8 + np.array([0, 0, -0.55]) + tang * 0.35
+                dirl /= np.linalg.norm(dirl)
+                w = 0.05 + 0.03 * (1 - s)
+                a0 = rib[j]
+                b0 = a0 + dirl * ll
+                i0 = len(lv)
+                lv += [tuple(a0 - tang * w), tuple(a0 + tang * w), tuple(b0 + tang * w * 0.2), tuple(b0 - tang * w * 0.2)]
+                lf.append((i0, i0 + 1, i0 + 2, i0 + 3))
+        # Mittelrippe als flaches Band
+        for j in range(m - 1):
+            a0, b0 = rib[j], rib[j + 1]
+            w = 0.035 * (1 - j / m)
+            i0 = len(lv)
+            lv += [tuple(a0 - side * w), tuple(a0 + side * w), tuple(b0 + side * w), tuple(b0 - side * w)]
+            lf.append((i0, i0 + 1, i0 + 2, i0 + 3))
+    lme = bpy.data.meshes.new(name + "_fronds")
+    lme.from_pydata(lv, [], lf)
+    lme.materials.append(leaf_mat)
+    return bpy.data.objects.new(name, tme), bpy.data.objects.new(name + "_f", lme)
+
+
+def palm_trunk_material(name="PalmTrunk"):
+    mat, nb, out = fpv.new_material(name)
+    co = nb.coords("Object")
+    z = nb.sep(co)[2]
+    rings = nb.node("ShaderNodeTexWave", wave_type="BANDS", bands_direction="Z", wave_profile="SAW")
+    nb.link(co, rings.inputs["Vector"])
+    rings.inputs["Scale"].default_value = 3.2
+    rings.inputs["Distortion"].default_value = 1.5
+    n = nb.noise(co, scale=6, detail=3)
+    col = nb.ramp(nb.out(rings, "Fac"), [(0.0, (0.10, 0.08, 0.06)), (0.6, (0.25, 0.21, 0.16)), (1.0, (0.16, 0.13, 0.1))])
+    col = nb.mix(nb.math("MULTIPLY", nb.out(n, "Fac"), 0.4), col, (0.08, 0.07, 0.05))
+    p = fpv.principled(nb, Base_Color=col, Roughness=0.9)
+    nb.link(nb.bump(nb.math("ADD", nb.out(rings, "Fac"), nb.out(n, "Fac")), strength=0.8, distance=0.03), p.inputs["Normal"])
+    nb.link(p.outputs[0], out.inputs[0])
+    return mat
+
+
+def vines_mesh(name, starts, rng, leaf_mat, stem_mat, len_range=(3, 9)):
+    """Herabhängende Lianen: starts = Liste (Punkt, Außennormale)."""
+    sv, sf, lv, lf = [], [], [], []
+    for (p, nrm) in starts:
+        p = np.array(p, float)
+        nrm = np.array(nrm, float)
+        nrm[2] = 0
+        if np.linalg.norm(nrm) < 1e-3:
+            nrm = np.array([1.0, 0, 0])
+        nrm /= np.linalg.norm(nrm)
+        Lh = rng.uniform(*len_range)
+        m = int(Lh / 0.35) + 2
+        pts = []
+        ph = rng.uniform(0, 6)
+        for j in range(m):
+            t = j / (m - 1)
+            q = p + nrm * (0.25 + 0.15 * np.sin(t * 7 + ph)) + np.array([0.12 * np.sin(t * 5 + ph), 0.12 * np.cos(t * 4 + ph), -Lh * t])
+            pts.append(q)
+        for a, b in zip(pts[:-1], pts[1:]):
+            d = b - a
+            t1 = np.cross(d, [1.0, 0, 0])
+            t1 /= np.linalg.norm(t1) + 1e-9
+            t2 = np.cross(d, t1)
+            t2 /= np.linalg.norm(t2) + 1e-9
+            i0 = len(sv)
+            for q in (a, b):
+                for k in range(4):
+                    ang = k * np.pi / 2
+                    sv.append(tuple(q + 0.018 * (np.cos(ang) * t1 + np.sin(ang) * t2)))
+            for k in range(4):
+                k2 = (k + 1) % 4
+                sf.append((i0 + k, i0 + k2, i0 + 4 + k2, i0 + 4 + k))
+        for j, q in enumerate(pts):
+            for _ in range(3):
+                d = rng.normal(0, 1, 3)
+                d[2] = abs(d[2]) * 0.3 - 0.4
+                d /= np.linalg.norm(d)
+                s = rng.uniform(0.08, 0.16)
+                c = q + d * 0.06
+                t1 = np.cross(d, [0, 0, 1.0])
+                t1 /= np.linalg.norm(t1) + 1e-9
+                i0 = len(lv)
+                lv += [tuple(c), tuple(c + t1 * s * 0.5 + d * s), tuple(c + d * s * 1.8), tuple(c - t1 * s * 0.5 + d * s)]
+                lf.append((i0, i0 + 1, i0 + 2, i0 + 3))
+    sme = bpy.data.meshes.new(name + "_stems")
+    sme.from_pydata(sv, [], sf)
+    sme.materials.append(stem_mat)
+    lme = bpy.data.meshes.new(name + "_leaves")
+    lme.from_pydata(lv, [], lf)
+    lme.materials.append(leaf_mat)
+    so = bpy.data.objects.new(name + "_stems", sme)
+    lo = bpy.data.objects.new(name + "_leaves", lme)
+    fpv.link(so)
+    fpv.link(lo)
+    return so, lo

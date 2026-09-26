@@ -26,6 +26,8 @@ def plaster_material(name="Plaster", window=True):
                         (1.0, (0.64, 0.62, 0.58))], interp="CONSTANT")
     wpos = nb.out(nb.node("ShaderNodeNewGeometry"), "Position")
     nrm = nb.out(nb.node("ShaderNodeNewGeometry"), "Normal")
+    tcol, trgh, tnrm = pbr_box(nb, "plaster", nb.coords("Object"), scale=0.35)
+    col = nb.vmath("SCALE", nb.mix(1.0, tcol, col, blend="MULTIPLY"), scale=1.25)
     n1 = nb.noise(wpos, scale=0.25, detail=3, rough=0.6)
     n2 = nb.noise(wpos, scale=3.0, detail=2, rough=0.6)
     dirt = nb.ramp(nb.out(n1, "Fac"), [(0.3, (0.72, 0.68, 0.62)), (0.7, (1.0, 1.0, 1.0))])
@@ -82,7 +84,7 @@ def plaster_material(name="Plaster", window=True):
         col = nb.mix(nb.math("MULTIPLY", foot.outputs[0], 0.5), col, (0.12, 0.1, 0.08))
         rough = nb.mix(win, 0.85, 0.08, dtype="FLOAT")
     p = fpv.principled(nb, Base_Color=col, Roughness=rough)
-    nb.link(nb.bump(nb.out(n2, "Fac"), strength=0.25, distance=0.02), p.inputs["Normal"])
+    nb.link(tnrm, p.inputs["Normal"])
     nb.link(p.outputs[0], out.inputs[0])
     return mat
 
@@ -278,10 +280,12 @@ def building(rng, mats, tanks, cx, cy, w, d, floors, rot, idx, style=None, front
     if style == "round":
         r = min(w, d) / 2
         objs.append(cylinder(f"B{idx}", cx, cy, 0, r, h, mats["plaster"], seg=40))
+        objs[0]["h"] = h
         rm = mats["roofs"][rng.integers(len(mats["roofs"]))]
         objs.append(cylinder(f"B{idx}r", cx, cy, h, r * 1.12, r * 0.55, rm, seg=40, r_top=r * 0.2))
         return objs, h + r * 0.55
     objs.append(box(f"B{idx}", cx, cy, 0, w, d, h, mats["plaster"], rot=rot))
+    objs[0]["h"] = h
     c, s = math.cos(rot), math.sin(rot)
     top = h
     if style == "flat":
@@ -455,6 +459,31 @@ def residence(mats, cx, cy, r=20.0, h=24.0):
     disc.location = (cx, cy - rr - 0.8, h + 3.0 + RH * f + disc_r * 0.75)
     disc.rotation_euler = (math.radians(78), 0, 0)
     objs.append(disc)
+    # Fenstersprossen (Mullions) an den Fensterbändern und Sparrenköpfe an der Traufe (je ein Mesh)
+    bm = bmesh.new()
+    for k in range(3):
+        zb = 6 + k * 6.5
+        for j in range(56):
+            a = 2 * math.pi * j / 56
+            res = bmesh.ops.create_cube(bm, size=1.0)
+            bmesh.ops.scale(bm, vec=(0.18, 0.25, 1.9), verts=res["verts"])
+            bmesh.ops.rotate(bm, verts=res["verts"], cent=(0, 0, 0), matrix=Matrix.Rotation(a, 3, "Z"))
+            bmesh.ops.translate(bm, vec=(cx + math.cos(a) * (r + 0.1), cy + math.sin(a) * (r + 0.1), zb + 0.9),
+                                verts=res["verts"])
+    for j in range(96):
+        a = 2 * math.pi * j / 96
+        res = bmesh.ops.create_cube(bm, size=1.0)
+        bmesh.ops.scale(bm, vec=(2.4, 0.22, 0.28), verts=res["verts"])
+        bmesh.ops.rotate(bm, verts=res["verts"], cent=(0, 0, 0), matrix=Matrix.Rotation(a, 3, "Z"))
+        bmesh.ops.translate(bm, vec=(cx + math.cos(a) * (r + 2.2), cy + math.sin(a) * (r + 2.2), h + 2.75),
+                            verts=res["verts"])
+    me = bpy.data.meshes.new("ResDetail")
+    bm.to_mesh(me)
+    bm.free()
+    det = bpy.data.objects.new("ResDetail", me)
+    me.materials.append(mats["red_dark"])
+    fpv.link(det)
+    objs.append(det)
     rim = cylinder("HiRim", 0, 0, -0.25, disc_r * 1.08, 0.24, mats["red_dark"], seg=48)
     rim.parent = disc
     rim.location = (0, 0, -0.26)
@@ -498,6 +527,9 @@ def cliff_mesh(name, x0, x1, y_face, z0, z1, mat, seed=5, res=0.8, panel=None, c
         cz = np.clip((chin - Z) / 10.0, 0, 1)
         cz = cz * cz * (3 - 2 * cz)
         Y = Y - 13.0 * cz * mxc
+    # tiefe Setzrisse
+    Y = add_cracks(Y, X, Z, np.random.default_rng(seed + 20), n=10, x_range=(x0 * 0.9, x1 * 0.9), z_top=z1,
+                   panel=panel)
     # unregelmäßige Oberkante
     topn = fpv.fbm2(X / 70, np.zeros_like(X) + seed, octaves=4, seed=seed + 11)
     Z = Z + np.clip((Z - (z1 - 40)) / 40, 0, 1) * 22 * topn
@@ -596,11 +628,19 @@ def hokage_head(template, name, loc, scale, mat, hair, mat_hair, rng):
                   (math.sin(a) * 3.1, -0.6, 3.9 + math.cos(a) * 1.4), 0.55)
         for sx in (-1, 1):
             spike(name + f"_bang{sx}", (sx * 1.15, -1.75, 3.0), (sx * 1.75, -1.9, 0.6), 0.38)
-    elif hair == "tsunade":  # Pony + Zöpfe
+    elif hair == "tsunade":  # Pony + Zöpfe + Rautenzeichen (Byakugō) auf der Stirn
         blob(name + "_cap", (0, 0.45, 2.95), (1.98, 2.35, 1.3))
         for sx in (-1, 1):
             spike(name + f"_bang{sx}", (sx * 0.7, -1.95, 3.3), (sx * 1.6, -2.0, 1.2), 0.42)
             blob(name + f"_tail{sx}", (sx * 1.9, 1.0, -0.6), (0.5, 0.55, 1.9))
+        dia = blob(name + "_diamond", (0, -2.13, 2.2), (0.17, 0.1, 0.17), rot=(0, math.radians(45), 0))
+        dia.modifiers.clear()
+    if hair == "tobirama":  # drei Gesichtslinien (Kinn + unter den Augen) als erhabene Grate
+        for (a, b) in (((0, -1.33, -0.55), (0, -1.28, -1.05)), ((-0.55, -1.95, 1.05), (-0.75, -1.75, 0.55)),
+                       ((0.55, -1.95, 1.05), (0.75, -1.75, 0.55))):
+            o = cyl_cone(name + "_line", L + Vector(a) * s, L + Vector(b) * s, 0.07 * s, mat_hair)
+            o.modifiers.clear()
+            parts.append(o)
     return parts
 
 
@@ -615,3 +655,314 @@ def cyl_cone(name, p0, p1, r, mat):
     ob.location = (p0 + p1) / 2
     fpv.displace_obj(ob, "CLOUDS", size=0.8, strength=0.15 * r, depth=2, subdiv=2, name=name + "_d")
     return ob
+
+
+# --------------------------------------------------------------------------
+# v2: Scan-Materialien, Fassaden-Details, Rundziegel, verschmolzene Köpfe, Risse
+# --------------------------------------------------------------------------
+
+CC0 = lambda f: os.path.join(fpv.ASSETS, "cc0", f)
+
+
+def pbr_box(nb, prefix, vec, scale=0.4, blend=0.25):
+    """Box-projizierte ambientCG-Maps (color, rough, normal) -> (color, rough, normal)."""
+    m = nb.mapping(vec, scale=(scale, scale, scale))
+    c = nb.image(CC0(prefix + "_color.jpg"), m, proj="BOX", blend=blend)
+    r = nb.image(CC0(prefix + "_rough.jpg"), m, colorspace="Non-Color", proj="BOX", blend=blend)
+    n = nb.image(CC0(prefix + "_normal.jpg"), m, colorspace="Non-Color", proj="BOX", blend=blend)
+    nm = nb.node("ShaderNodeNormalMap")
+    nm.inputs["Strength"].default_value = 0.8
+    nb.link(nb.out(n, "Color"), nm.inputs["Color"])
+    return nb.out(c, "Color"), nb.out(r, "Color"), nm.outputs[0]
+
+
+def plaster_pbr_material(name="PlasterPBR"):
+    """Scan-Putz (abgeplatzt) × Gebäudefarbe (pro Objekt), Schmutzfuß, Regenfahnen, Kavität."""
+    mat, nb, out = fpv.new_material(name)
+    oi = nb.node("ShaderNodeObjectInfo")
+    rnd = nb.out(oi, "Random")
+    bcol = nb.ramp(rnd, [(0.0, (0.72, 0.64, 0.50)), (0.2, (0.80, 0.78, 0.72)), (0.4, (0.66, 0.56, 0.44)),
+                         (0.55, (0.78, 0.68, 0.52)), (0.7, (0.62, 0.66, 0.60)), (0.82, (0.74, 0.54, 0.44)),
+                         (1.0, (0.84, 0.82, 0.78))], interp="CONSTANT")
+    co = nb.coords("Object")
+    tc, tr, tn = pbr_box(nb, "plaster", co, scale=0.35)
+    col = nb.mix(1.0, tc, bcol, blend="MULTIPLY")
+    col = nb.vmath("SCALE", col, scale=1.25)
+    wpos = nb.out(nb.node("ShaderNodeNewGeometry"), "Position")
+    x, y, z = nb.sep(wpos)
+    streak = nb.noise(nb.comb(nb.math("ADD", x, y), nb.math("MULTIPLY", z, 0.08), 0.0), scale=1.5, detail=2)
+    sm = nb.node("ShaderNodeMapRange", clamp=True)
+    nb.link(nb.out(streak, "Fac"), sm.inputs["Value"])
+    sm.inputs["From Min"].default_value = 0.55
+    sm.inputs["From Max"].default_value = 0.75
+    col = nb.mix(nb.math("MULTIPLY", sm.outputs[0], 0.3), col, nb.vmath("SCALE", col, scale=0.55))
+    foot = nb.node("ShaderNodeMapRange", clamp=True)
+    nb.link(z, foot.inputs["Value"])
+    foot.inputs["From Min"].default_value = 1.4
+    foot.inputs["From Max"].default_value = 0.0
+    col = nb.mix(nb.math("MULTIPLY", foot.outputs[0], 0.55), col, (0.12, 0.10, 0.08))
+    p = fpv.principled(nb, Base_Color=col, Roughness=nb.math("MULTIPLY_ADD", tr, 0.3, 0.6))
+    nb.link(tn, p.inputs["Normal"])
+    nb.link(p.outputs[0], out.inputs[0])
+    return mat
+
+
+def street_material(name="Cobble"):
+    mat, nb, out = fpv.new_material(name)
+    wpos = nb.out(nb.node("ShaderNodeNewGeometry"), "Position")
+    m = nb.mapping(wpos, scale=(0.3, 0.3, 0.3))
+    c = nb.image(CC0("paving_color.jpg"), m)
+    r = nb.image(CC0("paving_rough.jpg"), m, colorspace="Non-Color")
+    n = nb.image(CC0("paving_normal.jpg"), m, colorspace="Non-Color")
+    nm = nb.node("ShaderNodeNormalMap")
+    nb.link(nb.out(n, "Color"), nm.inputs["Color"])
+    # Lehm-/Staub-Flecken über das Pflaster
+    dirt = nb.image(os.path.join(fpv.ASSETS, "bab", "textures_ground.jpg"), nb.mapping(wpos, scale=(0.08, 0.08, 0.08)))
+    dn = nb.noise(wpos, scale=0.05, detail=3)
+    dm = nb.node("ShaderNodeMapRange", clamp=True)
+    nb.link(nb.out(dn, "Fac"), dm.inputs["Value"])
+    dm.inputs["From Min"].default_value = 0.45
+    dm.inputs["From Max"].default_value = 0.65
+    col = nb.mix(dm.outputs[0], nb.out(c, "Color"), nb.vmath("SCALE", nb.out(dirt, "Color"), scale=0.8))
+    p = fpv.principled(nb, Base_Color=col, Roughness=nb.math("MULTIPLY_ADD", nb.out(r, "Color"), 0.3, 0.62))
+    nb.link(nm.outputs[0], p.inputs["Normal"])
+    nb.link(p.outputs[0], out.inputs[0])
+    return mat
+
+
+def dirt_road_material(name="DirtRoad"):
+    mat, nb, out = fpv.new_material(name)
+    wpos = nb.out(nb.node("ShaderNodeNewGeometry"), "Position")
+    c = nb.image(os.path.join(fpv.ASSETS, "bab", "textures_dirt.jpg"), nb.mapping(wpos, scale=(0.25, 0.25, 0.25)))
+    g = nb.image(os.path.join(fpv.ASSETS, "bab", "textures_rockyGround_basecolor.png"), nb.mapping(wpos, scale=(0.35, 0.35, 0.35)))
+    n = nb.noise(wpos, scale=0.06, detail=3)
+    col = nb.mix(nb.out(n, "Fac"), nb.out(c, "Color"), nb.out(g, "Color"))
+    col = nb.vmath("SCALE", col, scale=0.8)
+    p = fpv.principled(nb, Base_Color=col, Roughness=0.92)
+    nb.link(nb.bump(nb.math("ADD", nb.sep(nb.out(c, "Color"))[0], nb.out(n, "Fac")), strength=0.4, distance=0.05), p.inputs["Normal"])
+    nb.link(p.outputs[0], out.inputs[0])
+    return mat
+
+
+def rust_metal_material(name="TankMetal", tint=(0.75, 0.73, 0.68)):
+    mat, nb, out = fpv.new_material(name)
+    co = nb.coords("Object")
+    tc, tr, tn = pbr_box(nb, "metal", co, scale=0.5)
+    col = nb.mix(0.55, tc, nb.vmath("MULTIPLY", tc, tint), blend="MIX")
+    p = fpv.principled(nb, Base_Color=col, Roughness=nb.math("MULTIPLY_ADD", tr, 0.4, 0.4), Metallic=0.35)
+    nb.link(tn, p.inputs["Normal"])
+    nb.link(p.outputs[0], out.inputs[0])
+    return mat
+
+
+def window_collection(mats):
+    """Fenster-Assets: Rahmen (Holz), vertieftes Glas, Sims, optional Fensterläden. Lokal: Fassade = XZ-Ebene,
+    Außen = -Y."""
+    coll = bpy.data.collections.new("KWindows")
+    bpy.context.scene.collection.children.link(coll)
+    subs = []
+    for i, (w, h, shutters) in enumerate(((1.1, 1.45, False), (1.1, 1.45, True), (1.8, 1.3, False), (0.8, 1.2, False))):
+        sub = bpy.data.collections.new(f"KWin{i}")
+        coll.children.link(sub)
+        objs = []
+        t = 0.09
+        objs.append(box(f"WinGlass{i}", 0, 0.02, 0, w, 0.04, h, mats["glass"], bevel=0))
+        objs.append(box(f"WinFrL{i}", -w / 2, -0.04, 0, t, 0.14, h, mats["frame"], bevel=0.015))
+        objs.append(box(f"WinFrR{i}", w / 2, -0.04, 0, t, 0.14, h, mats["frame"], bevel=0.015))
+        objs.append(box(f"WinFrT{i}", 0, -0.04, h - t / 2, w + t, 0.14, t, mats["frame"], bevel=0.015))
+        objs.append(box(f"WinMul{i}", 0, -0.02, 0, 0.05, 0.08, h, mats["frame"], bevel=0))
+        objs.append(box(f"WinSill{i}", 0, -0.12, -0.08, w + 0.3, 0.3, 0.1, mats["sill"], bevel=0.02))
+        if shutters:
+            for sx in (-1, 1):
+                objs.append(box(f"Shut{i}", sx * (w / 2 + 0.33), -0.05, 0, 0.55, 0.05, h, mats["shutter"], bevel=0.01))
+        for o in objs:
+            bpy.context.scene.collection.objects.unlink(o)
+            sub.objects.link(o)
+        subs.append(sub)
+    coll.hide_render = True
+    coll.hide_viewport = True
+    return subs
+
+
+def facade_details(rng, mats, wins, cx, cy, w, d, h, floors, rot, idx, front=None):
+    """Echte Fenster auf allen Fassaden, Holzbalken (Ecken + Geschossbänder), Lüftungsrohre, Klimageräte."""
+    c, s = math.cos(rot), math.sin(rot)
+    faces = [((0, -1), w, d / 2), ((0, 1), w, d / 2), ((-1, 0), d, w / 2), ((1, 0), d, w / 2)]
+    for (lx, ly), fw, off in faces:
+        nx, ny = lx * c - ly * s, lx * s + ly * c
+        ang = math.atan2(-nx, ny) + math.pi  # lokale -Y zeigt nach außen
+        tx, ty = -ny, nx
+        ncol = max(1, int((fw - 1.2) / 2.6))
+        for fl in range(floors):
+            if fl == 0 and front is not None and abs(nx * front[0] + ny * front[1]) > 0.9:
+                continue  # Erdgeschoss der Straßenseite: Ladenfront (Shader/Markise)
+            zz = 0.9 + fl * 3.2
+            for k in range(ncol):
+                if rng.random() < 0.12:
+                    continue
+                u = (k + 0.5) / ncol - 0.5
+                px = cx + nx * (off + 0.005) + tx * u * (fw - 1.0)
+                py = cy + ny * (off + 0.005) + ty * u * (fw - 1.0)
+                sub = wins[int(rng.integers(len(wins)))]
+                place_instance(sub, (px, py, zz), rot=ang, name=f"W{idx}")
+    # Holzbalken: senkrechte Ecken + Geschossbänder (ein Mesh pro Gebäude)
+    bm = bmesh.new()
+    bw = 0.22
+    for (sx, sy_) in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+        lx, ly = sx * (w / 2), sy_ * (d / 2)
+        res = bmesh.ops.create_cube(bm, size=1.0)
+        bmesh.ops.scale(bm, vec=(bw, bw, h), verts=res["verts"])
+        bmesh.ops.translate(bm, vec=(lx, ly, h / 2), verts=res["verts"])
+    for fl in range(1, floors + 1):
+        zz = fl * 3.2 - 0.15
+        for (lx, ly, sx_, sy2) in ((0, -d / 2, w, bw), (0, d / 2, w, bw), (-w / 2, 0, bw, d), (w / 2, 0, bw, d)):
+            res = bmesh.ops.create_cube(bm, size=1.0)
+            bmesh.ops.scale(bm, vec=(sx_ + 0.02, sy2 + 0.02, 0.2), verts=res["verts"])
+            bmesh.ops.translate(bm, vec=(lx, ly, zz), verts=res["verts"])
+    me = bpy.data.meshes.new(f"Beams{idx}")
+    bm.to_mesh(me)
+    bm.free()
+    ob = bpy.data.objects.new(f"Beams{idx}", me)
+    me.materials.append(mats["beam"])
+    fpv.link(ob)
+    ob.location = (cx, cy, 0)
+    ob.rotation_euler = (0, 0, rot)
+    # Lüftungsrohre an einer Seitenfassade (mit Knick über das Dach) + Klimageräte
+    for k in range(int(rng.integers(1, 3))):
+        lx = rng.uniform(-w / 2 + 0.6, w / 2 - 0.6)
+        side = rng.choice([-1, 1])
+        ly = side * (d / 2 + 0.18)
+        pts = [(lx, ly, 0.3), (lx, ly, h + 0.4), (lx, ly - side * 0.5, h + 0.9), (lx, ly - side * 1.4, h + 1.0)]
+        wp = [(cx + px * c - py * s, cy + px * s + py * c, pz) for px, py, pz in pts]
+        curve_tube(f"Pipe{idx}_{k}", wp, rng.uniform(0.07, 0.13), mats["pipe"], res=2)
+    for k in range(int(rng.integers(0, 3))):
+        fl = int(rng.integers(1, max(2, floors)))
+        lx = rng.uniform(-w / 2 + 0.8, w / 2 - 0.8)
+        side = rng.choice([-1, 1])
+        px, py = lx, side * (d / 2 + 0.3)
+        box(f"AC{idx}_{k}", cx + px * c - py * s, cy + px * s + py * c, fl * 3.2 - 1.4, 0.9, 0.55, 0.65, mats["ac"],
+            rot=rot, bevel=0.03)
+
+
+def tile_roof_mesh(name, cx, cy, z0, span, length, rise, rot, mat, tile_w=0.30, tile_l=0.42):
+    """Rundziegel (Kawara) als echte Geometrie auf einem Tonnendach (Bogen quer über 'span')."""
+    # Halbrohr-Ziegel
+    seg = 6
+    prof = [(math.cos(math.pi * k / seg) * tile_w / 2, math.sin(math.pi * k / seg) * tile_w * 0.45) for k in range(seg + 1)]
+    n_arc = max(4, int(math.pi * (span / 2 + rise) / 2 / tile_w * 1.3))
+    n_len = max(2, int(length / (tile_l * 0.85)))
+    verts, faces = [], []
+    for i in range(n_arc):
+        a = math.pi * (i + 0.5) / n_arc
+        # Punkt auf dem Bogen (Ellipse span/2 x rise), Normale
+        ax, az = -math.cos(a) * span / 2 * 1.04, math.sin(a) * rise
+        nxv, nzv = -math.cos(a) / (span / 2), math.sin(a) / max(rise, 0.1)
+        nl = math.hypot(nxv, nzv)
+        nxv, nzv = nxv / nl, nzv / nl
+        tx, tz = nzv, -nxv  # Tangente entlang des Bogens
+        for j in range(n_len):
+            y0 = -length / 2 - 0.2 + j * tile_l * 0.85
+            base = len(verts)
+            for yy in (y0, y0 + tile_l):
+                for (px, pz) in prof:
+                    X = ax + tx * px + nxv * (pz + 0.02)
+                    Z = az + tz * px + nzv * (pz + 0.02)
+                    verts.append((X, yy, Z))
+            m = seg + 1
+            for k in range(seg):
+                faces.append((base + k, base + k + 1, base + m + k + 1, base + m + k))
+    me = bpy.data.meshes.new(name)
+    me.from_pydata(verts, [], faces)
+    for p in me.polygons:
+        p.use_smooth = True
+    ob = bpy.data.objects.new(name, me)
+    me.materials.append(mat)
+    fpv.link(ob)
+    ob.location = (cx, cy, z0)
+    ob.rotation_euler = (0, 0, rot)
+    sol = ob.modifiers.new("s", "SOLIDIFY")
+    sol.thickness = 0.03
+    return ob
+
+
+def terracotta_material(name, color):
+    mat, nb, out = fpv.new_material(name)
+    oi = nb.node("ShaderNodeObjectInfo")
+    wpos = nb.out(nb.node("ShaderNodeNewGeometry"), "Position")
+    wn = nb.node("ShaderNodeTexWhiteNoise")
+    wn.noise_dimensions = "3D"
+    nb.link(nb.vmath("SCALE", wpos, scale=2.5), wn.inputs["Vector"])
+    col = nb.mix(nb.math("MULTIPLY", nb.out(wn, "Value"), 0.45), color, [v * 0.6 for v in color])
+    n = nb.noise(wpos, scale=0.5, detail=3)
+    col = nb.mix(nb.math("MULTIPLY", nb.out(n, "Fac"), 0.4), col, (0.14, 0.12, 0.10))
+    p = fpv.principled(nb, Base_Color=col, Roughness=0.5)
+    p.inputs["Coat Weight"].default_value = 0.15
+    nb.link(p.outputs[0], out.inputs[0])
+    return mat
+
+
+def fuse_parts(name, parts, voxel, mat, smooth_iter=4):
+    """Kopf + Haar-Felsmassen zu EINEM gemeißelten Mesh verschmelzen (Voxel-Remesh), Teile löschen."""
+    bpy.context.view_layer.update()
+    dg = bpy.context.evaluated_depsgraph_get()
+    bm = bmesh.new()
+    for o in parts:
+        ev = o.evaluated_get(dg)
+        me = bpy.data.meshes.new_from_object(ev)
+        me.transform(o.matrix_world)
+        # offene Scans (Halsöffnung) schließen, sonst verliert das Voxel-Remesh die Gesichtsfläche
+        tb = bmesh.new()
+        tb.from_mesh(me)
+        bnd = [e for e in tb.edges if e.is_boundary]
+        if bnd:
+            bmesh.ops.holes_fill(tb, edges=bnd, sides=0)
+            bmesh.ops.recalc_face_normals(tb, faces=tb.faces)
+        tb.to_mesh(me)
+        tb.free()
+        bm.from_mesh(me)
+        bpy.data.meshes.remove(me)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    ob = bpy.data.objects.new(name, me)
+    fpv.link(ob)
+    r = ob.modifiers.new("remesh", "REMESH")
+    r.mode = "VOXEL"
+    r.voxel_size = voxel
+    r.use_smooth_shade = True
+    sm = ob.modifiers.new("smooth", "SMOOTH")
+    sm.factor = 0.5
+    sm.iterations = smooth_iter
+    fpv.apply_modifiers(ob)
+    ob.data.materials.clear()
+    ob.data.materials.append(mat)
+    for o in parts:
+        bpy.data.objects.remove(o)
+    return ob
+
+
+def add_cracks(Y, X, Z, rng, n=8, x_range=(-400, 400), z_top=150, panel=None, depth=2.2, width=1.2):
+    """Tiefe Setzrisse als Polylinien (diagonal nach unten) in die Felswand graben."""
+    for _ in range(n):
+        x = rng.uniform(*x_range)
+        z = rng.uniform(z_top * 0.55, z_top * 0.98)
+        pts = [(x, z)]
+        for k in range(int(rng.integers(5, 10))):
+            x += rng.normal(0, 6)
+            z -= rng.uniform(6, 14)
+            pts.append((x, z))
+        dmin = np.full(X.shape, 1e9)
+        for (x1, z1), (x2, z2) in zip(pts[:-1], pts[1:]):
+            vx, vz = x2 - x1, z2 - z1
+            L2 = vx * vx + vz * vz
+            t = np.clip(((X - x1) * vx + (Z - z1) * vz) / L2, 0, 1)
+            dx = X - (x1 + t * vx)
+            dz = Z - (z1 + t * vz)
+            dmin = np.minimum(dmin, np.sqrt(dx * dx + dz * dz))
+        groove = depth * np.exp(-(dmin / width) ** 2)
+        if panel is not None:
+            px0, px1, pz0, pz1 = panel
+            inside = (X > px0) & (X < px1) & (Z > pz0) & (Z < pz1)
+            groove = np.where(inside, groove * 0.15, groove)
+        Y = Y + groove
+    return Y

@@ -21,12 +21,13 @@ from mathutils import Vector  # noqa: E402
 import fpv  # noqa: E402
 import konoha  # noqa: E402
 import nature  # noqa: E402
+import sunny  # noqa: E402
 import textures  # noqa: E402
 
 FPS = 24
 SECONDS = 20
 SPEED = 16.0
-SUN_ELEV, SUN_AZIM = 26.0, 262.0
+SUN_ELEV, SUN_AZIM = 17.0, 222.0  # goldene Stunde von links hinten: Gesichter modelliert, lange Schatten
 
 WALL_C, WALL_R = (0.0, 190.0), 190.0
 STREET_HW = 12.0
@@ -62,9 +63,9 @@ def build(args):
     frames = FPS * SECONDS
     fpv.setup_render(args.out, res=args.res, fps=FPS, seconds=SECONDS, samples=args.samples,
                      motion_blur=not args.no_mblur, mist_depth=6000.0)
-    fpv.build_world(sun_elev=SUN_ELEV, sun_azim=SUN_AZIM, sky_strength=0.08, clouds=True, cloud_cover=0.5,
-                    cloud_ref=10.0, aerosol=1.8, cloud_color=(1.0, 0.95, 0.88))
-    fpv.add_sun(SUN_ELEV, SUN_AZIM, strength=5.6, color=(1.0, 0.88, 0.74))
+    fpv.build_world(sun_elev=SUN_ELEV, sun_azim=SUN_AZIM, sky_strength=0.1, clouds=True, cloud_cover=0.45,
+                    cloud_ref=9.0, aerosol=2.4, cloud_color=(1.0, 0.82, 0.62))
+    fpv.add_sun(SUN_ELEV, SUN_AZIM, strength=6.2, color=(1.0, 0.74, 0.48), angle_deg=0.3)
     rng = np.random.default_rng(12)
 
     mats = {
@@ -87,7 +88,17 @@ def build(args):
         "red_dark": konoha.roof_material("ResRedDark", (0.30, 0.05, 0.03), var=0.1),
         "red_roof": konoha.roof_material("ResRoof", (0.46, 0.07, 0.035), var=0.15),
         "glass": fpv.simple_mat("ResGlass", (0.02, 0.025, 0.03), rough=0.1),
-        "tank": konoha.plaster_material("TankPaint", window=False),
+        "tank": konoha.rust_metal_material("TankMetal"),
+        "plaster_street": konoha.plaster_pbr_material("PlasterStreet"),
+        "frame": fpv.simple_mat("WinFrame", (0.09, 0.055, 0.03), rough=0.55),
+        "sill": fpv.simple_mat("Sill", (0.42, 0.40, 0.37), rough=0.8),
+        "shutter": sunny.paint_material("Shutter", (0.10, 0.22, 0.15), rough=0.5),
+        "beam": sunny.wood_material("BeamWood", dark=0.75, board=5.0),
+        "pipe": konoha.rust_metal_material("PipeMetal", tint=(0.6, 0.6, 0.6)),
+        "ac": sunny.paint_material("ACUnit", (0.62, 0.62, 0.60), rough=0.45),
+        "tiles": [konoha.terracotta_material("TileRed", (0.40, 0.07, 0.035)),
+                  konoha.terracotta_material("TileOrange", (0.50, 0.17, 0.05)),
+                  konoha.terracotta_material("TileSlate", (0.12, 0.14, 0.17))],
         "iron": fpv.simple_mat("Iron", (0.06, 0.055, 0.05), rough=0.5, metal=0.7),
         "wood": nature.bark_material("PoleWood", c=(0.16, 0.11, 0.07)),
         "wire": fpv.simple_mat("Wire", (0.01, 0.01, 0.01), rough=0.4),
@@ -111,14 +122,36 @@ def build(args):
         mats["door_" + k] = konoha.door_material("Door_" + k, p)
 
     tanks = konoha.water_tank_collection(mats["tank"], mats["iron"], mats["rooftop"])
+    wins = konoha.window_collection(mats)
+    street_mats = dict(mats, plaster=mats["plaster_street"])
+
+    def detailed_building(cx, cy, bw, bd, floors, style, front, idx):
+        objs, top = konoha.building(rng, street_mats, tanks, cx, cy, bw, bd, floors, 0.0, idx, style=style, front=front)
+        if style == "round":
+            return objs, top
+        h = objs[0]["h"]
+        konoha.facade_details(rng, mats, wins, cx, cy, bw, bd, h, floors, 0.0, idx, front=front)
+        if style == "barrel":
+            rise = min(bw, bd) * 0.28
+            tm = mats["tiles"][int(rng.integers(len(mats["tiles"])))]
+            if bw > bd:
+                konoha.tile_roof_mesh(f"Tiles{idx}", cx, cy, h, bd, bw, rise, math.pi / 2, tm)
+            else:
+                konoha.tile_roof_mesh(f"Tiles{idx}", cx, cy, h, bw, bd, rise, 0.0, tm)
+        return objs, top
 
     # Boden: Dorf + Hügel
     gmat = konoha.ground_material()
+    cobble = konoha.street_material()
     grass = nature.grass_material("KGrass", c1=(0.035, 0.06, 0.015), c2=(0.10, 0.12, 0.04), dry=(0.22, 0.19, 0.10),
                                   scale=2.0)
-    road = fpv.grid_mesh("Road", 12, 300, 2, 2, None, gmat, origin=(0, -148))
+    road = fpv.grid_mesh("Road", 12, 300, 2, 2, None, konoha.dirt_road_material(), origin=(0, -148))
     road.location.z = 0.04
     fpv.grid_mesh("VillageGround", 420, 420, 2, 2, None, gmat, origin=(0, 190))
+    st = fpv.grid_mesh("MainStreet", 2 * STREET_HW + 2, 178, 2, 2, None, cobble, origin=(0, 88))
+    st.location.z = 0.02
+    pz = fpv.grid_mesh("Plaza", 140, 100, 2, 2, None, cobble, origin=(0, 226))
+    pz.location.z = 0.02
     terr = fpv.grid_mesh("Terrain", 2400, 2400, 360, 360, lambda X, Y: terrain_height(X, Y) - 0.05, grass,
                          origin=(0, 400))
 
@@ -151,10 +184,9 @@ def build(args):
             d = rng.uniform(11, 15)
             floors = int(rng.integers(2, 5))
             cx = side * (STREET_HW + 1.5 + d / 2)
-            style = rng.choice(["flat", "flat", "barrel", "hip", "round"])
+            style = rng.choice(["flat", "barrel", "barrel", "round", "flat"])
             foot.append((cx, y + w / 2, max(w, d) / 2 + 2.5))
-            objs, top = konoha.building(rng, mats, tanks, cx, y + w / 2, d, w, floors, 0.0, idx, style=style,
-                                        front=(-side, 0.0))
+            objs, top = detailed_building(cx, y + w / 2, d, w, floors, style, (-side, 0.0), idx)
             # Banner an der Straßenfassade
             if rng.random() < 0.55:
                 ch = rng.choice(["火", "木", "忍", "茶", "楽", "薬", "酒"])
@@ -197,7 +229,7 @@ def build(args):
                                  (-62, 198, 20, 14, 4, "hip"), (-64, 258, 16, 16, 5, "flat"),
                                  (30, 272, 14, 12, 3, "flat")):
         foot.append((x, y, max(w, d) / 2 + 3))
-        konoha.building(rng, mats, tanks, x, y, w, d, fl, 0.0, idx, style=st)
+        detailed_building(x, y, w, d, fl, st, None, idx)
         idx += 1
     print("buildings", idx)
 
@@ -249,7 +281,7 @@ def build(args):
 
     # Hokage-Felsen
     rock = nature.rock_material("CliffRock", c1=(0.085, 0.07, 0.06), c2=(0.36, 0.30, 0.235), c3=(0.24, 0.19, 0.14),
-                                wet=False, moss=(0.05, 0.08, 0.025), moss_amount=0.4, scale=2.0, bump=1.0,
+                                wet=False, moss=(0.04, 0.06, 0.02), moss_amount=0.3, scale=2.0, bump=1.0,
                                 crack_w=0.3, strata_scale=1.2, lichen=0.25)
     face_rock = nature.rock_material("FaceRock", c1=(0.15, 0.125, 0.10), c2=(0.44, 0.37, 0.29), c3=(0.33, 0.26, 0.19),
                                      wet=False, scale=1.5, bump=0.5, crack_w=0.12, lichen=0.2,
@@ -262,7 +294,9 @@ def build(args):
     tpl.hide_render = True
     tpl.hide_viewport = True
     for (hx, hair) in HEADS:
-        konoha.hokage_head(tpl, f"Head_{hair}", (hx, CLIFF_Y + 2.0, HEAD_Z), HEAD_S, face_rock, hair, face_rock, rng)
+        parts = konoha.hokage_head(tpl, f"Head_{hair}", (hx, CLIFF_Y + 2.0, HEAD_Z), HEAD_S, face_rock, hair,
+                                   face_rock, rng)
+        konoha.fuse_parts(f"Hokage_{hair}", parts, voxel=0.2, mat=face_rock)
 
     # Bäume
     leaf = nature.leaf_material("KLeaves", c1=(0.03, 0.06, 0.012), c2=(0.10, 0.14, 0.03))
@@ -271,6 +305,10 @@ def build(args):
     variants = [nature.tree_variant(f"KTree{i}", leaf if i % 2 == 0 else leaf2, bark, height=h, crown_r=cr,
                                     n_clusters=nc, leaves_per=90, seed=60 + i, leaf_size=0.4)
                 for i, (h, cr, nc) in enumerate(((14, 5.0, 26), (11, 4.2, 22), (17, 6.0, 30), (8, 3.2, 16)))]
+    conleaf = nature.leaf_material("SugiLeaves", c1=(0.015, 0.035, 0.012), c2=(0.04, 0.07, 0.025), trans=0.2)
+    variants += [nature.tree_variant(f"KSugi{i}", conleaf, bark, height=h, crown_r=cr, n_clusters=nc, leaves_per=110,
+                                     seed=80 + i, shape="conical", leaf_size=0.3)
+                 for i, (h, cr, nc) in enumerate(((22, 4.0, 34), (16, 3.2, 28)))]
     _, subs = nature.make_tree_collection("KTrees", variants)
     # großer alter Baum auf der Straße (Manöverpunkt)
     big = nature.tree_variant("BigTree", leaf, bark, height=21, crown_r=7.0, n_clusters=44, leaves_per=140, seed=99,

@@ -768,7 +768,7 @@ def displace_obj(ob, tex_type="CLOUDS", size=1.0, strength=1.0, depth=4, midleve
 def apply_modifiers(ob):
     dg = bpy.context.evaluated_depsgraph_get()
     ev = ob.evaluated_get(dg)
-    me = bpy.data.meshes.new_from_object(ev)
+    me = bpy.data.meshes.new_from_object(ev, preserve_all_data_layers=True, depsgraph=dg)
     ob.modifiers.clear()
     old = ob.data
     ob.data = me

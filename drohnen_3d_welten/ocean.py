@@ -5,10 +5,11 @@ import bpy
 import numpy as np
 
 import fpv
+import textures
 
 
 def water_material(name="Water", deep=(0.004, 0.028, 0.040), shallow=(0.02, 0.09, 0.10), rough=0.035,
-                   foam_attr="foam", wake_fn=None, far=False, foam_amount=1.0):
+                   foam_attr="foam", wake_fn=None, far=False, foam_amount=1.0, color_fn=None):
     """Wasser-Shader. Performance: nur 3D-Rauschen mit animiertem Versatz, wenige Oktaven."""
     mat, nb, out = fpv.new_material(name)
     p = fpv.principled(nb, Roughness=rough, IOR=1.333)
@@ -31,6 +32,8 @@ def water_material(name="Water", deep=(0.004, 0.028, 0.040), shallow=(0.02, 0.09
         crest.inputs["From Min"].default_value = 0.0
         crest.inputs["From Max"].default_value = 1.2
         col = nb.mix(crest.outputs[0], deep, shallow)
+    if color_fn is not None:
+        col = color_fn(nb, col)
     foam = None
     if not far:
         at = nb.node("ShaderNodeAttribute", attribute_name=foam_attr)
@@ -146,3 +149,136 @@ def far_plane(xmin, xmax, ymin, ymax, R=30000.0, mat=None, z=-0.02):
         me.materials.append(mat)
     fpv.link(ob)
     return ob
+
+
+# --------------------------------------------------------------------------
+# Geometry-Nodes: Bugwelle, Kelvin-Kielspur, Rumpf-Kontaktschaum
+# --------------------------------------------------------------------------
+
+def ocean_fx_gn(ocean_ob, ship_root, hull_ob, bow_x=16.5, stern_x=-16.0, amp=1.0, hull_halfbeam=5.0):
+    """Hängt einen GN-Modifier an den Ozean (nach dem Ocean-Modifier):
+    - Displacement in Schiffskoordinaten: Aufstau am Bug, Senke mittschiffs, Kelvin-Arme (19,47°),
+      Querwellen hinter dem Heck (animiert über Scene Time)
+    - Attribute 'wake' (Kielwasser/Bugwelle) und 'hull_foam' (Kontaktzone per Geometry Proximity)
+    """
+    ng = bpy.data.node_groups.new("OceanFX", "GeometryNodeTree")
+    ng.interface.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+    ng.interface.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+    nb = fpv.NB(ng)
+    gi = nb.node("NodeGroupInput")
+    go = nb.node("NodeGroupOutput")
+    pos = nb.node("GeometryNodeInputPosition").outputs[0]
+    tsec = nb.node("GeometryNodeInputSceneTime").outputs["Seconds"]
+    # Schiffskoordinaten
+    oi = nb.node("GeometryNodeObjectInfo")
+    oi.transform_space = "RELATIVE"
+    oi.inputs["Object"].default_value = ship_root
+    inv = nb.node("FunctionNodeInvertMatrix")
+    nb.link(oi.outputs["Transform"], inv.inputs[0])
+    tp = nb.node("FunctionNodeTransformPoint")
+    nb.link(pos, tp.inputs[0])
+    nb.link(inv.outputs[0], tp.inputs[1])
+    x, y, _ = nb.sep(tp.outputs[0])
+    m = nb.math
+    yb = m("ABSOLUTE", y)
+    db = m("SUBTRACT", bow_x, x)                       # Abstand hinter dem Bug
+    dbp = m("MAXIMUM", db, 0.0)
+    # Kelvin-Arme
+    dev = m("SUBTRACT", yb, m("MULTIPLY", dbp, 0.354))
+    wid = m("MULTIPLY_ADD", dbp, 0.04, 0.6)
+    arm = m("EXPONENT", m("DIVIDE", m("MULTIPLY", m("MULTIPLY", dev, dev), -1.0), wid))
+    arm = m("MULTIPLY", arm, m("EXPONENT", m("DIVIDE", dbp, -55.0)))
+    arm = m("MULTIPLY", arm, m("GREATER_THAN", db, 1.0))
+    zarm = m("MULTIPLY", m("MULTIPLY", arm, 0.3 * amp),
+             m("SINE", m("SUBTRACT", m("MULTIPLY", dbp, 1.0), m("MULTIPLY", tsec, 3.0))))
+    # Aufstau am Bug
+    bx = m("SUBTRACT", x, bow_x - 1.0)
+    bow = m("EXPONENT", m("MULTIPLY", m("ADD", m("DIVIDE", m("MULTIPLY", bx, bx), 5.0),
+                                         m("DIVIDE", m("MULTIPLY", y, y), 7.0)), -1.0))
+    # Senke mittschiffs
+    dy = m("SUBTRACT", yb, 5.4)
+    tr = m("MULTIPLY", m("EXPONENT", m("DIVIDE", m("MULTIPLY", dy, dy), -3.0)),
+           m("EXPONENT", m("DIVIDE", m("MULTIPLY", x, x), -140.0)))
+    # Heck: Querwellen + turbulente Spur
+    xs = m("SUBTRACT", stern_x, x)
+    xsp = m("MAXIMUM", xs, 0.0)
+    spread = m("MULTIPLY_ADD", xsp, 0.25, 3.0)
+    gauss_y = m("EXPONENT", m("DIVIDE", m("MULTIPLY", y, y), m("MULTIPLY", m("MULTIPLY", spread, spread), -2.0)))
+    ztr = m("MULTIPLY", m("MULTIPLY", m("SINE", m("SUBTRACT", m("MULTIPLY", xsp, 0.8), m("MULTIPLY", tsec, 2.5))),
+                          m("EXPONENT", m("DIVIDE", xsp, -35.0))), m("MULTIPLY", gauss_y, 0.12 * amp))
+    ztr = m("MULTIPLY", ztr, m("GREATER_THAN", xs, 0.0))
+    core = m("MAXIMUM", m("SUBTRACT", 1.0, m("DIVIDE", yb, m("MULTIPLY_ADD", xsp, 0.09, 3.2))), 0.0)
+    core = m("MULTIPLY", core, m("MULTIPLY", m("EXPONENT", m("DIVIDE", xsp, -45.0)), m("GREATER_THAN", xs, -2.0)))
+    dz = m("ADD", m("ADD", zarm, m("MULTIPLY", bow, 0.55 * amp)), m("ADD", m("MULTIPLY", tr, -0.25 * amp), ztr))
+    sp = nb.node("GeometryNodeSetPosition")
+    nb.link(gi.outputs[0], sp.inputs["Geometry"])
+    nb.link(nb.comb(0.0, 0.0, dz), sp.inputs["Offset"])
+    arm_foam = m("MULTIPLY", arm, m("MULTIPLY", m("EXPONENT", m("DIVIDE", dbp, -14.0)), 0.9))
+    wake = m("MAXIMUM", m("MAXIMUM", arm_foam, m("MULTIPLY", core, 0.8)), m("MULTIPLY", bow, 0.9))
+    st1 = nb.node("GeometryNodeStoreNamedAttribute")
+    st1.data_type = "FLOAT"
+    st1.domain = "POINT"
+    nb.link(sp.outputs[0], st1.inputs["Geometry"])
+    st1.inputs["Name"].default_value = "wake"
+    nb.link(wake, st1.inputs["Value"])
+    # Kontaktschaum am Rumpf: analytische Wasserlinien-Kontur in Schiffskoordinaten
+    # (Superellipse |x/a|^p + |y/b(x)|^2; billiger als Geometry Proximity bei Motion-Blur-Neuauswertung)
+    half_len = (bow_x - stern_x) / 2 + 0.3
+    xc = m("SUBTRACT", x, (bow_x + stern_x) / 2)
+    ex = m("POWER", m("ABSOLUTE", m("DIVIDE", xc, half_len)), 2.6)
+    ey = m("POWER", m("DIVIDE", yb, hull_halfbeam), 2.0)
+    dd = m("SQRT", m("ADD", ex, ey))
+    hf = nb.node("ShaderNodeMapRange", clamp=True)
+    nb.link(dd, hf.inputs["Value"])
+    hf.inputs["From Min"].default_value = 1.32
+    hf.inputs["From Max"].default_value = 1.0
+    st2 = nb.node("GeometryNodeStoreNamedAttribute")
+    st2.data_type = "FLOAT"
+    st2.domain = "POINT"
+    nb.link(st1.outputs[0], st2.inputs["Geometry"])
+    st2.inputs["Name"].default_value = "hull_foam"
+    nb.link(hf.outputs[0], st2.inputs["Value"])
+    nb.link(st2.outputs[0], go.inputs[0])
+    mod = ocean_ob.modifiers.new("OceanFX", "NODES")
+    mod.node_group = ng
+    return mod
+
+
+def shore_distance_image(rocks, xmin, ymin, xmax, ymax, cell=0.5, max_d=12.0, name="ShoreDist"):
+    """Abstandsfeld (Meter) von jedem Wasserpunkt zur Fels-Wasserlinie, als Float-Bild.
+    rocks: Liste Blender-Objekte (Mesh, bereits positioniert)."""
+    nx = int((xmax - xmin) / cell)
+    ny = int((ymax - ymin) / cell)
+    D = np.full((ny, nx), max_d, np.float32)
+    xs = xmin + (np.arange(nx) + 0.5) * cell
+    ys = ymin + (np.arange(ny) + 0.5) * cell
+    bpy.context.view_layer.update()
+    for ob in rocks:
+        mw = ob.matrix_world
+        co = np.array([mw @ v.co for v in ob.data.vertices])
+        ring = co[np.abs(co[:, 2] - 0.3) < 1.2][:, :2]
+        if len(ring) == 0:
+            continue
+        rx0, ry0 = ring.min(0) - max_d
+        rx1, ry1 = ring.max(0) + max_d
+        ix = np.where((xs >= rx0) & (xs <= rx1))[0]
+        iy = np.where((ys >= ry0) & (ys <= ry1))[0]
+        if len(ix) == 0 or len(iy) == 0:
+            continue
+        GX, GY = np.meshgrid(xs[ix], ys[iy])
+        P = np.stack([GX.ravel(), GY.ravel()], 1)
+        best = np.full(len(P), max_d, np.float32)
+        for k in range(0, len(ring), 256):
+            d = np.sqrt(((P[:, None, :] - ring[None, k:k + 256, :]) ** 2).sum(-1)).min(1)
+            best = np.minimum(best, d)
+        sub = D[np.ix_(iy, ix)]
+        D[np.ix_(iy, ix)] = np.minimum(sub, best.reshape(len(iy), len(ix)))
+    # als 16-Bit-PNG speichern und laden (generierte Float-Bilder werden im Hintergrundmodus nicht übernommen)
+    import os
+    from PIL import Image as PILImage
+    path = os.path.join(textures.OUT, f"{name}.png")
+    arr = (np.clip(D / max_d, 0, 1) * 65535).astype(np.uint16)[::-1]  # Blender: Zeile 0 = unten
+    PILImage.fromarray(arr, mode="I;16").save(path)
+    img = bpy.data.images.load(path, check_existing=False)
+    img.colorspace_settings.name = "Non-Color"
+    return img, (xmin, ymin, xmax - xmin, ymax - ymin)

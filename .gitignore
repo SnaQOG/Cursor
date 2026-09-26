@@ -59,4 +59,5 @@ trading-bot-logs/
 # Test coverage
 .coverage
 coverage.xml
-htmlcov/ 
+htmlcov/
+drohnen_3d_welten/assets

@@ -1,12 +1,14 @@
 """Welt 1 – One Piece: Grand Line, Felsnadeln im Meer, Thousand Sunny.
 
 Flug (20 s, konstant 15 m/s, eine durchgehende Aufnahme):
-  0–5 s   tief (3 m) über den Wellen, Durchflug zwischen zwei Felsnadeln
-  5–9 s   leichter Schwenk rechts, dann Linkskurve mit Schräglage um die große Felsnadel
-  ~9 s    Reveal: die Thousand Sunny taucht hinter der Felsnadel auf (bisher verdeckt)
-  9–15 s  Anflug auf den Löwenkopf, Steigflug auf ~9 m
-  15–17 s Vorbeiflug an Bug, Rumpf und Jolly-Roger-Segel (Schiff rechts)
-  17–20 s weiter über das offene Meer Richtung Inseln am Horizont
+  0–5 s    tief (3 m) über den Wellen, Durchflug zwischen zwei Felsnadeln
+  5–12 s   leichter Schwenk rechts, dann Linkskurve mit Schräglage um die große Felsnadel
+  ~11–12 s Reveal: die Thousand Sunny kommt hinter der Felsnadel hervor, Breitseite (Steuerbord)
+  12–15,5 s Anflug quer auf die Steuerbordseite, Steigflug auf ~9,6 m: die ganze Strohhutbande an Deck
+           (Ruffy auf dem Löwenkopf, Jinbei am Steuer, Brook mit Geige, Lysop und Chopper winken,
+           Nami an den Mandarinen, Zorro schläft am Mast, Sanji, Robin liest, Franky auf dem Achterkastell)
+  ~16 s    Überflug über das Rasendeck zwischen Fockmast und Achterkastell, ~4 m über der Crew
+  16–20 s  über die Backbordseite hinaus weiter aufs offene Meer Richtung Inseln
 """
 import argparse
 import math
@@ -19,6 +21,7 @@ import bpy  # noqa: E402
 import numpy as np  # noqa: E402
 from mathutils import Vector  # noqa: E402
 
+import crew  # noqa: E402
 import fpv  # noqa: E402
 import nature  # noqa: E402
 import ocean  # noqa: E402
@@ -31,18 +34,32 @@ SUN_ELEV, SUN_AZIM = 32.0, 200.0
 
 ROUTE = [
     (0, -8, 3.0), (0, 40, 3.1), (-1, 80, 3.4), (9, 118, 4.3), (13, 150, 5.4), (4, 184, 7.0),
-    (-18, 207, 8.2), (-45, 231, 9.0), (-75, 254, 9.2), (-108, 276, 8.8), (-140, 296, 8.5),
+    (-18, 207, 9.3), (-45, 231, 9.8), (-75, 254, 9.6), (-108, 276, 9.0), (-140, 296, 8.5),
 ]
+CAM = dict(look_pitch=-3.0, pitch_follow=0.5, bank_gain=1.0, max_bank=32, micro=1.0, seed=5,
+           pitch_overrides=[(14.0, 16.5, -7.0)])      # beim Anflug leicht auf das Deck hinunterblicken
 
-SHIP_HEADING = -40.5  # Grad (mathematisch, von +X), Bug zeigt nach Südosten
 SHIP_SPEED = 3.0
-SHIP_T15 = Vector((-104.72, 287.53, 0.0))  # Position bei t = 15 s: frontale Annäherung, Endbild ~32 m vor dem Bug
+T_CROSS = 16.0      # Zeitpunkt des Überflugs über die Mittellinie
+CROSS_X = -1.5      # Schiffs-X der Überflugstelle (zwischen Fockmast 2,9 und Achterkastell -5,2)
 
 
-def ship_start():
-    h = math.radians(SHIP_HEADING)
-    d = Vector((math.cos(h), math.sin(h), 0))
-    return SHIP_T15 - d * SHIP_SPEED * 15.0
+def camera_path(frames):
+    return fpv.fpv_path(ROUTE, SPEED, FPS, frames, **CAM)
+
+
+def ship_course(pos):
+    """Kurs und Startpunkt der Sunny aus der Kamerabahn: Die Kamera kreuzt bei T_CROSS die Mittellinie an
+    Schiffs-X = CROSS_X, und zwar relativ zum fahrenden Schiff genau quer (Kamerarichtung = Backbord um
+    asin(v_Schiff / v_Kamera) Richtung Bug gedreht)."""
+    i = int(round(T_CROSS * FPS)) + 1
+    h = Vector(pos[i + 6]) - Vector(pos[i - 6])
+    cam_heading = math.degrees(math.atan2(h.y, h.x))
+    heading = cam_heading - 90.0 + math.degrees(math.asin(SHIP_SPEED / SPEED))
+    d = Vector((math.cos(math.radians(heading)), math.sin(math.radians(heading)), 0))
+    c = Vector((pos[i][0], pos[i][1], 0))
+    p_cross = c - d * CROSS_X
+    return heading, p_cross - d * SHIP_SPEED * T_CROSS
 
 
 ROCKS = [
@@ -137,9 +154,14 @@ def build(args):
                     cloud_ref=9.0, aerosol=0.5, ozone=2.0)
     fpv.add_sun(SUN_ELEV, SUN_AZIM, strength=5.2, color=(1.0, 0.9, 0.78))
 
-    # Schiff
+    pos, quats, info = camera_path(frames)
+    heading, start = ship_course(pos)
+    print(f"Sunny: Kurs {heading:.1f} Grad, Start {tuple(round(v, 2) for v in start)}")
+
+    # Schiff mit der Strohhutbande an Bord
     root, body, _ = sunny.build()
-    sunny.animate(root, body, SHIP_HEADING, tuple(ship_start()), SHIP_SPEED, FPS, frames)
+    sunny.animate(root, body, heading, tuple(start), SHIP_SPEED, FPS, frames)
+    crew.place_crew(body, frames, sunny)
     hull = bpy.data.objects["Hull"]
     rng = np.random.default_rng(77)
 
@@ -232,8 +254,6 @@ def build(args):
     island("IslandFar", -300, 2600, 700, 420, 34, imat)
 
     # Kamera
-    pos, quats, info = fpv.fpv_path(ROUTE, SPEED, FPS, frames, look_pitch=-3.0, pitch_follow=0.5,
-                                    bank_gain=1.0, max_bank=32, micro=1.0, seed=5)
     fpv.make_camera(pos, quats, fov_deg=92.0)
     print(f"route length {info['total']:.1f} m, used {info['used']:.1f} m")
     return sc

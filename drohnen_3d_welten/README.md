@@ -7,21 +7,25 @@ Wow-Motiv hinter einer Verdeckung, stabilisierte Weitwinkel-Action-Cam (kein Fis
 
 | Video | Welt | Flug |
 |---|---|---|
-| `videos/01_OnePiece_ThousandSunny.mp4` | Grand Line: tiefblaues Meer, Karstfelsen, Thousand Sunny | tief über den Wellen durch ein Felsentor, Linkskurve um die große Felsnadel → Reveal der Thousand Sunny, die frontal entgegenkommt (Sonnen-Löwe, gekreuzte Knochen, Jolly-Roger-Segel) → Endbild dicht vor dem Bug |
-| `videos/02_Naruto_Konoha.mp4` | Konohagakure mit Hokage-Felsen | Waldstraße → Durchflug durch das あ/ん-Tor → sandfarbene Hauptstraße mit Pastellhäusern, bunten Dächern, Wassertanks und Laternen → S-Kurve um den alten Baum → Steigflug über das Flachdach der 火-Residenz, auf dem Naruto und Sasuke zum Felsen hinaufschauen → die fünf Hokage-Gesichter im Zickzack füllen das Bild |
-| `videos/03_DragonBall_Namek.mp4` | Planet Namek | grasgrüner Himmel mit drei Sonnen, grünes Meer, beige Felsnadeln mit blauen Ajisa-Bäumen → Steigflug an der Tafelberg-Wand → Reveal über der Kante: blaues Gras mit Sandflecken und roten Pilzen, Namekianer-Dorf, sieben Dragon Balls auf einem Steinsockel, Friezas Raumschiff → Flug über die Nordkante aufs Meer |
+| `videos/01_OnePiece_ThousandSunny.mp4` | Grand Line: tiefblaues Meer, Karstfelsen, Thousand Sunny mit der ganzen Strohhutbande | tief über den Wellen durch ein Felsentor, Linkskurve um die große Felsnadel → Reveal der Sunny in Breitseite → Anflug quer auf die Steuerbordseite: Ruffy auf dem Löwenkopf, Jinbei am Steuer, Brook mit Geige, Lysop und Chopper winken, Nami an den Mandarinen, Zorro schläft am Mast, Sanji, Robin liest, Franky („SUPER!“) auf dem Achterkastell → Überflug ~4 m über dem Rasendeck zwischen Fockmast und Achterkastell → hinaus aufs offene Meer |
+| `videos/02_Naruto_Konoha.mp4` | Konohagakure mit Hokage-Felsen | Waldstraße → Durchflug durch das あ/ん-Tor → Naruto und Sasuke liefern sich vor der Drohne ein Duell über die Hauptstraße (Wandsprünge, Zusammenstöße in der Luft) → S-Kurve um den alten Baum, beide springen aufs Dach der 火-Residenz → Rasengan gegen Chidori: Aufladen, Ansturm, Zusammenprall mit Lichtexplosion und Druckwelle → die fünf Hokage-Gesichter im Zickzack füllen das Bild |
+| `videos/03_DragonBall_Namek.mp4` | Planet Namek | grasgrüner Himmel mit drei Sonnen, grünes Meer, beige Felsnadeln → über dem Tafelberg blitzen schon Zusammenstöße → Steigflug an der Wand → über der Kante kämpfen Super-Saiyajin Goku und Freezer direkt vor der Drohne (Schockwellen bei jedem Treffer) → Freezers Todesstrahlen sprengen das Plateau (Staub, Brocken), eine abgelenkte Ki-Kugel trifft eine ferne Felsnadel → die Drohne fliegt unter Goku durch, während er das Kamehameha abfeuert → Strahlenduell, Durchbruch, große Explosion über der Nordkante → weiter aufs Meer |
 
 ## Aufbau
 
 | Datei | Inhalt |
 |---|---|
 | `fpv.py` | Render-Setup, Himmel + Wolken, **FPV-Kamera** (konstantes Bahn-Tempo, Schräglage aus der Kurvenkrümmung, Piloten-/Mikrokorrekturen, Bewegungsunschärfe 180°) |
-| `post.py` | Action-Cam-Look: Dunst aus Tiefenpass, geglättete Auto-Belichtung, AgX-Tonemapping, dezentes Sensorrauschen/Vignette, Lanczos auf 1080×1920, H.264 |
+| `post.py` | Action-Cam-Look: Dunst aus Tiefenpass (für halbtransparente Effekte korrigiert), geglättete Auto-Belichtung, AgX-Tonemapping, Bloom für Energie-Effekte, dezentes Sensorrauschen/Vignette, Lanczos auf 1080×1920, H.264 |
 | `ocean.py` | FFT-Ozean (Ocean-Modifier) + Geometry Nodes: Bugwelle, Kelvin-Heckwelle (19,47°), Rumpf-Schaum, Brandung über ein Küsten-Abstandsfeld |
 | `nature.py` | Fels (Karst, Schichtbänke, Kavität), Palmen, Lianen, Bäume |
 | `sunny.py` | Thousand Sunny nach den Model Sheets (三面図/決定稿): bauchiger Planken-Rumpf, rote U-Bordwand mit Voluten und Bullaugen, Soldier-Dock-Ring „1“, Bugschild, Sonnen-Löwe mit gekreuzten Knochen, Vorschiff mit Steuerrad, Achterkastell mit Bogenfenstern, rot-gelbe Kuppeln, Heckkanone, Rasendeck mit Mandarinenbäumen, 20-m-Jolly-Roger-Segel, gestreiftes Gaffelsegel |
 | `konoha.py` | Konoha: Pastell-Putzfassaden, bunte Ziegel-/Blechdächer, Stufentürme, Sandstraße, Fenster, Rohre, Stromleitungen, 火-Residenz nach Anime-Vorlage (Fensterreihen, Ziegelkragen, weiße Hörner), Hokage-Felsen aus ockerfarbenem Sandstein (Scan-Köpfe + Haar per Voxel-Remesh verschmolzen, Zickzack-Anordnung, Treppen, Felshütten, Kuppelbauten) |
-| `ninja.py` | Naruto und Sasuke (Shippuden) nach den Model Sheets: Skin-Modifier-Körper, Kleidung mit Farbzonen, Stachelhaar, Stirnband, Uzumaki-Spirale und Uchiha-Wappen als Rücken-Decals, Seilgürtel, Kusanagi |
+| `figures.py` | Gelenk-Rig für alle Figuren: Empty-Hierarchie (Wurzel, Rumpf, Kopf, Schultern/Ellbogen/Handgelenke, Hüften/Knie/Knöchel), Skin-Modifier-Segmente an den Gelenken, Posenbibliothek mit Spiegelung, Bodenkontakt per Vorwärtskinematik |
+| `ninja.py` | Naruto und Sasuke (Shippuden) nach den Model Sheets auf dem Rig: Kleidung mit Farbzonen, Stachelhaar, Stirnband, Uzumaki-Spirale und Uchiha-Wappen als Rücken-Decals, Seilgürtel, Kusanagi |
+| `dbz.py` | Super-Saiyajin Goku (orange-blauer Gi, goldenes Stachelhaar) und Freezer (Endform, weiß mit lila Panzerteilen, Schwanz) |
+| `crew.py` | die Strohhutbande (Ruffy, Zorro, Nami, Lysop, Sanji, Chopper, Robin, Franky, Brook, Jinbei) in Kanon-Größen mit Posen/Animationen und Platz an Bord |
+| `vfx.py` | Energie-Effekte: Rasengan/Kamehameha-Ladung (Wirbelkugel), Chidori (flackernde Blitzvarianten), Strahlen mit Längenverlauf fürs Strahlenduell, Explosionen mit Druckwellenring, Ki-Kugeln, Super-Saiyajin-Aura, Staubwolken, Gesteinsbrocken (ballistisch) – alles über Keyframes gesteuert und mit Punktlichtern, die die Umgebung beleuchten |
 | `namek.py` | Namek: Lehm-Kuppelhäuser (Boolean + Normalen-Transfer), schlanke Ajisa-Bäume mit blauen Kugelkronen, blaue Grashalme, Sandflecken, rote Pilze, Dragon Balls, Friezas Raumschiff |
 | `world_*.py` | die drei Welten inkl. Flugroute |
 | `params/*.py` | Farbkorrektur/Dunst je Welt |

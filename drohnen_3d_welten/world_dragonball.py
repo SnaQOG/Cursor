@@ -4,10 +4,16 @@ Türkiser Himmel mit drei Sonnen, grünliches Meer, Felsnadeln, Tafelberg mit Aj
 Namekianer-Kuppelhäusern, den sieben Dragon Balls und Friezas Raumschiff.
 
 Flug (20 s, konstant 18 m/s, eine durchgehende Aufnahme):
-  0–6 s    tief über dem Meer zwischen Felsnadeln hindurch
-  6–10,5 s Steigflug an der Steilwand des Tafelbergs hinauf
-  ~10,8 s  Reveal über der Kante: Dorf, leuchtende Dragon Balls, Raumschiff (vorher verdeckt)
-  11–20 s  tief über das Plateau: an den Dragon Balls vorbei, Raumschiff rechts, Richtung Nordkante
+  0–3 s      tief über dem Meer zwischen Felsnadeln hindurch; über dem Tafelberg blitzen Zusammenstöße
+  3–8,5 s    Steigflug an der Steilwand hinauf, Goku und Freezer kämpfen hoch über der Kante
+  ~8,7 s     über der Kante: Dorf, Dragon Balls, Raumschiff; der Kampf ist jetzt direkt vor der Kamera
+  8,5–11,5 s Schlagabtausch 18–24 m vor der Kamera (Schockwellen bei jedem Treffer)
+  11,5–13 s  Freezer wird weggeschleudert, feuert Todesstrahlen ins Plateau (Explosionen, Staub, Brocken),
+             Goku weicht aus, Freezer lenkt zwei Ki-Kugeln aufs Meer ab
+  13–15,5 s  Goku schwebt über der Flugbahn und feuert das Kamehameha; die Kamera fliegt unter ihm durch
+             und am Strahl entlang, Strahlenduell mit Freezers Todesstrahl, bei 15,5 s bricht das
+             Kamehameha durch -> große Explosion über der Nordkante
+  15,5–20 s  weiter über die Kante hinaus aufs Meer, die Explosion verglüht
 """
 import argparse
 import math
@@ -20,11 +26,15 @@ import bpy  # noqa: E402
 import bmesh  # noqa: E402,I100
 import numpy as np  # noqa: E402
 
+import dbz  # noqa: E402
 import fpv  # noqa: E402
 import namek  # noqa: E402
 import nature  # noqa: E402
 from world_onepiece import foam_builder, shallow_tint  # noqa: E402
 import ocean  # noqa: E402
+import vfx  # noqa: E402
+from figures import POSES  # noqa: E402
+from mathutils import Vector  # noqa: E402
 
 FPS = 24
 SECONDS = 20
@@ -38,10 +48,12 @@ DB_C = (1.0, 232.0)
 SHIP_C = (40.0, 268.0)
 
 ROUTE = [
-    (0, -15, 3.4), (-2, 40, 3.4), (2, 95, 4.2), (1, 128, 12.0), (0, 152, 30.0), (0, 170, 47.0),
+    (-2, 36, 3.4), (2, 95, 4.2), (1, 128, 12.0), (0, 152, 30.0), (0, 170, 47.0),
     (2, 190, 49.0), (4, 220, 47.5), (7, 252, 47.5), (7, 288, 48.0), (4, 312, 44.0), (1, 336, 43.6),
-    (-2, 372, 43.0),
+    (-2, 372, 43.0), (-5, 410, 43.0), (-8, 450, 43.0),
 ]
+PLATEAU = 39.0                  # mittlere Plateauhöhe (Grund unter der Flugbahn)
+GOLD, KAME, DEATH, KI = (1.0, 0.62, 0.10), (0.10, 0.36, 1.0), (0.85, 0.25, 1.0), (1.0, 0.80, 0.28)
 
 SPIRES = [
     # (x, y, r, h, seed)
@@ -106,6 +118,195 @@ def mesa_height(X, Y):
     rough = 0.8 * fpv.fbm2(X / 3, Y / 3, 3, seed=25) * (u > 0) * (u < 1)
     h = foot + ut * (top - foot) + rough - 3
     return h
+
+
+def namek_fight(pos, top_z, rock, houses):
+    """Goku (SSJ) gegen Freezer, getaktet auf den Kameraflug (pos[i] = Kameraposition in Frame i).
+    Alle Nahkampfpositionen werden relativ zur Kamera bestimmt (D m voraus, X m rechts, Z m über dem Plateau),
+    damit der Kampf im Bild bleibt, obwohl die Drohne mit 18 m/s geradeaus fliegt."""
+    n = len(pos)
+
+    def F(t):
+        return int(round(t * FPS)) + 1
+
+    def cam(t):
+        return Vector(pos[min(max(F(t), 0), n - 1)])
+
+    def fwd(t):
+        i = F(t)
+        a, b = Vector(pos[max(i - 6, 0)]), Vector(pos[min(i + 6, n - 1)])
+        return Vector((b.x - a.x, b.y - a.y, 0)).normalized()
+
+    def rel(t, D, X, Z, above_cam=False):
+        h = fwd(t)
+        p = cam(t) + h * D + Vector((h.y, -h.x, 0)) * X
+        p.z = (cam(t).z if above_cam else PLATEAU) + Z
+        return p
+
+    G = dbz.goku((0, 0, 0), 0.0)
+    Z = dbz.freezer((0, 0, 0), 0.0)
+    vfx.aura("GokuAura", G.base, GOLD, 1, n + 2, height=1.95, width=0.95, light_w=900.0)
+    chest = {G: 1.15 * G.s, Z: 1.15 * Z.s}
+    last_yaw = {}
+
+    def key(fig, t, pose, p, look, lean=0.0, extra=None, roll=0.0):
+        d = look - p
+        yaw = math.degrees(math.atan2(-d.x, d.y))
+        if fig in last_yaw:                      # Gier stetig halten (kein 340°-Dreher beim Interpolieren)
+            while yaw - last_yaw[fig] > 180:
+                yaw -= 360
+            while yaw - last_yaw[fig] < -180:
+                yaw += 360
+        last_yaw[fig] = yaw
+        rot = dict(POSES[pose])
+        if extra:
+            rot.update(extra)
+        fig.pose(F(t), rot, loc=(p.x, p.y, p.z - chest[fig]), yaw=yaw, base_rot=(lean, roll, 0))
+
+    # ---- Schlagabtausch: (Zeit, Treffpunkt, Achse Goku->Freezer, Goku-Pose, Freezer-Pose, Stärke)
+    teaser = [(1.9, (-6, 222, 74), (1, 0.2, 0.1)), (2.7, (8, 214, 80), (-1, 0.3, -0.2)),
+              (3.5, (-3, 230, 70), (1, -0.4, 0.3)), (4.3, (10, 220, 84), (-1, -0.2, 0.1)),
+              (5.0, (-8, 212, 76), (1, 0.5, -0.1)), (5.8, (4, 206, 70), (-1, 0.1, 0.3)),
+              (6.6, (-4, 200, 66), (1, -0.3, 0.0)), (7.45, (3, 196, 60), (-1, 0.2, 0.2))]
+    # Nahkampf 8,5–11 m vor der Kamera, 1,8–2,8 m über Kamerahöhe (Blick ~13° nach oben, oberes Bilddrittel)
+    melee = [(8.3, 11, -2.0, 3.2, (1, 0.3, -0.1)), (8.8, 9.5, 2.3, 2.6, (-1, 0.2, 0.2)),
+             (9.3, 9, -2.6, 2.0, (1, -0.2, 0.1)), (9.75, 8.5, 1.8, 2.4, (-1, -0.3, -0.2)),
+             (10.2, 8.5, -1.0, 1.8, (1, 0.35, 0.25)), (10.65, 9, 2.6, 2.4, (-1, 0.1, -0.1)),
+             (11.1, 8.5, -2.0, 2.0, (1, -0.25, 0.0)), (11.5, 9.5, 0.5, 2.6, (-0.3, 1.0, 0.25))]
+    clashes = [(t, Vector(c), Vector(a).normalized(), 3.0, 60000.0) for (t, c, a) in teaser]
+    clashes += [(t, rel(t, D, X, Zh, True), Vector(a).normalized(), 0.6, 4000.0) for (t, D, X, Zh, a) in melee]
+    g_moves = ["punch_R", "kick_R", "punch_L", "kick_L"]
+    z_moves = ["guard", "punch_L", "kick_R", "guard"]
+    prev = None
+    for k, (t, C, ax, r, lw) in enumerate(clashes):
+        # Achse im Kamerabezug drehen (Nahkampf: seitlich im Profil sichtbar)
+        if t > 8.0:
+            h = fwd(t)
+            rt = Vector((h.y, -h.x, 0))
+            ax = (rt * ax.x + h * ax.y + Vector((0, 0, ax.z))).normalized()
+        sep = 1.6 if t > 8 else 3.0
+        gA, zA = C - ax * sep, C + ax * sep
+        if prev:
+            # Bogen zwischen zwei Treffern: bei Seitenwechsel fliegt Goku über, Freezer unter dem anderen durch
+            tp, gP, zP, axp = prev
+            tm = 0.5 * (tp + t - 0.12)
+            up = Vector((0, 0, 2.2 if axp.dot(ax) < 0 else 0.9))
+            key(G, tm, "fly", (gP + gA) / 2 + up, (zP + zA) / 2, lean=-60)
+            key(Z, tm, "fly", (zP + zA) / 2 - up, (gP + gA) / 2, lean=-40)
+        key(G, t - 0.12, "fly", gA, C + ax, lean=-45)
+        key(Z, t - 0.12, "fly", zA, C - ax, lean=-30)
+        key(G, t, g_moves[k % 4], C - ax * 0.55, C + ax)
+        key(Z, t, z_moves[k % 4], C + ax * 0.5, C - ax)
+        gR, zR = C - ax * 2.3, C + ax * 2.6
+        key(G, t + 0.14, "recoil", gR, C + ax, lean=10)
+        key(Z, t + 0.14, "recoil", zR, C - ax, lean=15)
+        prev = (t + 0.14, gR, zR, ax)
+        b = vfx.burst(f"Hit{k}", C, F(t), (1.0, 0.78, 0.35), r_max=r, dur=10 if t > 8 else 12, light_w=lw,
+                      bolts=False, seed=20 + k, core_s=8.0, glow_s=2.0, glow_alpha=0.25, ring_s=2.5,
+                      core_color=(1.0, 0.95, 0.8))
+        b.rotation_mode = "QUATERNION"
+        b.rotation_quaternion = ax.to_track_quat("Z", "Y")
+
+    # ---- 11,5 s: Gokus Schlag schleudert Freezer davon (Salto rückwärts), er fängt sich hoch voraus
+    Zp = rel(12.05, 34, 7, 18)
+    key(Z, 11.8, "recoil", rel(11.8, 24, 4, 13), cam(11.8), lean=120)
+    key(Z, 12.05, "point_R", Zp, cam(12.05) + fwd(12.05) * 24, lean=0)
+    # ---- Todesstrahlen ins Plateau, Goku weicht aus und kontert mit einer Ki-Kugel
+    for (t, pose, X) in ((11.75, "fly", -1.0), (12.05, "guard", -4.0), (12.33, "guard", 3.0), (12.6, "point_R", 1.0),
+                         (12.8, "guard", -1.0)):
+        key(G, t, pose, rel(t, 10, X, 2.6, True), Zp, lean=-20 if pose == "fly" else 0)
+    shots = [(12.12, -7.0, 24), (12.36, 8.0, 26), (12.58, -9.0, 25)]
+    for k, (t, X, D) in enumerate(shots):
+        tgt = rel(t + 0.05, D, X, 0)
+        if any(math.hypot(tgt.x - hx, tgt.y - hy) < hr + 4 for (hx, hy, hr) in houses):
+            X = -X
+            tgt = rel(t + 0.05, D, X, 0)
+        tgt.z = top_z(tgt.x, tgt.y) + 0.2
+        d = tgt - Zp
+        aim = math.degrees(math.atan2(d.z, Vector((d.x, d.y)).length))
+        key(Z, t - 0.06, "point_R", Zp, tgt, extra={"shoulder.R": (90 + aim, -5, 0)})
+        key(Z, t + 0.1, "point_R", Zp, tgt, extra={"shoulder.R": (90 + aim + 12, -5, 0)})
+        bpy.context.scene.frame_set(F(t))
+        o = Z.J["wrist.R"].matrix_world.translation + d.normalized() * 0.18
+        vfx.energy_ball(f"DeathTip{k}", Z.J["wrist.R"], (0, 0, -0.17), DEATH, 0.09, F(t) - 5, F(t) - 1, F(t) + 5,
+                        light_w=120.0, swirl=False, spin=False)
+        vfx.beam(f"DeathBeam{k}", o, tgt - o, (tgt - o).length, 0.2, DEATH, F(t), F(t) + 2, F(t) + 7,
+                 light_w=4000.0, core_s=5.0, whiten=0.3, glow_s=3.0)
+        vfx.burst(f"Impact{k}", tgt + Vector((0, 0, 0.8)), F(t) + 2, (1.0, 0.55, 0.85), r_max=4.5, dur=18,
+                  light_w=45000.0, bolts=False, seed=40 + k, ring_dz=-0.7, core_s=12.0, glow_s=4.0, ring_s=3.0,
+                  core_color=(1.0, 0.9, 0.95))
+        vfx.dust_cloud(f"Dust{k}", tgt, F(t) + 3, 5.0, color=(0.50, 0.45, 0.36), dur=60, seed=60 + k)
+        vfx.debris(f"Debris{k}_", tgt + Vector((0, 0, 0.3)), F(t) + 2, rock, n=14, speed=13.0, size=0.28,
+                   seed=80 + k, ground=tgt.z - 0.1)
+    # Gokus Ki-Kugel: Freezer schlägt sie weg, sie schlägt in eine ferne Felsnadel ein
+    far = Vector((110, 498, 52))
+    bpy.context.scene.frame_set(F(12.62))
+    o = G.J["wrist.R"].matrix_world.translation.copy()
+    hitp = Zp + Vector((-0.5, -0.5, 0.3))
+    vfx.ki_blast("Ki", o, hitp, F(12.62), F(12.84), KI, radius=0.34, impact=False)
+    key(Z, 12.78, "guard", Zp, o)
+    key(Z, 12.86, "punch_L", Zp, far)
+    vfx.burst("KiSwat", hitp, F(12.84), KI, r_max=1.6, dur=10, light_w=8000.0, ring=False, bolts=False, seed=91)
+    vfx.ki_blast("KiDeflect", hitp, far, F(12.84), F(13.66), KI, radius=0.34, r_impact=11.0, seed=90)
+
+    # ---- Kamehameha gegen Todesstrahl
+    ZK = Vector((3.0, 358.0, 72.0))
+    GK = cam(14.35) + Vector((-3.2, 0, 0))
+    GK.z = PLATEAU + 9.5
+    key(Z, 13.25, "fly", Zp.lerp(ZK, 0.6) + Vector((0, 0, 4)), ZK, lean=-60)
+    key(Z, 13.6, "point_R", ZK, GK)
+    key(G, 13.2, "kame_charge", GK + Vector((0.3, -0.8, 0.2)), ZK)
+    key(G, 13.3, "kame_charge", GK, ZK)
+    key(G, 13.85, "kame_charge", GK + Vector((0, 0.05, -0.05)), ZK)
+    d = ZK - GK
+    aim = math.degrees(math.atan2(d.z, Vector((d.x, d.y)).length))
+    fire = {"shoulder.R": (88 + aim, 0, 12), "shoulder.L": (88 + aim, 0, -12)}
+    key(G, 13.95, "kame_fire", GK, ZK, extra=fire)
+    key(G, 15.6, "kame_fire", GK + Vector((0, -0.3, 0)), ZK, extra=fire)
+    key(G, 16.3, "guard", GK + Vector((0, 0.5, 0.4)), ZK)
+    aimz = math.degrees(math.atan2(-d.z, Vector((d.x, d.y)).length))
+    key(Z, 13.9, "point_R", ZK, GK, extra={"shoulder.R": (90 + aimz, -5, 0)})
+    key(Z, 15.4, "point_R", ZK + Vector((0, 0.8, 0)), GK, extra={"shoulder.R": (90 + aimz, -5, 0)})
+    vfx.energy_ball("KameCharge", G.J["wrist.R"], (-0.07, 0.06, -0.13), KAME, 0.34, F(13.2), F(13.85), F(14.0),
+                    light_w=900.0)
+    sc = bpy.context.scene
+    sc.frame_set(F(13.95))
+    o = (G.J["wrist.R"].matrix_world.translation + G.J["wrist.L"].matrix_world.translation) / 2
+    sc.frame_set(F(13.9))
+    oz = Z.J["wrist.R"].matrix_world.translation.copy()
+    L = (oz - o).length
+    dk = (oz - o).normalized()
+    o = o + dk * 0.2
+    Lc = 0.52 * L
+    wob = [(-0.0, 0.01), (0.25, Lc), (0.55, Lc - 2.5), (0.85, Lc + 1.5), (1.1, Lc - 1.0), (1.5, L)]
+    kl = [(F(13.95 + dt), v) for dt, v in wob]
+    zl = [(F(13.95), 0.01)] + [(F(13.95 + dt), L - v) for dt, v in wob[1:-1]] + [(F(15.45), 0.3)]
+    vfx.beam("Kamehameha", o, dk, kl, 0.95, KAME, F(13.95), F(14.2), F(16.0), light_w=26000.0,
+             wobble=(F(14.2), F(15.9), 0.12), core_s=5.0, whiten=0.35, glow_s=3.0, core_r=0.3)
+    vfx.beam("DeathBeamDuel", oz, -dk, zl, 0.55, DEATH, F(13.95), F(14.2), F(15.5), light_w=12000.0,
+             wobble=(F(14.2), F(15.4), 0.15), core_s=5.0, whiten=0.35, glow_s=2.6)
+    # Treffpunkt der Strahlen: knisternde Energiekugel, die hin und her drückt und dann zu Freezer rast
+    mid = bpy.data.objects.new("DuelPoint", None)
+    fpv.link(mid)
+    for f, v in kl[1:]:
+        mid.location = o + dk * v
+        mid.keyframe_insert("location", frame=f)
+    vfx.energy_ball("DuelBall", mid, (0, 0, 0), (0.62, 0.55, 1.0), 2.0, F(14.18), F(14.3), F(15.45), light_w=30000.0)
+    vfx.lightning("DuelArcs", mid, (0, 0, 0), (0.75, 0.7, 1.0), F(14.2), F(15.45), radius=4.5, n_bolts=10,
+                  variants=6, seed=12, light_w=0.0, thickness=0.06)
+    b = vfx.burst("DuelMeet", o + dk * Lc, F(14.2), (0.6, 0.55, 1.0), r_max=6.0, dur=18, light_w=90000.0, bolts=False,
+                  seed=13, core_s=12.0, glow_s=3.0, ring_s=3.5)
+    b.rotation_mode = "QUATERNION"
+    b.rotation_quaternion = dk.to_track_quat("Z", "Y")
+    # Durchbruch: riesige Explosion um Freezer, Druckwelle, Rauch
+    vfx.burst("FinalBlast", ZK, F(15.45), (1.0, 0.62, 0.22), r_max=17.0, dur=60, light_w=450000.0, seed=14,
+              core_s=12.0, glow_s=3.5, glow_alpha=0.45, ring_s=4.0, core_color=(1.0, 0.92, 0.7))
+    vfx.dust_cloud("FinalSmoke", ZK + Vector((0, 0, -9)), F(16.0), 13.0, color=(0.30, 0.28, 0.27), dur=90, seed=15,
+                   puffs=16, rise=0.5)
+    for fig_f, s in ((F(15.45), 1.0), (F(15.5), 0.001)):
+        Z.base.scale = (s, s, s)
+        Z.base.keyframe_insert("scale", frame=fig_f)
+    return G, Z
 
 
 def build(args):
@@ -305,8 +506,11 @@ def build(args):
                       exclude=excl, zmin=MESA_H - 5)
 
     pos, quats, info = fpv.fpv_path(route, SPEED, FPS, frames, look_pitch=-3.0, pitch_follow=0.5,
-                                    bank_gain=1.0, max_bank=30, micro=1.0, seed=13)
+                                    bank_gain=1.0, max_bank=30, micro=1.0, seed=13,
+                                    pitch_overrides=[(8.6, 15.9, 6.0)])   # Blick leicht nach oben: Kampf
     fpv.make_camera(pos, quats, fov_deg=92.0)
+    namek_fight(pos, top_z, rock, houses)
+    bpy.context.scene.cycles.transparent_max_bounces = 16   # Aura, Strahlen, Glühhüllen übereinander
     print(f"route length {info['total']:.1f} m, used {info['used']:.1f} m")
     return sc
 

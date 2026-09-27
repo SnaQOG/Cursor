@@ -237,23 +237,24 @@ def lightning(name, parent, offset, color, f_on, f_off, radius=0.7, n_bolts=7, v
     return root
 
 
-def burst(name, loc, f0, color, r_max=6.0, dur=24, light_w=60000.0, ring=True, bolts=True, seed=5, ring_dz=0.0):
+def burst(name, loc, f0, color, r_max=6.0, dur=24, light_w=60000.0, ring=True, bolts=True, seed=5, ring_dz=0.0,
+          core_s=25.0, glow_s=9.0, glow_alpha=0.32, ring_s=6.0, core_color=(0.9, 0.95, 1.0)):
     """Aufprall-Explosion: weißer Blitz, expandierende Glühkugel, Druckwellenring, Blitzbögen, Lichtspitze."""
     root = bpy.data.objects.new(name, None)
     fpv.link(root)
     root.location = loc
-    core_m = glow_material(name + "CoreMat", (0.9, 0.95, 1.0), 25.0, kind="core")
+    core_m = glow_material(name + "CoreMat", core_color, core_s, kind="core")
     core = _sphere(name + "Core", 1.0, core_m)
     core.parent = root
     key_scale(core, [(f0 - 1, 0.001), (f0, r_max * 0.12), (f0 + 3, r_max * 0.35), (f0 + 7, r_max * 0.18),
                      (f0 + 10, 0.001)])
-    gm = glow_material(name + "GlowMat", color, 9.0, falloff=1.9, alpha=0.32)
+    gm = glow_material(name + "GlowMat", color, glow_s, falloff=1.9, alpha=glow_alpha)
     glow = _sphere(name + "Glow", 1.0, gm)
     glow.parent = root
     key_scale(glow, [(f0 - 1, 0.001), (f0, r_max * 0.25), (f0 + int(dur * 0.3), r_max), (f0 + dur, r_max * 1.15)])
     key_fade(gm, [(f0, 1.0), (f0 + int(dur * 0.25), 0.9), (f0 + int(dur * 0.6), 0.35), (f0 + dur, 0.0)])
     if ring:
-        rm = glow_material(name + "RingMat", color, 6.0, falloff=0.6, alpha=0.6)
+        rm = glow_material(name + "RingMat", color, ring_s, falloff=0.6, alpha=0.6)
         bm = bmesh.new()
         n = 96
         outer = [bm.verts.new((math.cos(a), math.sin(a), 0)) for a in np.linspace(0, 2 * math.pi, n, endpoint=False)]
@@ -277,19 +278,31 @@ def burst(name, loc, f0, color, r_max=6.0, dur=24, light_w=60000.0, ring=True, b
     return root
 
 
-def beam(name, origin, direction, length, radius, color, f_start, f_full, f_end, light_w=8000.0):
+def beam(name, origin, direction, length, radius, color, f_start, f_full, f_end, light_w=8000.0, wobble=None,
+         core_s=14.0, whiten=0.7, glow_s=4.5, core_r=0.42):
     """Energiestrahl (Kamehameha, Todesstrahl): Kern + Glühmantel wachsen von der Quelle bis zur Länge,
-    Kopfkugel an der Spitze, Punktlicht an Kopf und Quelle, Ausblenden am Ende."""
+    Kopfkugel an der Spitze, Punktlicht an Kopf und Quelle, Ausblenden am Ende.
+    length: Zahl oder Liste [(frame, länge)] (Strahlenduell: Länge ändert sich); wobble = (f0, f1, amp):
+    pulsierender Radius."""
     d = Vector(direction).normalized()
     root = bpy.data.objects.new(name, None)
     fpv.link(root)
     root.location = origin
     root.rotation_mode = "QUATERNION"
     root.rotation_quaternion = d.to_track_quat("Z", "Y")
-    cm = glow_material(name + "CoreMat", tuple(0.7 + 0.3 * c for c in color), 14.0, kind="core")
-    gm = glow_material(name + "GlowMat", color, 4.5, falloff=1.1, alpha=0.65)
+    if isinstance(length, (int, float)):
+        lengths = [(f_start, 0.01), (f_full, float(length)), (f_end, float(length))]
+    else:
+        lengths = [(int(f), max(float(v), 0.01)) for f, v in length]
+    rad = [(f_start - 1, 0.001), (f_start, 0.4), (min(f_start + 2, f_full), 1.0), (f_end - 4, 1.0), (f_end, 0.05)]
+    if wobble:
+        rng = np.random.default_rng(len(name))
+        rad += [(f, 1.0 + wobble[2] * rng.uniform(-1, 1)) for f in range(wobble[0], wobble[1], 2)]
+        rad.sort()
+    cm = glow_material(name + "CoreMat", tuple(whiten + (1 - whiten) * c for c in color), core_s, kind="core")
+    gm = glow_material(name + "GlowMat", color, glow_s, falloff=1.1, alpha=0.65)
     parts = []
-    for (nm, r, m) in (("Core", radius * 0.42, cm), ("Glow", radius, gm)):
+    for (nm, r, m) in (("Core", radius * core_r, cm), ("Glow", radius, gm)):
         bm = bmesh.new()
         bmesh.ops.create_cone(bm, cap_ends=True, segments=32, radius1=r, radius2=r, depth=1.0)
         bmesh.ops.translate(bm, vec=(0, 0, 0.5), verts=bm.verts)
@@ -298,28 +311,125 @@ def beam(name, origin, direction, length, radius, color, f_start, f_full, f_end,
         ob.parent = root
         parts.append(ob)
     for ob in parts:
-        key_scale(ob, [(f_start - 1, (0.001, 0.001, 0.001)), (f_start, (0.4, 0.4, 0.01)),
-                       (f_full, (1, 1, length)), (f_end - 4, (1, 1, length)), (f_end, (0.05, 0.05, length))])
-    head_m = glow_material(name + "HeadMat", color, 8.0, falloff=0.9, alpha=0.7)
+        for f, v in rad:
+            ob.scale = (v, v, 1.0)
+            ob.keyframe_insert("scale", index=0, frame=f)
+            ob.keyframe_insert("scale", index=1, frame=f)
+        for f, L in [(f_start - 1, 0.01)] + lengths:
+            ob.scale = (1.0, 1.0, L)
+            ob.keyframe_insert("scale", index=2, frame=f)
+    head_m = glow_material(name + "HeadMat", color, glow_s * 1.8, falloff=0.9, alpha=0.7)
     head = _sphere(name + "Head", radius * 1.6, head_m)
     head.parent = root
-    for f, z, sc in ((f_start - 1, 0.0, 0.001), (f_start, 0.0, 0.6), (f_full, length, 1.0), (f_end - 4, length, 1.0),
-                     (f_end, length, 0.001)):
-        head.location = (0, 0, z)
+    for f, L in [(f_start - 1, 0.0)] + lengths:
+        head.location = (0, 0, L)
         head.keyframe_insert("location", frame=f)
-        head.scale = (sc, sc, sc)
-        head.keyframe_insert("scale", frame=f)
+    key_scale(head, [(f_start - 1, 0.001), (f_start, 0.6), (f_full, 1.0), (f_end - 4, 1.0), (f_end, 0.001)])
     for nm, zz in (("L0", 0.3), ("L1", None)):
         lt = point_light(name + nm, color, 0.0, radius)
         lt.parent = root
         if zz is None:
-            for f, z in ((f_start, 0.0), (f_full, length)):
-                lt.location = (0, 0, z)
+            for f, L in lengths:
+                lt.location = (0, 0, L)
                 lt.keyframe_insert("location", frame=f)
         else:
             lt.location = (0, 0, zz)
         key_energy(lt, [(f_start - 1, 0.0), (f_start + 2, light_w), (f_end - 4, light_w), (f_end, 0.0)])
     return root
+
+
+def smoke_material(name, color):
+    """Staub/Rauch als diffuse Quellwolke: im Kern fast deckend (rauscharm bei wenigen Samples), zur Silhouette
+    weich auslaufend, von Rauschen aufgelockert; 'Fade' blendet aus. (Volumen wären realistischer, machen in
+    Cycles aber jede Schattenabfrage der Szene mehrfach teurer.)"""
+    mat, nb, out = fpv.new_material(name)
+    fade = _fade_node(nb)
+    co = nb.coords("Object")
+    nz = nb.noise(co, scale=2.6, detail=5, rough=0.62)
+    lw = nb.node("ShaderNodeLayerWeight")
+    lw.inputs["Blend"].default_value = 0.5
+    # harte, ausgefranste Kante statt Teiltransparenz (rauschfrei); Ausblenden = Auflösen über die Schwelle
+    soft = nb.math("POWER", nb.math("SUBTRACT", 1.0, lw.outputs["Facing"]), 0.6)
+    val = nb.math("MULTIPLY", soft, nb.math("ADD", nb.out(nz, "Fac"), 0.25))
+    thr = nb.math("ADD", 0.42, nb.math("MULTIPLY", nb.math("SUBTRACT", 1.0, fade.outputs[0]), 0.9))
+    a = nb.math("MINIMUM", nb.math("MAXIMUM", nb.math("MULTIPLY", nb.math("SUBTRACT", val, thr), 14.0), 0.0), 1.0)
+    col = nb.mix(nb.out(nz, "Fac"), [c * 0.6 for c in color], [min(1.0, c * 1.1) for c in color])
+    p = fpv.principled(nb, Base_Color=col, Roughness=1.0)
+    tr = nb.node("ShaderNodeBsdfTransparent")
+    mix = nb.node("ShaderNodeMixShader")
+    nb.link(a, mix.inputs[0])
+    nb.link(tr.outputs[0], mix.inputs[1])
+    nb.link(p.outputs[0], mix.inputs[2])
+    nb.link(mix.outputs[0], out.inputs[0])
+    return mat
+
+
+def dust_cloud(name, loc, f0, r_max, color=(0.55, 0.50, 0.42), dur=48, seed=1, puffs=12, rise=0.35):
+    """Aufgewirbelte Staub-/Rauchwolke: viele kleine, weiche Quellbüschel, die explosionsartig aufquellen,
+    langsam steigen und in der zweiten Hälfte verblassen."""
+    rng = np.random.default_rng(seed)
+    root = bpy.data.objects.new(name, None)
+    fpv.link(root)
+    root.location = loc
+    m = smoke_material(name + "Mat", color)
+    for k in range(puffs):
+        r = r_max * rng.uniform(0.22, 0.4)
+        bm = bmesh.new()
+        bmesh.ops.create_icosphere(bm, subdivisions=3, radius=1.0)
+        ob = fpv.mesh_from_bmesh(bm, f"{name}P{k}", m)
+        fpv.displace_obj(ob, "CLOUDS", size=0.5, strength=0.18, depth=2, name=f"{name}P{k}_d")
+        ob.parent = root
+        az = rng.uniform(0, 2 * math.pi)
+        rr = r_max * 0.6 * math.sqrt(rng.random())
+        base = Vector((math.cos(az) * rr, math.sin(az) * rr, r * 0.3 + rng.uniform(0, 0.4) * r_max))
+        ob.rotation_euler = tuple(rng.uniform(0, 6.3, 3))
+        for f, sc, lift in ((f0 - 1, 0.001, 0.0), (f0, 0.2, 0.0), (f0 + 5, 0.75, 0.1), (f0 + int(dur * 0.5), 1.0, 0.6),
+                            (f0 + dur, 1.2, 1.0)):
+            ob.scale = (r * sc, r * sc, r * sc * 0.85)
+            ob.keyframe_insert("scale", frame=f)
+            ob.location = base * (0.3 + 0.7 * min(sc, 1.0)) + Vector((0, 0, rise * r_max * lift))
+            ob.keyframe_insert("location", frame=f)
+    key_fade(m, [(f0, 1.0), (f0 + int(dur * 0.4), 0.9), (f0 + dur, 0.0)])
+    return root
+
+
+def debris(name, loc, f0, mat, n=12, speed=14.0, size=0.25, seed=1, fps=24, dur=1.6, ground=None):
+    """Weggeschleuderte Gesteinsbrocken (ballistisch, rotierend), landen auf 'ground' (z) und bleiben liegen."""
+    rng = np.random.default_rng(seed)
+    g = -9.81
+    zg = loc[2] if ground is None else ground
+    for k in range(n):
+        bm = bmesh.new()
+        bmesh.ops.create_icosphere(bm, subdivisions=1, radius=size * rng.uniform(0.5, 1.4))
+        for v in bm.verts:
+            v.co *= rng.uniform(0.7, 1.2)
+        ob = fpv.mesh_from_bmesh(bm, f"{name}{k}", mat)
+        az = rng.uniform(0, 2 * math.pi)
+        el = rng.uniform(0.6, 1.3)
+        v0 = Vector((math.cos(az) * math.cos(el), math.sin(az) * math.cos(el), math.sin(el))) * speed * rng.uniform(0.5,
+                                                                                                                1.1)
+        spin = Vector(rng.normal(0, 8, 3))
+        ob.rotation_mode = "XYZ"
+        steps = int(dur * fps)
+        landed = None
+        for i in range(-1, steps + 1, 2):
+            t = max(i, 0) / fps
+            p = Vector(loc) + v0 * t + Vector((0, 0, 0.5 * g * t * t))
+            if p.z < zg and t > 0.1:
+                if landed is None:
+                    landed = p.copy()
+                    landed.z = zg
+                p = landed
+            ob.location = p
+            ob.keyframe_insert("location", frame=f0 + i)
+            if landed is None:
+                ob.rotation_euler = tuple(spin * t)
+                ob.keyframe_insert("rotation_euler", frame=f0 + i)
+        ob.scale = (0.001, 0.001, 0.001)
+        ob.keyframe_insert("scale", frame=f0 - 1)
+        ob.scale = (1, 1, 1)
+        ob.keyframe_insert("scale", frame=f0)
+        _interp(ob.animation_data, "LINEAR")
 
 
 def ki_blast(name, p0, p1, f0, f1, color, radius=0.35, impact=True, r_impact=3.0, seed=1):
@@ -343,43 +453,69 @@ def ki_blast(name, p0, p1, f0, f1, color, radius=0.35, impact=True, r_impact=3.0
 
 
 def aura(name, parent, color, f_on, f_off, height=1.9, width=0.75, light_w=600.0):
-    """Super-Saiyajin-Aura: flammenartige, nach oben strömende Glühhülle um den Körper + flackerndes Licht."""
-    mat, nb, out = fpv.new_material(name + "Mat")
-    fade = _fade_node(nb)
-    t = _fade_node(nb, "Time", 0.0)
-    co = nb.coords("Object")
-    x, y, z = nb.sep(co)
-    flow = nb.comb(nb.math("MULTIPLY", x, 3.0), nb.math("MULTIPLY", y, 3.0), nb.math("SUBTRACT", nb.math("MULTIPLY", z, 1.2), t.outputs[0]))
-    nz = nb.noise(flow, scale=2.5, detail=4, rough=0.6)
-    flames = nb.math("POWER", nb.math("MAXIMUM", nb.math("SUBTRACT", nb.out(nz, "Fac"), 0.35), 0.0), 1.2)
-    lw = nb.node("ShaderNodeLayerWeight")
-    lw.inputs["Blend"].default_value = 0.35
-    edge = nb.math("POWER", lw.outputs["Facing"], 1.5)
-    a = nb.math("MINIMUM", nb.math("MULTIPLY", nb.math("MULTIPLY", flames, nb.math("ADD", edge, 0.25)),
-                                   nb.math("MULTIPLY", fade.outputs[0], 2.2)), 1.0)
-    em = nb.node("ShaderNodeEmission")
-    nb.set_in(em, "Color", color)
-    nb.link(nb.math("MULTIPLY", nb.math("ADD", flames, 0.25), 9.0), em.inputs["Strength"])
-    tr = nb.node("ShaderNodeBsdfTransparent")
-    mix = nb.node("ShaderNodeMixShader")
-    nb.link(a, mix.inputs[0])
-    nb.link(tr.outputs[0], mix.inputs[1])
-    nb.link(em.outputs[0], mix.inputs[2])
-    nb.link(mix.outputs[0], out.inputs[0])
-    ob = _sphere(name, 1.0, mat, seg=40)
-    ob.parent = parent
-    ob.location = (0, 0, height * 0.5)
-    ob.scale = (width * 0.55, width * 0.45, height * 0.62)
-    # Flammenspitzen nach oben: obere Hälfte strecken
-    for v in ob.data.vertices:
-        if v.co.z > 0:
-            v.co.z *= 1.35
-            v.co.x *= 1.0 - 0.35 * v.co.z
-            v.co.y *= 1.0 - 0.35 * v.co.z
-    key_fade(mat, [(f_on - 1, 0.0), (f_on + 3, 1.0), (f_off - 3, 1.0), (f_off, 0.0)])
-    for f in (f_on - 1, f_off):
-        t.outputs[0].default_value = (f - f_on) / 24.0 * 3.2
-        t.outputs[0].keyframe_insert("default_value", frame=f)
+    """Super-Saiyajin-Aura: flammenförmige, nach oben strömende Glühhülle mit hellem Rand um den Körper,
+    Flammenzungen oben, weicher Halo und flackerndes Licht."""
+    rim = tuple(min(1.0, c * 0.5 + 0.55) for c in color)
+
+    def shell_mat(nm, strength, alpha, streak_scale):
+        mat, nb, out = fpv.new_material(nm)
+        fade = _fade_node(nb)
+        t = _fade_node(nb, "Time", 0.0)
+        co = nb.coords("Object")
+        x, y, z = nb.sep(co)
+        flow = nb.comb(nb.math("MULTIPLY", x, 4.0), nb.math("MULTIPLY", y, 4.0),
+                       nb.math("SUBTRACT", nb.math("MULTIPLY", z, 0.9), t.outputs[0]))
+        nz = nb.noise(flow, scale=streak_scale, detail=3, rough=0.55)
+        streak = nb.math("MINIMUM", nb.math("MAXIMUM", nb.math("MULTIPLY", nb.math("SUBTRACT", nb.out(nz, "Fac"), 0.42),
+                                                                        4.0), 0.0), 1.0)
+        lw = nb.node("ShaderNodeLayerWeight")
+        lw.inputs["Blend"].default_value = 0.4
+        edge = nb.math("POWER", lw.outputs["Facing"], 1.2)
+        a = nb.math("ADD", 0.01, nb.math("MULTIPLY", streak, 0.10))
+        a = nb.math("ADD", a, nb.math("MULTIPLY", edge, nb.math("ADD", nb.math("MULTIPLY", streak, 0.35), 0.12)))
+        a = nb.math("MINIMUM", nb.math("MULTIPLY", a, nb.math("MULTIPLY", fade.outputs[0], alpha)), 1.0)
+        em = nb.node("ShaderNodeEmission")
+        nb.set_in(em, "Color", nb.mix(edge, color, rim))
+        s = nb.math("ADD", nb.math("MULTIPLY", streak, 6.0), nb.math("MULTIPLY", edge, 4.0))
+        nb.link(nb.math("MULTIPLY", nb.math("ADD", s, 2.5), strength), em.inputs["Strength"])
+        tr = nb.node("ShaderNodeBsdfTransparent")
+        mix = nb.node("ShaderNodeMixShader")
+        nb.link(a, mix.inputs[0])
+        nb.link(tr.outputs[0], mix.inputs[1])
+        nb.link(em.outputs[0], mix.inputs[2])
+        nb.link(mix.outputs[0], out.inputs[0])
+        return mat, t, fade
+
+    def flame_shell(nm, mat, grow):
+        ob = _sphere(nm, 1.0, mat, seg=48)
+        ob.parent = parent
+        ob.location = (0, 0, height * 0.46)
+        ob.scale = (width * 0.55 * grow, width * 0.45 * grow, height * 0.6 * grow)
+        rng = np.random.default_rng(len(nm))
+        ph = rng.uniform(0, 6.3, 3)
+        for v in ob.data.vertices:
+            x, y, z = v.co
+            if z > 0:
+                a = math.atan2(y, x)
+                tongue = (0.5 + 0.5 * math.sin(a * 5 + ph[0])) ** 3 + 0.6 * (0.5 + 0.5 * math.sin(a * 9 + ph[1])) ** 4
+                v.co.z = z * (1.3 + 0.55 * tongue * z)
+                k = 1.0 - 0.45 * z
+                v.co.x, v.co.y = x * k, y * k
+            else:
+                v.co.z = z * 0.85
+        return ob
+
+    m1, _, _ = shell_mat(name + "Mat", 1.0, 1.0, 2.6)
+    flame_shell(name, m1, 1.0)
+    m2, _, _ = shell_mat(name + "HaloMat", 0.4, 0.22, 1.6)
+    flame_shell(name + "Halo", m2, 1.22)
+    for m in (m1, m2):
+        key_fade(m, [(f_on - 1, 0.0), (f_on + 3, 1.0), (f_off - 3, 1.0), (f_off, 0.0)])
+        nd = m.node_tree.nodes["Time"]
+        for f in (f_on - 1, f_off):
+            nd.outputs[0].default_value = (f - f_on) / 24.0 * 3.6
+            nd.outputs[0].keyframe_insert("default_value", frame=f)
+        _interp(m.node_tree.animation_data, "LINEAR")
     lt = point_light(name + "Light", color, 0.0, 0.6)
     lt.parent = parent
     lt.location = (0, 0, height * 0.55)
@@ -387,4 +523,4 @@ def aura(name, parent, color, f_on, f_off, height=1.9, width=0.75, light_w=600.0
     for f in range(f_on - 1, f_off + 1):
         lt.data.energy = light_w * rng.uniform(0.7, 1.1) if f_on <= f < f_off else 0.0
         lt.data.keyframe_insert("energy", frame=f)
-    return ob
+    return m1

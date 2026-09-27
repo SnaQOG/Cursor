@@ -69,6 +69,11 @@ def load_frame(image_path):
 
 def composite(path, P):
     obj, alpha, mist, env = load_frame(path)
+    # Cycles mittelt den Mist-Pass über Transparenz: halbtransparente Flächen vor dem Himmel bekommen
+    # mist ≈ (1 - alpha) + alpha * mist_obj. Zurückrechnen, sonst würden Energieeffekte und Kanten
+    # gegen den Himmel wie kilometerweit entfernt eingedunstet.
+    a = np.clip(alpha, 0.0, 1.0)
+    mist = np.where(a > 0.02, np.clip((mist - (1.0 - a)) / np.maximum(a, 1e-3), 0.0, 1.0), mist)
     dist = mist * P["mist_depth"]
     # Dunst: Transmission + Einstreuung
     L = P["haze_dist"]

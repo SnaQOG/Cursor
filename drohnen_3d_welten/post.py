@@ -121,6 +121,40 @@ def tonemap(img, look, proc_holder={}):
     return buf
 
 
+def _blur(img, sigma):
+    """Separabler Gauß (numpy) für kleine Bilder."""
+    r = max(1, int(3 * sigma))
+    x = np.arange(-r, r + 1, dtype=np.float32)
+    k = np.exp(-x * x / (2 * sigma * sigma))
+    k /= k.sum()
+    out = img
+    for axis in (0, 1):
+        pad = [(0, 0)] * img.ndim
+        pad[axis] = (r, r)
+        p = np.pad(out, pad, mode="edge")
+        acc = np.zeros_like(out)
+        for i, wgt in enumerate(k):
+            sl = [slice(None)] * img.ndim
+            sl[axis] = slice(i, i + out.shape[axis])
+            acc += wgt * p[tuple(sl)]
+        out = acc
+    return out
+
+
+def bloom(img, thr=2.5, strength=0.35, f=8):
+    """Leuchten heller Quellen (Energieattacken, Blitze, Sonnenglanz): Hochpass über thr, verkleinert
+    weichgezeichnet (zwei Radien), bilinear zurück."""
+    h, w, _ = img.shape
+    hh, ww = h // f, w // f
+    b = np.maximum(img - thr, 0)[:hh * f, :ww * f].reshape(hh, f, ww, f, 3).mean((1, 3))
+    if b.max() <= 0:
+        return img
+    bb = 0.55 * _blur(b, 1.5) + 0.45 * _blur(b, 6.0)
+    up = np.stack([np.asarray(Image.fromarray(bb[..., c].astype(np.float32), mode="F").resize((w, h), Image.BILINEAR))
+                   for c in range(3)], -1)
+    return img + strength * up
+
+
 def _stage2(args):
     i, path, P, ev, outdir = args
     img = composite(path, P)
@@ -132,6 +166,8 @@ def _stage2(args):
     sat = P.get("sat", 1.0)
     img = Y + (img - Y) * sat
     img = np.maximum(img, 0)
+    if P.get("bloom"):
+        img = bloom(img, thr=P.get("bloom_thr", 2.5), strength=P["bloom"])
     out = tonemap(img, P.get("look"))
     out = np.clip(out, 0, 1)
     h, w = out.shape[:2]

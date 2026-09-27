@@ -210,56 +210,11 @@ def ribbon(name, pts, width, mat, twist=0.0):
     return ob
 
 
-def _legs_and_feet(tag, mats, pants, lower, shoe, pant_to=0.36):
-    """Hose als EIN Skelett (Becken + beide Beine, durchgehender Schritt) bis pant_to (m), darunter
-    Stiefel/Wicklung bis zum Knöchel, Sandale mit Sohle, Riemen und freien Zehen."""
-    # Becken als Ellipsoid, Beinketten beginnen im Rumpf -> keine Naht, kein Knick im Schritt
-    objs = [ellipsoid(f"{tag}Pelvis", (0, 0, 0.9), (0.152, 0.112, 0.12), pants)]
-    lows = []
-    for sx in (-1, 1):
-        top = Vector((sx * 0.07, 0, 1.0))
-        hip = Vector((sx * 0.085, 0, 0.84))
-        knee = Vector((sx * 0.095, 0.025, 0.50))
-        ankle = Vector((sx * 0.10, 0, 0.10))
-        cut = knee.lerp(ankle, (0.50 - pant_to) / 0.40)
-        objs.append(skin_part(f"{tag}Leg{sx}", [top, hip, hip.lerp(knee, 0.5), knee, cut],
-                              [(i, i + 1) for i in range(4)],
-                              [(0.08, 0.08), (0.09, 0.09), (0.079, 0.079), (0.064, 0.064), (0.058, 0.058)], pants))
-        lows.append((sx, cut, ankle))
-    for sx, cut, ankle in lows:
-        objs.append(skin_part(f"{tag}Shin{sx}", [cut + Vector((0, 0, 0.04)), ankle + Vector((0, 0, 0.03))], [(0, 1)],
-                              [(0.054, 0.054), (0.046, 0.046)], lower))
-        objs.append(skin_part(f"{tag}Foot{sx}", [ankle + Vector((0, -0.02, -0.035)), Vector((sx * 0.10, 0.12, 0.032))],
-                              [(0, 1)], [(0.046, 0.04), (0.042, 0.026)], mats["skin"]))
-        bm = bmesh.new()
-        bmesh.ops.create_cube(bm, size=1.0)
-        bmesh.ops.scale(bm, vec=(0.095, 0.27, 0.025), verts=bm.verts)
-        bmesh.ops.translate(bm, vec=(sx * 0.10, 0.05, 0.0125), verts=bm.verts)
-        sole = fpv.mesh_from_bmesh(bm, f"{tag}Sole{sx}", shoe, smooth=False)
-        bv = sole.modifiers.new("bv", "BEVEL")
-        bv.width = 0.01
-        bv.segments = 2
-        objs.append(sole)
-        objs.append(skin_part(f"{tag}Strap{sx}", [ankle + Vector((0, -0.015, -0.01)), ankle + Vector((0, -0.015, 0.09))],
-                              [(0, 1)], [(0.052, 0.05), (0.05, 0.048)], shoe))
-    return objs
-
-
-def _arm(tag, sx, pts, radii, mat, hand_mat, hand_r=(0.045, 0.045, 0.05)):
-    """Arm-Kette, die IM Rumpf beginnt (nahtloser Schulteransatz), Hand in Verlängerung des Unterarms."""
-    root = Vector((sx * 0.06, 0, pts[0][2] - 0.04))
-    chain = [root] + [Vector(p) for p in pts]
-    objs = [skin_part(f"{tag}Arm{sx}", chain, [(i, i + 1) for i in range(len(chain) - 1)], [radii[0]] + list(radii),
-                      mat)]
-    d = (chain[-1] - chain[-2]).normalized()
-    objs.append(ellipsoid(f"{tag}Hand{sx}", chain[-1] + d * 0.045, hand_r, hand_mat))
-    return objs
-
-
-def naruto(loc, yaw_deg, mats=None):
-    """Naruto Uzumaki (Shippuden): schwarz-orange Jacke mit Uzumaki-Spirale am Rücken, orange Hose,
+def naruto(loc, yaw_deg, mats=None, pose="stand"):
+    """Naruto Uzumaki (Shippuden, Model Sheet): schwarz-orange Jacke mit Uzumaki-Spirale am Rücken, orange Hose,
     Oberschenkel-Bandage mit Holster, schwarze Stiefelsandalen, Stirnband mit Blattsymbol und langen Enden,
-    gelbes Stachelhaar. Pose: rechter Arm zeigt hinauf zum Hokage-Felsen."""
+    gelbes Stachelhaar. Gibt eine animierbare Figur (figures.Figure) zurück."""
+    from figures import POSES, Figure
     tag = "Naruto"
     ORANGE, BLACK = (0.86, 0.26, 0.035), (0.028, 0.028, 0.032)
     sp = spiral_decal(os.path.join(textures.OUT, "uzumaki_spiral.png"))
@@ -279,32 +234,21 @@ def naruto(loc, yaw_deg, mats=None):
     }
     if mats:
         m.update(mats)
-    objs = []
-    # Rumpf (Jacke): Becken – Bauch – Brust – Hals
-    torso = [(0, 0, 0.90), (0, 0.01, 1.05), (0, 0, 1.22), (0, -0.005, 1.37), (0, 0, 1.43)]
-    objs.append(skin_part(f"{tag}Torso", torso, [(i, i + 1) for i in range(4)],
-                          [(0.155, 0.115), (0.15, 0.11), (0.165, 0.115), (0.14, 0.1), (0.065, 0.065)], m["jacket"]))
-    objs.append(skin_part(f"{tag}Collar", [(0, 0, 1.40), (0, 0, 1.49)], [(0, 1)], [(0.075, 0.072), (0.07, 0.068)],
-                          m["sleeve"]))
-    # Arme: rechts erhoben zum Felsen, links Hand an der Hüfte
-    arms = {1: [(0.19, 0, 1.36), (0.23, 0.2, 1.52), (0.25, 0.38, 1.73), (0.255, 0.43, 1.79)],
-            -1: [(-0.19, 0, 1.36), (-0.32, -0.05, 1.13), (-0.19, 0.0, 0.99), (-0.15, 0.01, 0.97)]}
-    for sx, pts in arms.items():
-        objs += _arm(tag, sx, pts[:3], [(0.06, 0.06), (0.051, 0.051), (0.043, 0.043)], m["sleeve"], m["skin"])
-    objs += _legs_and_feet(tag, m, m["pants"], m["boot"], m["boot"], pant_to=0.30)
-    # Bandage + Holster am rechten Oberschenkel, Tasche hinten rechts
-    objs.append(skin_part(f"{tag}Bandage", [(0.092, 0.012, 0.64), (0.093, 0.016, 0.72)], [(0, 1)],
-                          [(0.082, 0.082), (0.084, 0.084)], m["bandage"]))
-    objs.append(ellipsoid(f"{tag}Holster", (0.17, 0.0, 0.66), (0.022, 0.05, 0.08), m["holster"]))
-    objs.append(ellipsoid(f"{tag}Pouch", (0.1, -0.13, 0.92), (0.06, 0.035, 0.06), m["pouch"]))
-    # Kopf, Ohren
+    fig = Figure(tag, 1.66, loc, yaw_deg)
+    fig.body({"torso": m["jacket"], "pelvis": m["pants"], "upper_arm": m["sleeve"], "forearm": m["sleeve"],
+              "hand": m["skin"], "thigh": m["pants"], "lower": m["boot"], "foot": m["boot"], "skin": m["skin"]},
+             pant_to=0.30)
+    fig.seg("Collar", [(0, 0, 1.40), (0, 0, 1.49)], [(0.075, 0.072), (0.07, 0.068)], m["sleeve"], "spine")
+    fig.seg("Bandage", [(0.092, 0.012, 0.64), (0.093, 0.016, 0.72)], [(0.082, 0.082), (0.084, 0.084)], m["bandage"],
+            "hip.R")
+    fig.ell("Holster", (0.17, 0.0, 0.66), (0.022, 0.05, 0.08), m["holster"], "hip.R")
+    fig.ell("Pouch", (0.1, -0.13, 0.92), (0.06, 0.035, 0.06), m["pouch"], "root")
     H = Vector((0, 0.01, 1.57))
-    objs.append(ellipsoid(f"{tag}Head", H, (0.098, 0.108, 0.118), m["skin"]))
+    head = []
     for sx in (-1, 1):
-        objs.append(ellipsoid(f"{tag}Ear{sx}", H + Vector((sx * 0.097, -0.005, 0.0)), (0.014, 0.022, 0.03), m["skin"]))
-    # Stirnband: Band, Metallplatte vorn, lange Enden hinten (flattern leicht)
+        head.append(ellipsoid(f"{tag}Ear{sx}", H + Vector((sx * 0.097, -0.005, 0.0)), (0.014, 0.022, 0.03), m["skin"]))
     band = [tuple(H + Vector((math.cos(a) * 0.104, math.sin(a) * 0.114, 0.045))) for a in np.linspace(0, 2 * math.pi, 41)]
-    objs.append(tube(f"{tag}Band", band, 0.022, m["band"]))
+    head.append(tube(f"{tag}Band", band, 0.022, m["band"]))
     bm = bmesh.new()
     bmesh.ops.create_cube(bm, size=1.0)
     bmesh.ops.scale(bm, vec=(0.13, 0.012, 0.045), verts=bm.verts)
@@ -313,13 +257,12 @@ def naruto(loc, yaw_deg, mats=None):
     bv = plate.modifiers.new("bv", "BEVEL")
     bv.width = 0.006
     bv.segments = 2
-    objs.append(plate)
+    head.append(plate)
     for k, (dx, dz) in enumerate(((0.02, 0.0), (-0.015, -0.025))):
         pts = [tuple(H + Vector((dx + 0.03 * math.sin(t * 5 + k), -0.11 - 0.33 * t, 0.045 + dz - 0.22 * t * t)))
                for t in np.linspace(0, 1, 12)]
-        objs.append(ribbon(f"{tag}Tail{k}", pts, 0.035, m["band"], twist=0.9))
-    # Stachelhaar: Kappe + ~26 Stacheln (hinten/oben/seitlich), Pony vorn über dem Stirnband
-    objs.append(ellipsoid(f"{tag}HairCap", H + Vector((0, -0.01, 0.035)), (0.106, 0.116, 0.108), m["hair"]))
+        head.append(ribbon(f"{tag}Tail{k}", pts, 0.035, m["band"], twist=0.9))
+    head.append(ellipsoid(f"{tag}HairCap", H + Vector((0, -0.01, 0.035)), (0.106, 0.116, 0.108), m["hair"]))
     rng = np.random.default_rng(3)
     dirs, lens, brs = [], [], []
     while len(dirs) < 44:   # Stacheln starten im Kopfzentrum: Länge 0,2–0,32 m ragt 9–20 cm heraus
@@ -330,16 +273,20 @@ def naruto(loc, yaw_deg, mats=None):
         dirs.append((math.cos(az) * math.cos(el), math.sin(az) * math.cos(el) - 0.15, math.sin(el) + 0.2))
         lens.append(rng.uniform(0.2, 0.32))
         brs.append(rng.uniform(0.06, 0.08))
-    objs.append(spikes(f"{tag}Spikes", H + Vector((0, -0.01, 0.06)), dirs, lens, brs, m["hair"]))
+    head.append(spikes(f"{tag}Spikes", H + Vector((0, -0.01, 0.06)), dirs, lens, brs, m["hair"]))
     bang = [(math.cos(a) * 0.4, 1.0, -0.8) for a in np.linspace(-1.2, 1.2, 5)]
-    objs.append(spikes(f"{tag}Bangs", H + Vector((0, 0.07, 0.1)), bang, [0.07] * 5, [0.03] * 5, m["hair"]))
-    return _assemble(tag, objs, loc, yaw_deg)
+    head.append(spikes(f"{tag}Bangs", H + Vector((0, 0.07, 0.1)), bang, [0.07] * 5, [0.03] * 5, m["hair"]))
+    for o in head:
+        fig.attach(o, "head")
+    fig.pose(1, POSES.get(pose, {}))
+    return fig
 
 
-def sasuke(loc, yaw_deg, mats=None):
-    """Sasuke Uchiha (Shippuden): hellgraues Kurzarmhemd mit hohem Kragen und Uchiha-Wappen am Rücken,
+def sasuke(loc, yaw_deg, mats=None, pose="stand"):
+    """Sasuke Uchiha (Shippuden, Model Sheet): hellgraues Kurzarmhemd mit hohem Kragen und Uchiha-Wappen am Rücken,
     indigofarbener Hüftwickel bis zum Knie, dicker lila Seilgürtel mit Knoten, dunkle Hose,
     graue Beinwickel, Armstulpen, Kusanagi-Schwert schräg im Gürtel, schwarzes Haar (hinten stachelig)."""
+    from figures import POSES, Figure
     tag = "Sasuke"
     GREY, INDIGO = (0.40, 0.40, 0.46), (0.045, 0.045, 0.16)
     cr = uchiha_decal(os.path.join(textures.OUT, "uchiha_crest.png"))
@@ -357,38 +304,29 @@ def sasuke(loc, yaw_deg, mats=None):
     }
     if mats:
         m.update(mats)
-    objs = []
-    torso = [(0, 0, 0.93), (0, 0.01, 1.06), (0, 0, 1.23), (0, -0.005, 1.38), (0, 0, 1.44)]
-    objs.append(skin_part(f"{tag}Torso", torso, [(i, i + 1) for i in range(4)],
-                          [(0.15, 0.11), (0.14, 0.105), (0.16, 0.11), (0.135, 0.098), (0.062, 0.062)], m["shirt"]))
-    objs.append(skin_part(f"{tag}Collar", [(0, -0.01, 1.40), (0, -0.015, 1.53)], [(0, 1)],
-                          [(0.085, 0.08), (0.09, 0.085)], m["shirt"]))
-    # Hüftwickel: weiter Rock bis zum Knie
-    objs.append(skin_part(f"{tag}Wrap", [(0, 0, 0.98), (0, 0.0, 0.78), (0, 0.0, 0.55)], [(0, 1), (1, 2)],
-                          [(0.17, 0.13), (0.19, 0.15), (0.2, 0.16)], m["wrap"], subdiv=2))
-    # Seilgürtel: zwei dicke Windungen + hängender Knoten vorn links
+    fig = Figure(tag, 1.66, loc, yaw_deg)
+    fig.body({"torso": m["shirt"], "pelvis": m["pants"], "upper_arm": m["shirt"], "forearm": m["skin"],
+              "hand": m["skin"], "thigh": m["pants"], "lower": m["wraps"], "foot": m["shoe"], "skin": m["skin"]},
+             pant_to=0.34, sleeve_to=0.45)
+    fig.seg("Collar", [(0, -0.01, 1.40), (0, -0.015, 1.53)], [(0.085, 0.08), (0.09, 0.085)], m["shirt"], "spine")
+    fig.seg("Wrap", [(0, 0, 0.98), (0, 0.0, 0.78), (0, 0.0, 0.58)], [(0.17, 0.13), (0.19, 0.15), (0.2, 0.16)],
+            m["wrap"], "root")
     for k, z in enumerate((0.965, 1.02)):
         pts = [(math.cos(a) * 0.168, math.sin(a) * 0.125, z + 0.01 * math.sin(a * 3)) for a in np.linspace(0, 2 * math.pi, 49)]
-        objs.append(tube(f"{tag}Rope{k}", pts, 0.028, m["rope"]))
-    objs.append(tube(f"{tag}Knot", [(-0.1, 0.12, 0.99), (-0.12, 0.15, 0.85), (-0.11, 0.14, 0.70)], 0.03, m["rope"]))
-    for sx in (-1, 1):
-        pts = [(sx * 0.19, 0, 1.37), (sx * 0.235, -0.02, 1.1), (sx * 0.26, 0.03, 0.87)]
-        objs.append(skin_part(f"{tag}Sleeve{sx}", [(sx * 0.06, 0, 1.33), pts[0], (sx * 0.222, -0.012, 1.22)],
-                              [(0, 1), (1, 2)], [(0.068, 0.066), (0.066, 0.066), (0.062, 0.06)], m["shirt"]))
-        objs += _arm(tag, sx, pts, [(0.05, 0.05), (0.041, 0.041), (0.034, 0.034)], m["skin"], m["skin"],
-                     hand_r=(0.036, 0.032, 0.055))
-        objs.append(skin_part(f"{tag}Guard{sx}", [(sx * 0.252, 0.015, 0.92), (sx * 0.258, 0.026, 0.98)], [(0, 1)],
-                              [(0.042, 0.042), (0.044, 0.044)], m["guard"]))
-    objs += _legs_and_feet(tag, m, m["pants"], m["wraps"], m["shoe"], pant_to=0.34)
-    # Kusanagi schräg hinten im Gürtel
-    objs.append(tube(f"{tag}Sheath", [(-0.2, -0.16, 0.62), (0.2, -0.15, 1.18)], 0.022, m["sheath"]))
-    objs.append(tube(f"{tag}Hilt", [(0.2, -0.15, 1.18), (0.27, -0.148, 1.29)], 0.017, m["sheath"]))
-    # Kopf + Haar: hinten stachelig abstehend, lange Strähnen seitlich vorn
+        fig.attach(tube(f"{tag}Rope{k}", pts, 0.028, m["rope"]), "root")
+    fig.attach(tube(f"{tag}Knot", [(-0.1, 0.12, 0.99), (-0.12, 0.15, 0.85), (-0.11, 0.14, 0.70)], 0.03, m["rope"]),
+               "root")
+    for sd, sx in (("R", 1), ("L", -1)):
+        el, wr = Vector((sx * 0.21, 0, 1.10)), Vector((sx * 0.22, 0, 0.86))
+        fig.seg(f"Guard{sd}", [el.lerp(wr, 0.62), el.lerp(wr, 0.92)], [(0.044, 0.044), (0.046, 0.046)], m["guard"],
+                f"elbow.{sd}")
+    fig.attach(tube(f"{tag}Sheath", [(-0.2, -0.16, 0.62), (0.2, -0.15, 1.18)], 0.022, m["sheath"]), "root")
+    fig.attach(tube(f"{tag}Hilt", [(0.2, -0.15, 1.18), (0.27, -0.148, 1.29)], 0.017, m["sheath"]), "root")
     H = Vector((0, 0.01, 1.60))
-    objs.append(ellipsoid(f"{tag}Head", H, (0.096, 0.106, 0.116), m["skin"]))
+    head = []
     for sx in (-1, 1):
-        objs.append(ellipsoid(f"{tag}Ear{sx}", H + Vector((sx * 0.095, -0.005, 0.0)), (0.014, 0.022, 0.03), m["skin"]))
-    objs.append(ellipsoid(f"{tag}HairCap", H + Vector((0, -0.02, 0.03)), (0.105, 0.115, 0.108), m["hair"]))
+        head.append(ellipsoid(f"{tag}Ear{sx}", H + Vector((sx * 0.095, -0.005, 0.0)), (0.014, 0.022, 0.03), m["skin"]))
+    head.append(ellipsoid(f"{tag}HairCap", H + Vector((0, -0.02, 0.03)), (0.105, 0.115, 0.108), m["hair"]))
     rng = np.random.default_rng(7)
     dirs, lens, brs = [], [], []
     for k in range(26):   # hinten abstehende Stacheln (Referenz: Rückansicht)
@@ -397,18 +335,11 @@ def sasuke(loc, yaw_deg, mats=None):
         dirs.append((math.cos(az) * math.cos(el) * 0.85, math.sin(az) * math.cos(el), math.sin(el) + 0.3))
         lens.append(rng.uniform(0.2, 0.31))
         brs.append(rng.uniform(0.055, 0.075))
-    objs.append(spikes(f"{tag}Spikes", H + Vector((0, -0.05, 0.05)), dirs, lens, brs, m["hair"], bend=(0, -0.3, 0.15)))
+    head.append(spikes(f"{tag}Spikes", H + Vector((0, -0.05, 0.05)), dirs, lens, brs, m["hair"], bend=(0, -0.3, 0.15)))
     side = [(sx * 0.9, 0.35, -1.0) for sx in (-1, -0.6, 0.6, 1)]
-    objs.append(spikes(f"{tag}Bangs", H + Vector((0, 0.05, 0.08)), side, [0.17, 0.13, 0.13, 0.17], [0.03] * 4,
+    head.append(spikes(f"{tag}Bangs", H + Vector((0, 0.05, 0.08)), side, [0.17, 0.13, 0.13, 0.17], [0.03] * 4,
                        m["hair"]))
-    return _assemble(tag, objs, loc, yaw_deg)
-
-
-def _assemble(tag, objs, loc, yaw_deg):
-    root = bpy.data.objects.new(tag, None)
-    fpv.link(root)
-    for o in objs:
-        o.parent = root
-    root.location = loc
-    root.rotation_euler = (0, 0, math.radians(yaw_deg))
-    return root
+    for o in head:
+        fig.attach(o, "head")
+    fig.pose(1, POSES.get(pose, {}))
+    return fig

@@ -26,6 +26,8 @@ import fpv  # noqa: E402
 import konoha  # noqa: E402
 import nature  # noqa: E402
 import ninja  # noqa: E402
+import vfx  # noqa: E402
+from figures import POSES  # noqa: E402
 import sunny  # noqa: E402
 import textures  # noqa: E402
 
@@ -47,8 +49,8 @@ HEADS = [(-110, 10.0, "hashirama"), (-55, -13.0, "tobirama"), (0, 14.0, "hiruzen
 
 ROUTE = [
     (0, -60, 4.4), (0, -30, 4.8), (0, 0, 5.5), (0, 35, 7.6), (-2, 75, 10.0), (-7, 112, 11.0),
-    (-3, 145, 12.5), (-4, 170, 18.0), (-10, 192, 30.0), (-16, 211, 38.6), (-19, 232, 37.9),
-    (-19, 251, 38.3), (-17, 270, 49.0), (-14, 290, 62.0), (-11, 308, 76.0), (-9, 322, 86.0),
+    (-3, 145, 14.0), (-4, 168, 23.0), (-10, 190, 33.5), (-16, 211, 39.3), (-19, 232, 39.4),
+    (-19, 251, 39.6), (-17, 270, 49.0), (-14, 290, 62.0), (-11, 308, 76.0), (-9, 322, 86.0),
 ]
 
 
@@ -140,6 +142,103 @@ def cliff_details(cliff_ob, mats, rng):
         d.data.materials.append(mats["roofs"][0])
         for pp in d.data.polygons:
             pp.use_smooth = True
+
+
+def chase_over_roofs(N, S, street_roofs, C, deck, key, F, lead=13.0):
+    """Straßenduell vor der Drohne: Naruto und Sasuke kämpfen ~13 m vor der Kamera über der Hauptstraße,
+    stoßen sich abwechselnd von den Hauswänden ab und prallen in der Mitte in der Luft zusammen
+    (Schlag/Tritt mit Funken), springen dann über den alten Baum und über den Platz aufs Residenzdach."""
+    pos, _, _ = fpv.fpv_path(ROUTE, SPEED, FPS, FPS * SECONDS, look_pitch=-2.0, pitch_follow=0.45, micro=0.0)
+    ts = np.arange(len(pos)) / FPS
+
+    def yf(t):
+        return float(np.interp(t, ts, pos[:, 1])) + lead
+
+    clashes = [3.9, 5.0, 6.1, 7.2, 8.2]
+    for fig, side in ((N, -1), (S, 1)):
+        other = -side
+        wall = lambda t: Vector((side * 11.0, yf(t), 8.4))
+        key(fig, 0.0, "jump", wall(3.0), wall(3.0) + Vector((-side, 0, 0)), air=True)
+        key(fig, 3.0, "jump", wall(3.0), wall(3.0) + Vector((-side, 0, 0)), air=True)
+        for k, tc in enumerate(clashes):
+            q = Vector((side * 0.66, yf(tc), 9.8))
+            opp = Vector((other * 0.66, yf(tc), 9.8))
+            key(fig, tc - 0.2, "jump", Vector((side * 2.8, yf(tc - 0.2), 9.4)), opp, air=True)
+            atk = ("punch_R", "kick_R", "punch_L", "kick_L", "punch_R")[k] if side < 0 else \
+                  ("kick_L", "punch_L", "kick_R", "punch_R", "punch_L")[k]
+            key(fig, tc, atk, q, opp, air=True)
+            key(fig, tc + 0.15, "guard", q + Vector((side * 0.4, 0.3, 0.15)), opp, air=True)
+            if k < len(clashes) - 1:
+                tw = (tc + clashes[k + 1]) / 2
+                w = Vector((side * 11.0, yf(tw), 8.0 + 0.6 * (k % 2)))
+                key(fig, tw, "land", w, w + Vector((side, 0, 0)), air=True)   # Abstoß an der Hauswand
+        # über den alten Baum, über den Platz, Ziegelkragen, Dach
+        a = math.radians(250 if side < 0 else 290)
+        skirt = Vector((C.x + 23 * math.cos(a), C.y + 1 + 23 * math.sin(a), 16.8))
+        deckp = Vector((C.x + side * 9.0, C.y + 7.0, deck))
+        tree = Vector((TREE_POS[0] + side * 2.5, TREE_POS[1] + 1.0, 25.0))
+        plaza = Vector((side * 8.0, 181.0, 0.3))
+        key(fig, 8.75, "jump", tree, tree + Vector((0, 8, -4)), air=True)
+        key(fig, 9.45, "jump", Vector((side * 4.0, 150.0, 15.0)), plaza, air=True)
+        key(fig, 10.1, "land", plaza, skirt)
+        key(fig, 10.25, "jump", plaza + Vector((0, 2.0, 1.0)), skirt, air=True)
+        key(fig, 10.95, "land", skirt, deckp)
+        key(fig, 11.1, "jump", skirt + Vector((0, 1.5, 1.5)), deckp, air=True)
+        key(fig, 11.7, "jump", (skirt + deckp) / 2 + Vector((0, 0, 7.0)), deckp, air=True)
+    for k, tc in enumerate(clashes):
+        for j, dt in enumerate((0.0, 0.15)):
+            vfx.burst(f"StreetSpark{k}{j}", Vector((0, yf(tc + dt) + 0.3, 10.9)), F(tc + dt), (0.95, 0.85, 0.6),
+                      r_max=1.1, dur=7, light_w=1800.0, ring=False, bolts=False)
+
+
+def roof_fight(deck, street_roofs):
+    """Choreografie auf dem Residenzdach, getaktet auf den Kameraflug (Drohne bei ~15,8 s über der Dachmitte):
+    Sprint + Schlagabtausch, Luftsprung mit Zusammenprall, Rasengan/Chidori aufladen, Ansturm,
+    Zusammenprall mit Lichtexplosion und Druckwelle, beide werden zurückgeschleudert."""
+    C = Vector((RES_POS[0], RES_POS[1] - 1.0, deck))
+    nar = ninja.naruto(tuple(C), 0.0)
+    sas = ninja.sasuke(tuple(C), 0.0)
+
+    def F(t):
+        return int(round(t * FPS)) + 1
+
+    def at(dx, dy, dz=0.0):
+        return C + Vector((dx, dy, dz))
+
+    def key(fig, t, pose, pos, look, air=False):
+        d = look - pos
+        yaw = math.degrees(math.atan2(-d.x, d.y))
+        fig.pose(F(t), POSES[pose], loc=(pos.x, pos.y, pos.z), yaw=yaw, ground=None if air else pos.z)
+
+    N, S = nar, sas
+    Y = 7.0   # Kampflinie 6 m nördlich der Dachmitte (Flugbahn läuft über die Mitte)
+    chase_over_roofs(N, S, street_roofs, C, deck, key, F)
+    # (Zeit, Pose N, Position N, Pose S, Position S, in der Luft?)
+    plan = [
+        (12.15, "land", at(-9.0, Y), "land", at(9.0, Y), False),
+        (12.45, "crouch_charge_R", at(-9.0, Y), "crouch_charge_L", at(9.0, Y), False),
+        (13.55, "crouch_charge_R", at(-8.9, Y), "crouch_charge_L", at(8.9, Y), False),
+        (13.75, "run_a", at(-6.6, Y), "run_b", at(6.6, Y), False),
+        (13.95, "run_b", at(-4.3, Y), "run_a", at(4.3, Y), False),
+        (14.15, "dash_thrust_R", at(-2.2, Y, 0.35), "dash_thrust_L", at(2.2, Y, 0.35), True),
+        (14.4, "dash_thrust_R", at(-0.62, Y, 0.55), "dash_thrust_L", at(0.62, Y, 0.55), True),
+        (14.7, "recoil", at(-4.2, Y - 0.5, 1.8), "recoil", at(4.2, Y - 0.5, 1.8), True),
+        (15.15, "land", at(-8.4, Y - 1.0), "land", at(8.4, Y - 1.0), False),
+        (16.4, "land", at(-8.7, Y - 1.0), "land", at(8.7, Y - 1.0), False),
+        (17.2, "guard", at(-8.7, Y - 1.0), "guard", at(8.7, Y - 1.0), False),
+    ]
+    for (t, pn, xn, ps, xs, air) in plan:
+        key(N, t, pn, xn, xs, air)
+        key(S, t, ps, xs, xn, air)
+    blue = (0.12, 0.42, 1.0)
+    # Rasengan (rechte Hand Naruto) und Chidori (linke Hand Sasuke)
+    vfx.energy_ball("Rasengan", N.J["wrist.R"], (0, 0.03, -0.19), blue, 0.28, F(12.35), F(13.1), F(14.45),
+                    light_w=260.0)
+    vfx.lightning("Chidori", S.J["wrist.L"], (0, 0.0, -0.12), (0.35, 0.6, 1.0), F(12.4), F(14.45), radius=0.7,
+                  n_bolts=9, seed=4, light_w=450.0)
+    # Zusammenprall: Lichtblitz, Glühkugel, Druckwellenring flach über das Dach, Blitzbögen
+    vfx.burst("Clash", at(0, Y, 1.9), F(14.42), (0.25, 0.55, 1.0), r_max=4.2, dur=26, light_w=16000.0, seed=8,
+              ring_dz=-1.7)
 
 
 def build(args):
@@ -269,6 +368,7 @@ def build(args):
     foot = []
     tops = []
     # a) entlang der Hauptstraße
+    street_roofs = []
     for side in (-1, 1):
         y = 22.0
         while y < 172:
@@ -279,6 +379,7 @@ def build(args):
             style = rng.choice(["flat", "barrel", "barrel", "round", "flat"])
             foot.append((cx, y + w / 2, max(w, d) / 2 + 2.5))
             objs, top = detailed_building(cx, y + w / 2, d, w, floors, style, (-side, 0.0), idx)
+            street_roofs.append((side, y + w / 2, objs[0]["h"], style))
             # Banner an der Straßenfassade
             if rng.random() < 0.55:
                 ch = rng.choice(["火", "木", "忍", "茶", "楽", "薬", "酒"])
@@ -330,10 +431,8 @@ def build(args):
     print("buildings", idx)
 
     _, res_top = konoha.residence(mats, RES_POS[0], RES_POS[1], r=21.0)
-    # Naruto und Sasuke (Model Sheets) auf dem Flachdach der Residenz, Blick hinauf zum Hokage-Felsen
-    deck = res_top + 0.65
-    ninja.naruto((RES_POS[0] - 1.1, RES_POS[1] + 16.2, deck), 0.0)
-    ninja.sasuke((RES_POS[0] + 1.2, RES_POS[1] + 16.0, deck), -8.0)
+    # Kampf Naruto gegen Sasuke auf dem Flachdach der Residenz (Rasengan gegen Chidori)
+    roof_fight(res_top + 0.65, street_roofs)
     for (x, y, rr, tiers, rm) in ((-44, 150, 5.5, 3, 3), (40, 128, 5.0, 2, 5)):   # Stufentürme an der Straße
         konoha.tiered_tower(f"StreetTower{x}", x, y, rr, tiers, mats, mats["roofs"][rm], rng)
         foot.append((x, y, rr + 3))

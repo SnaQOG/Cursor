@@ -27,7 +27,7 @@ import sunny  # noqa: E402
 FPS = 24
 SECONDS = 20
 SPEED = 15.0
-SUN_ELEV, SUN_AZIM = 22.0, 200.0
+SUN_ELEV, SUN_AZIM = 32.0, 200.0
 
 ROUTE = [
     (0, -8, 3.0), (0, 40, 3.1), (-1, 80, 3.4), (9, 118, 4.3), (13, 150, 5.4), (4, 184, 7.0),
@@ -36,7 +36,7 @@ ROUTE = [
 
 SHIP_HEADING = -40.5  # Grad (mathematisch, von +X), Bug zeigt nach Südosten
 SHIP_SPEED = 3.0
-SHIP_T15 = Vector((-27.9, 233.4, 0.0))  # Position bei t = 15 s
+SHIP_T15 = Vector((-104.72, 287.53, 0.0))  # Position bei t = 15 s: frontale Annäherung, Endbild ~32 m vor dem Bug
 
 
 def ship_start():
@@ -58,7 +58,7 @@ ROCKS = [
     (-5, 262, 3.5, 5, 19, 0.6),
     (-150, 205, 12.0, 38, 20, 0.3),
     (70, 110, 10.0, 34, 21, 0.3),
-    (-122, 305, 7.0, 18, 22, 0.35),
+    (-107.7, 321.8, 7.0, 18, 22, 0.35),  # neben dem Kurs der Sunny
     (-150, 268, 5.0, 12, 23, 0.4),
     (-205, 345, 11.0, 30, 24, 0.3),
     (-96, 330, 4.0, 7, 25, 0.5),
@@ -105,11 +105,11 @@ def shore_factor(nb, img, smap, d0, d1, max_d):
     return mr.outputs[0]
 
 
-def shallow_tint(shore_img, shore_map, max_d=12.0):
+def shallow_tint(shore_img, shore_map, max_d=12.0, color=(0.02, 0.20, 0.19)):
     def fn(nb, col):
         f = shore_factor(nb, shore_img, shore_map, 0.0, 11.0, max_d)
         f = nb.math("MULTIPLY", nb.math("POWER", f, 1.5), 0.75)
-        return nb.mix(f, col, (0.02, 0.20, 0.19))
+        return nb.mix(f, col, color)
     return fn
 
 
@@ -134,7 +134,7 @@ def build(args):
     fpv.setup_render(args.out, res=args.res, fps=FPS, seconds=SECONDS, samples=args.samples,
                      motion_blur=not args.no_mblur, mist_depth=6000.0)
     fpv.build_world(sun_elev=SUN_ELEV, sun_azim=SUN_AZIM, sky_strength=0.08, clouds=True, cloud_cover=0.42,
-                    cloud_ref=9.0, aerosol=1.4)
+                    cloud_ref=9.0, aerosol=0.5, ozone=2.0)
     fpv.add_sun(SUN_ELEV, SUN_AZIM, strength=5.2, color=(1.0, 0.9, 0.78))
 
     # Schiff
@@ -213,13 +213,13 @@ def build(args):
     shore_img, shore_map = ocean.shore_distance_image([o for o, _, _ in rocks], -250, -70, 170, 450, cell=0.5)
 
     # Ozean + Geometry-Nodes-Kielspur
-    wmat = ocean.water_material("Sea", deep=(0.003, 0.03, 0.045), shallow=(0.02, 0.10, 0.11),
-                                wake_fn=foam_builder(shore_img, shore_map), color_fn=shallow_tint(shore_img, shore_map))
+    wmat = ocean.water_material("Sea", deep=(0.005, 0.06, 0.19), shallow=(0.015, 0.21, 0.33),
+                                wake_fn=foam_builder(shore_img, shore_map), color_fn=shallow_tint(shore_img, shore_map, color=(0.01, 0.24, 0.30)))
     ocean.animate_time_value(wmat, FPS, frames)
     oc = ocean.make_ocean(x0, y0, nx, ny, tile=tile, res=res, wind=9.5, wave_scale=0.9, chop=1.3, fps=FPS,
                           frames=frames, mat=wmat, direction_deg=-30, alignment=0.4, foam_coverage=0.25)
-    ocean.ocean_fx_gn(oc, root, hull)
-    far = ocean.water_material("FarSea", deep=(0.003, 0.03, 0.045), shallow=(0.02, 0.10, 0.11), far=True)
+    ocean.ocean_fx_gn(oc, root, hull, bow_x=sunny.X_B, stern_x=sunny.X_S, hull_halfbeam=sunny.B2)
+    far = ocean.water_material("FarSea", deep=(0.005, 0.06, 0.19), shallow=(0.015, 0.21, 0.33), far=True)
     ocean.far_plane(x0 - tile / 2 + 1, x0 - tile / 2 + tile * nx - 1, y0 - tile / 2 + 1, y0 - tile / 2 + tile * ny - 1,
                     mat=far, z=-0.05)
 

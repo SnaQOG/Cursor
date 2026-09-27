@@ -55,14 +55,65 @@ def jolly_roger_flag(path=None, W=1536, H=1024):
     return path
 
 
+def _skull_outlined(d, cx, cy, s, ow, white, black, hat_fill, band_fill):
+    """Jolly Roger wie auf dem Model Sheet: jedes Teil erst schwarz (Kontur, Breite ow), dann farbig."""
+    bw = int(0.16 * s)
+    bones = []
+    for ang in (35, -35):
+        a = math.radians(ang)
+        dx, dy = math.cos(a) * 1.25 * s, math.sin(a) * 1.25 * s
+        p0, p1 = (cx - dx, cy + 0.35 * s - dy), (cx + dx, cy + 0.35 * s + dy)
+        knobs = []
+        for sx, sy in (p0, p1):
+            for off in (-1, 1):
+                knobs.append((sx - math.sin(a) * 0.1 * s * off, sy + math.cos(a) * 0.1 * s * off))
+        bones.append((p0, p1, knobs))
+    r = 0.13 * s
+    for grow, fill in ((ow, black), (0, white)):
+        for p0, p1, knobs in bones:
+            d.line([p0, p1], fill=fill, width=bw + 2 * grow)
+            for (kx, ky) in knobs:
+                d.ellipse([kx - r - grow, ky - r - grow, kx + r + grow, ky + r + grow], fill=fill)
+    for grow, fill in ((ow, black), (0, white)):
+        d.ellipse([cx - 0.62 * s - grow, cy - 0.75 * s - grow, cx + 0.62 * s + grow, cy + 0.45 * s + grow], fill=fill)
+        d.rounded_rectangle([cx - 0.36 * s - grow, cy + 0.1 * s - grow, cx + 0.36 * s + grow, cy + 0.72 * s + grow],
+                            radius=int(0.12 * s), fill=fill)
+    for ex in (-0.26, 0.26):
+        d.ellipse([cx + (ex - 0.17) * s, cy - 0.22 * s, cx + (ex + 0.17) * s, cy + 0.14 * s], fill=black)
+    d.polygon([(cx, cy + 0.18 * s), (cx - 0.08 * s, cy + 0.34 * s), (cx + 0.08 * s, cy + 0.34 * s)], fill=black)
+    for tx in (-0.2, -0.07, 0.07, 0.2):
+        d.line([(cx + tx * s, cy + 0.48 * s), (cx + tx * s, cy + 0.70 * s)], fill=black, width=max(2, int(0.035 * s)))
+    # Strohhut: Krempe, Kuppel, rotes Band – mit Kontur
+    for grow, fill in ((ow, black), (0, hat_fill)):
+        d.ellipse([cx - 1.0 * s - grow, cy - 0.78 * s - grow, cx + 1.0 * s + grow, cy - 0.48 * s + grow], fill=fill)
+        d.pieslice([cx - 0.6 * s - grow, cy - 1.35 * s - grow, cx + 0.6 * s + grow, cy - 0.35 * s + grow], 180, 360,
+                   fill=fill)
+    d.rectangle([cx - 0.6 * s, cy - 0.78 * s, cx + 0.6 * s, cy - 0.64 * s], fill=band_fill)
+    d.line([(cx - 0.6 * s, cy - 0.78 * s), (cx + 0.6 * s, cy - 0.78 * s)], fill=black, width=max(2, ow // 2))
+    d.line([(cx - 0.6 * s, cy - 0.64 * s), (cx + 0.6 * s, cy - 0.64 * s)], fill=black, width=max(2, ow // 2))
+
+
 def jolly_roger_sail(path=None, W=2048, H=2048):
-    """Segel-Aufdruck: schwarzer Schädel auf transparentem Grund (Alpha)."""
-    path = path or os.path.join(OUT, "jolly_sail.png")
+    """Segel-Aufdruck nach dem Model Sheet (決定稿): weißer Schädel und Knochen mit schwarzer Kontur,
+    schwarze Augenhöhlen, gelber Strohhut mit rotem Band – auf transparentem Grund (Alpha)."""
+    path = path or os.path.join(OUT, "jolly_sail_color.png")
     im = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
-    _skull(d, W / 2, H * 0.40 + 120, 520, fill=(12, 11, 10, 255), hole=(0, 0, 0, 0), hat=True,
-           hat_fill=(12, 11, 10, 255), band_fill=(0, 0, 0, 0))
+    _skull_outlined(d, W / 2, H * 0.42 + 90, 500, 26, white=(244, 240, 230, 255), black=(14, 12, 11, 255),
+                    hat_fill=(232, 184, 52, 255), band_fill=(184, 26, 22, 255))
     im = im.filter(ImageFilter.GaussianBlur(1.5))
+    im.save(path)
+    return path
+
+
+def number_decal(text, path, W=512, fg=(16, 14, 12)):
+    """Schwarze Ziffer (z. B. die „1“ des Soldier Dock) auf transparentem Grund."""
+    im = Image.new("RGBA", (W, W), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    font = ImageFont.truetype(JP_FONT, int(W * 0.78))
+    bb = d.textbbox((0, 0), text, font=font)
+    d.text(((W - (bb[2] - bb[0])) / 2 - bb[0], (W - (bb[3] - bb[1])) / 2 - bb[1]), text, font=font, fill=(*fg, 255))
+    im = im.filter(ImageFilter.GaussianBlur(1.0))
     im.save(path)
     return path
 

@@ -55,22 +55,29 @@ def namek_sky(nb, d):
     x, y, z = nb.sep(d)
     zz = nb.math("MAXIMUM", z, 0.0)
     t = nb.math("POWER", zz, 0.55)
-    col = nb.ramp(t, [(0.0, (0.76, 0.90, 0.56)), (0.12, (0.56, 0.82, 0.46)), (0.45, (0.26, 0.60, 0.34)),
-                      (1.0, (0.10, 0.40, 0.26))])
+    # Referenz (Anime/Manga): gesättigtes Grasgrün, am Horizont hell gelbgrün
+    col = nb.ramp(t, [(0.0, (0.80, 0.88, 0.42)), (0.07, (0.50, 0.74, 0.20)), (0.30, (0.12, 0.47, 0.07)),
+                      (1.0, (0.035, 0.30, 0.02))])
     below = nb.math("LESS_THAN", z, 0.0)
-    col = nb.mix(below, col, (0.55, 0.74, 0.48))
+    col = nb.mix(below, col, (0.55, 0.72, 0.35))
     # Leuchten um die Hauptsonne
     sd = fpv.sun_dir(SUN_ELEV, SUN_AZIM)
     dp = nb.math("MAXIMUM", nb.vmath("DOT_PRODUCT", d, tuple(sd)), 0.0)
     glow = nb.math("ADD", nb.math("MULTIPLY", nb.math("POWER", dp, 8.0), 0.5),
                    nb.math("MULTIPLY", nb.math("POWER", dp, 64.0), 1.5))
     col = nb.vmath("ADD", col, nb.vmath("SCALE", (1.0, 0.97, 0.85), scale=glow))
-    return col
+    # Kamera- und Spiegelstrahlen sehen den kräftigen Himmel; diffuses Licht kommt entsättigt an,
+    # damit blaues Gras und beiger Fels ihre Farbe behalten (sonst färbt der grüne Himmel alles türkis)
+    lp = nb.node("ShaderNodeLightPath")
+    vivid = nb.math("MAXIMUM", lp.outputs["Is Camera Ray"], lp.outputs["Is Glossy Ray"])
+    lum = nb.vmath("DOT_PRODUCT", col, (0.2126, 0.7152, 0.0722))
+    neutral = nb.mix(0.6, col, nb.comb(lum, lum, lum))
+    return nb.mix(vivid, neutral, col)
 
 
 def namek_rock():
-    return nature.rock_material("NamekRock", c1=(0.13, 0.095, 0.065), c2=(0.50, 0.38, 0.24), c3=(0.34, 0.24, 0.14),
-                                wet_line=1.6, algae=(0.03, 0.06, 0.04), moss=(0.04, 0.17, 0.16), moss_amount=0.3,
+    return nature.rock_material("NamekRock", c1=(0.16, 0.10, 0.12), c2=(0.62, 0.40, 0.27), c3=(0.46, 0.30, 0.24),
+                                wet_line=1.6, algae=(0.03, 0.06, 0.04), moss=(0.02, 0.11, 0.34), moss_amount=0.3,
                                 strata_scale=2.2, bump=0.9, crack_w=0.15, scale=1.5, lichen=0.1,
                                 moss_tex=os.path.join(fpv.ASSETS, "grasslight-big.jpg"), moss_tex_scale=4.0)
 
@@ -110,7 +117,7 @@ def build(args):
     for (e, a, s) in SUNS2:
         extra.append((e, a, 0.6, 500.0 * s, (1.0, 0.97, 0.9)))
     fpv.build_world(sun_elev=SUN_ELEV, sun_azim=SUN_AZIM, sky_strength=0.85, clouds=True, cloud_cover=0.25,
-                    cloud_ref=1.1, custom_sky=namek_sky, extra_suns=extra, cloud_color=(0.95, 1.0, 0.95),
+                    cloud_ref=1.1, custom_sky=namek_sky, extra_suns=extra, cloud_color=(1.0, 1.0, 0.78),
                     cloud_scale=1.3)
     fpv.add_sun(SUN_ELEV, SUN_AZIM, strength=5.6, color=(1.0, 0.92, 0.76), name="Sun1", angle_deg=1.5)
     for i, (e, a, s) in enumerate(SUNS2):
@@ -160,15 +167,15 @@ def build(args):
     # Meer: smaragdgrün, Flachwasser + Brandung an Felsen und Tafelberg (Abstandsfeld)
     shore_img, shore_map = ocean.shore_distance_image(spires + [mesa], -200, -100, 200, 420, cell=0.5,
                                                       name="NamekShore")
-    wmat = ocean.water_material("NamekSea", deep=(0.008, 0.06, 0.04), shallow=(0.04, 0.17, 0.11),
+    wmat = ocean.water_material("NamekSea", deep=(0.012, 0.10, 0.035), shallow=(0.07, 0.30, 0.10),
                                 wake_fn=foam_builder(shore_img, shore_map), foam_amount=0.4,
-                                color_fn=shallow_tint(shore_img, shore_map))
+                                color_fn=shallow_tint(shore_img, shore_map, color=(0.05, 0.25, 0.09)))
     ocean.animate_time_value(wmat, FPS, frames)
     tile = 100.0
     x0, y0, nx, ny = -140.0, -40.0, 3, 5
     ocean.make_ocean(x0, y0, nx, ny, tile=tile, res=13, wind=6.5, wave_scale=0.7, chop=1.1, fps=FPS, frames=frames,
                      mat=wmat, direction_deg=60, alignment=0.3, foam_coverage=0.1)
-    far = ocean.water_material("NamekFarSea", deep=(0.008, 0.06, 0.04), shallow=(0.04, 0.17, 0.11), far=True)
+    far = ocean.water_material("NamekFarSea", deep=(0.012, 0.10, 0.035), shallow=(0.07, 0.30, 0.10), far=True)
     ocean.far_plane(x0 - tile / 2 + 1, x0 - tile / 2 + tile * nx - 1, y0 - tile / 2 + 1, y0 - tile / 2 + tile * ny - 1,
                     mat=far, z=-0.05)
 
@@ -204,11 +211,11 @@ def build(args):
     namek.spaceship(mats, SHIP_C[0], SHIP_C[1], top_z(*SHIP_C) + 1.5)
 
     # Ajisa-Bäume (verdrehte dünne Stämme, perfekte Kugelkronen)
-    leaf = nature.leaf_material("AjisaLeaf", c1=(0.03, 0.13, 0.10), c2=(0.08, 0.26, 0.19), trans=0.3)
-    bark = nature.bark_material("AjisaBark", c=(0.16, 0.15, 0.10))
+    leaf = nature.leaf_material("AjisaLeaf", c1=(0.004, 0.045, 0.30), c2=(0.03, 0.12, 0.50), trans=0.3)
+    bark = nature.bark_material("AjisaBark", c=(0.42, 0.33, 0.18))
     variants = [namek.ajisa_variant(f"Ajisa{i}", leaf, bark, height=h, crown_r=cr, leaves=int(900 * cr * cr / 4),
                                     seed=70 + i, leaf_size=0.36, turns=tw)
-                for i, (h, cr, tw) in enumerate(((7.0, 3.0, 1.4), (9.5, 3.8, 1.8), (5.5, 2.4, 1.2), (11.0, 4.2, 2.1)))]
+                for i, (h, cr, tw) in enumerate(((12.0, 2.8, 0.8), (15.0, 3.3, 1.0), (9.0, 2.3, 0.6), (17.0, 3.6, 1.1)))]
     _, subs = nature.make_tree_collection("AjisaTrees", variants)
     pos, _, _ = fpv.fpv_path(route, SPEED, FPS, frames, micro=0.0)
     path_xy = pos[:, :2]
@@ -263,9 +270,37 @@ def build(args):
     nature.scatter_instances("Ajisa", subs, pts, scales=scl, seed=4)
     print("ajisa", len(pts))
 
-    # Blaugrünes Gras als echte Halme entlang der Flugbahn (Dichte fällt mit dem Abstand)
+    # Sandflecken im blauen Gras und rote Pilzgruppen (Referenzbilder)
+    prng = np.random.default_rng(58)
+    patches = []
+    while len(patches) < 26:
+        a = prng.uniform(0, 2 * math.pi)
+        rr = MESA_R * 0.72 * math.sqrt(prng.random())
+        x, y = MESA_C[0] + math.cos(a) * rr, MESA_C[1] + math.sin(a) * rr
+        rx = prng.uniform(1.5, 6.0)
+        rim = [top_z(x + rx * math.cos(b), y + rx * math.sin(b)) for b in np.linspace(0, 2 * math.pi, 12)]
+        if min(rim) < MESA_H - 4.5 or any(math.hypot(x - ax, y - ay) < ar + 2 for (ax, ay, ar) in avoid):
+            continue
+        patches.append((x, y, rx, rx * prng.uniform(0.45, 0.9), prng.uniform(0, math.pi)))
+    namek.sand_patches("SandPatches", patches, mesa_height, namek.sand_material())
+    mclusters = []
+    while len(mclusters) < 50:
+        k = int(prng.integers(0, len(path_xy)))
+        p = path_xy[k]
+        if not (190 < p[1] < 318):
+            continue
+        tng = path_xy[min(k + 1, len(path_xy) - 1)] - path_xy[max(k - 1, 0)]
+        tng = tng / (np.linalg.norm(tng) + 1e-9)
+        x, y = p + np.array([-tng[1], tng[0]]) * prng.uniform(2.5, 14) * prng.choice([-1, 1])
+        if any(math.hypot(x - ax, y - ay) < ar for (ax, ay, ar) in avoid) or top_z(x, y) < MESA_H - 5:
+            continue
+        mclusters.append((float(x), float(y)))
+    namek.mushrooms("Mushroom", mclusters, mesa_height, prng)
+
+    # Blaues Gras als echte Halme entlang der Flugbahn (Dichte fällt mit dem Abstand)
     excl = [(x, y, r * 0.95) for (x, y, r) in houses] + [(DB_C[0], DB_C[1], 1.7), (SHIP_C[0], SHIP_C[1], 17.5)]
     excl += boulders
+    excl += [(x, y, min(rx, ry) * 0.7) for (x, y, rx, ry, _) in patches]
     namek.grass_field("NamekGrass", mesa_height, path_xy, namek.grass_blade_material(), rng, ymin=172, ymax=330,
                       exclude=excl, zmin=MESA_H - 5)
 

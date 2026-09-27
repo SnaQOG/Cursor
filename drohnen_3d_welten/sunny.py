@@ -1,13 +1,14 @@
-"""Thousand Sunny (One Piece) – Production-Modell v2.
+"""Thousand Sunny (One Piece) – v3 nach den offiziellen Model Sheets (三面図 / 決定稿, Folge 313~).
 
 Lokales System: +X = Bug, +Y = Backbord, +Z = oben, Wasserlinie z = 0.
-Brigantine, ~32 m Länge, ~10 m Breite, Großmast ~27 m über Deck.
-
-Referenz-Merkmale: gerundeter brauner Plankenrumpf mit weißen und roten Details,
-gelber Löwenkopf mit orangefarbener Blütenmähne und gekreuzten Knochen dahinter,
-Rasendeck, zwei Masten mit weißen Rahsegeln (Großsegel mit Strohhut-Jolly-Roger),
-Gaffelsegel rot-schwarz gestreift am zweiten Mast, rundes Ausguck-Haus, schwarze Flagge,
-Soldier-Dock-Tore mittschiffs, Kanonenpforten, Coup-de-Burst-Öffnung am Heck.
+Maße aus den Zeichnungen (Maßstabsleiste 0–100, 1 Einheit ≈ 9 cm):
+  Rumpfkörper ~21 m lang und ~12 m breit (sehr bauchig), Gesamtlänge Löwe–Heckkanone ~28 m,
+  Rasendeck 4,2 m über Wasser, rote U-Bordwand (Bug 9,3 m, Mitte 5,2 m) mit cremefarbener Kante,
+  Voluten und Bullaugen, schwarzes Band und schwarzer Ring mit „1“ (Soldier Dock) mittschiffs,
+  roter Bugschild mit gelben Nieten, Vorschiff mit Steuerrad, zweistöckiges Achterkastell
+  (Bogenfenster), Rundturm mit rot-gelber Kuppel, große Heckkanone (Gaon Cannon / Coup de Burst),
+  Fockmast mit Ausguck-Kuppel und ~20 m breitem Jolly-Roger-Rahsegel, Großmast auf dem
+  Achterkastell mit Rahsegel und rot-schwarz gestreiftem Gaffelsegel.
 """
 import math
 
@@ -19,130 +20,114 @@ from mathutils import Matrix, Vector
 import fpv
 import textures
 
-L = 32.0
-W = 4.9
-PLANK_W = 0.30   # Plankenbreite entlang des Umfangs (m)
-PLANK_L = 6.5    # Plankenlänge (m)
+X_S, X_B = -11.2, 10.0      # Heck- und Bugende des Rumpfkörpers
+X_C = -0.6                  # breiteste Stelle
+B2 = 6.0                    # halbe Breite
+Z_DECK = 4.2                # Rasendeck
+Z_FORE = 8.3                # Vorschiffsdeck (Steuerrad)
+Z_ROOF = 9.05               # Dach des Achterkastells
+X_CAST = -5.2               # Front des Achterkastells
+X_FORE = 5.8                # Achterkante des Vorschiffs
+FORE_X, MAIN_X = 2.9, -7.5  # Masten
+SD_X, SD_Z, SD_R = -0.2, 1.9, 2.42   # Soldier-Dock-Ring
+PLANK_W = 0.32
+PLANK_L = 6.0
+# Farben (linear) nach dem farbigen Model Sheet
+RED = (0.36, 0.018, 0.014)
+CREAM = (0.80, 0.63, 0.36)
+BLACK = (0.018, 0.016, 0.014)
+YELLOW = (0.86, 0.50, 0.025)
+
+# Rückwärtskompatibel für ocean.ocean_fx_gn / world_onepiece
+L = X_B - X_S
+W = B2
 
 
-def sheer(u):
-    return 3.9 + 1.6 * np.clip((u - 0.55) / 0.45, 0, 1) ** 2 + 1.2 * np.clip((0.25 - u) / 0.25, 0, 1) ** 2
+def half_beam(X):
+    X = np.asarray(X, float)
+    bow = X >= X_C
+    t = np.where(bow, (X - X_C) / (X_B - X_C), (X_C - X) / (X_C - X_S))
+    p = np.where(bow, 2.4, 2.8)
+    return B2 * np.clip(1 - np.clip(t, 0, 1) ** p, 0, 1) ** (1 / p)
 
 
-def keel(u):
-    return -2.3 + 2.5 * np.clip((u - 0.78) / 0.22, 0, 1) ** 2 + 0.4 * np.clip((0.08 - u) / 0.08, 0, 1)
+def keel(X):
+    X = np.asarray(X, float)
+    return (-2.8 + 3.3 * np.clip((X - 0.5) / (X_B - 0.5), 0, 1) ** 2.2
+            + 5.0 * np.clip((-1.0 - X) / (-1.0 - X_S), 0, 1) ** 2.0)
 
 
-def half_beam(u):
-    hw = W * (0.80 + 0.20 * np.sin(np.pi / 2 * np.clip(u / 0.28, 0, 1)))
-    bow = np.clip((u - 0.58) / 0.42, 0, 1)
-    return hw * np.sqrt(np.clip(1 - bow ** 2.1, 0, 1))
+def sheer(X):
+    """Oberkante der Bordwand: U-Form zwischen Achterkastell und Vorschiff (flacher Boden 5,2 m,
+    steile Arme bis 7,4/7,2 m, Bugarm steigt weiter bis 9,3 m), achtern Kastell-Sockel 4,5 m."""
+    X = np.asarray(X, float)
+    g = np.full_like(X, 5.2)
+    s = np.clip((X - 1.9) / 1.4, 0, 1)
+    g = np.where(X > 1.9, 5.2 + 2.2 * (1 - np.sqrt(1 - s * s)), g)
+    g = np.where(X > 3.3, 7.4 + 1.9 * np.clip((X - 3.3) / (X_FORE - 3.3), 0, 1) ** 1.2, g)
+    g = np.where(X > X_FORE, 9.3 + 0.3 * np.clip((X - X_FORE) / (X_B - X_FORE), 0, 1), g)
+    s = np.clip((-2.5 - X) / 0.9, 0, 1)
+    g = np.where(X < -2.5, 5.2 + 2.0 * (1 - np.sqrt(1 - s * s)), g)
+    w = np.clip((X - (X_CAST - 0.15)) / 0.15, 0, 1)
+    g = np.where(X < X_CAST, 4.5 + (g - 4.5) * w, g)
+    return g
 
 
-def section(v):
-    return 1 - (1 - v) ** 2.3 + 0.04 * np.sin(np.pi * v)
+def section_y(X, z):
+    """Halbe Breite in Höhe z: runde Kimm (Radius ~3,4 m), senkrechte Seiten, leicht ausgestellte Bordwand."""
+    X = np.asarray(X, float)
+    z = np.asarray(z, float)
+    k = keel(X)
+    rb = np.clip((sheer(X) - k) * 0.8, 0.1, 3.4)
+    zz = np.clip((z - k) / rb, 0, 1)
+    f = np.sqrt(np.clip(1 - (1 - zz) ** 2, 0, 1))
+    flare = 1 + 0.035 * np.clip((z - Z_DECK) / 4.0, 0, 1)
+    return half_beam(X) * f * flare
 
 
-def hull_point(u, v, side=1):
-    x = -L / 2 + u * L
-    return Vector((x, side * half_beam(u) * section(v), keel(u) + (sheer(u) - keel(u)) * v))
-
-
-def hull_frame(u, v, side=1):
-    """Lokales Rahmen-System auf der Rumpfhaut: (Punkt, Tangente längs, Tangente Umfang, Normale)."""
-    p = hull_point(u, v, side)
-    tu = (hull_point(min(u + 0.002, 1), v, side) - hull_point(max(u - 0.002, 0), v, side)).normalized()
-    tv = (hull_point(u, min(v + 0.01, 1), side) - hull_point(u, max(v - 0.01, 0), side)).normalized()
-    n = tu.cross(tv) * side
+def hull_frame(X, z, side=1):
+    """(Punkt, Tangente längs, Tangente hoch, Außennormale) auf der Rumpfhaut."""
+    def P(xx, zz):
+        return Vector((xx, side * float(section_y(xx, zz)), zz))
+    e = 0.03
+    p = P(X, z)
+    tx = (P(X + e, z) - P(X - e, z)).normalized()
+    tz = (P(X, z + e) - P(X, z - e)).normalized()
+    n = tx.cross(tz)
     if n.y * side < 0:
         n = -n
-    return p, tu, tv, n.normalized()
+    return p, tx, tz, n.normalized()
+
+
+def hull_front_point(y, z):
+    """Vorderster Rumpfpunkt mit |Breite| = y in Höhe z (für Bugschild-Nieten)."""
+    xs = np.linspace(X_C, X_B, 800)
+    w = section_y(xs, np.full_like(xs, z))
+    ok = np.where((w >= abs(y)) & (sheer(xs) > z + 0.2) & (keel(xs) < z - 0.2))[0]
+    if len(ok) == 0:
+        return None
+    X = float(xs[ok[-1]])
+    p = Vector((X, y, z))
+    e = 0.03
+    # Normale über Nachbarpunkte der Kontur
+    def surf(yy, zz):
+        ww = section_y(xs, np.full_like(xs, zz))
+        k = np.where((ww >= abs(yy)) & (sheer(xs) > zz))[0]
+        return Vector((float(xs[k[-1]]) if len(k) else X, yy, zz))
+    ty = (surf(y + e, z) - surf(y - e, z)).normalized()
+    tz = (surf(y, z + e) - surf(y, z - e)).normalized()
+    n = ty.cross(tz)
+    if n.x < 0:
+        n = -n
+    return p, n.normalized()
 
 
 # --------------------------------------------------------------------------
 # Materialien
 # --------------------------------------------------------------------------
 
-def hull_material():
-    """Planken aus UV (x = Länge in m, y = Umfang in m) + Farbzonen aus UV 'HullV'."""
-    mat, nb, out = fpv.new_material("HullPlanks")
-    uvn = nb.node("ShaderNodeUVMap")
-    uvn.uv_map = "UVMap"
-    ux, uy, _ = nb.sep(uvn.outputs[0])
-    hvn = nb.node("ShaderNodeUVMap")
-    hvn.uv_map = "HullV"
-    hv = nb.sep(hvn.outputs[0])[0]
-    co = nb.coords("Object")
-    zobj = nb.sep(co)[2]
-    # Plankenreihe + versetzte Stöße
-    rowf = nb.math("DIVIDE", uy, PLANK_W)
-    row = nb.math("FLOOR", rowf)
-    t = nb.math("FRACT", rowf)
-    rh = nb.node("ShaderNodeTexWhiteNoise")
-    rh.noise_dimensions = "1D"
-    nb.link(row, rh.inputs["W"])
-    segf = nb.math("DIVIDE", nb.math("ADD", ux, nb.math("MULTIPLY", nb.out(rh, "Value"), PLANK_L)), PLANK_L)
-    seg = nb.math("FLOOR", segf)
-    s = nb.math("FRACT", segf)
-    pid = nb.node("ShaderNodeTexWhiteNoise")
-    pid.noise_dimensions = "2D"
-    nb.link(nb.comb(row, seg, 0.0), pid.inputs["Vector"])
-    rnd = nb.out(pid, "Value")
-    # prozedurale Holzmaserung entlang der Planke, pro Planke versetzt
-    wood, grain = grain_wood(nb, ux, nb.math("MULTIPLY", t, PLANK_W), rnd)
-    rgh_v = nb.math("MULTIPLY_ADD", grain, 0.25, 0.5)
-    # Fugen
-    seam_t = nb.math("LESS_THAN", t, 0.045)
-    seam_s = nb.math("MAXIMUM", nb.math("LESS_THAN", s, 0.004), nb.math("GREATER_THAN", s, 0.996))
-    seam = nb.math("MAXIMUM", seam_t, seam_s)
-    # Farbzonen (v = 0 Kiel .. 1 Schandeck): rotes Band, weißes Band, Unterwasserschiff
-    def band(a, b, soft=0.004):
-        lo = nb.node("ShaderNodeMapRange", clamp=True)
-        nb.link(hv, lo.inputs["Value"])
-        lo.inputs["From Min"].default_value = a - soft
-        lo.inputs["From Max"].default_value = a + soft
-        hi = nb.node("ShaderNodeMapRange", clamp=True)
-        nb.link(hv, hi.inputs["Value"])
-        hi.inputs["From Min"].default_value = b + soft
-        hi.inputs["From Max"].default_value = b - soft
-        return nb.math("MULTIPLY", lo.outputs[0], hi.outputs[0])
-    white = band(0.905, 0.965)
-    red = band(0.872, 0.893)
-    wl = nb.node("ShaderNodeMapRange", clamp=True)
-    grime = nb.noise(co, scale=0.5, detail=3)
-    nb.link(nb.math("ADD", zobj, nb.math("MULTIPLY", nb.out(grime, "Fac"), 0.25)), wl.inputs["Value"])
-    wl.inputs["From Min"].default_value = 0.22
-    wl.inputs["From Max"].default_value = 0.30
-    above = wl.outputs[0]
-    boot = nb.math("MULTIPLY", above, nb.math("LESS_THAN", zobj, 0.45))
-    col = wood
-    col = nb.mix(red, col, (0.42, 0.05, 0.035))
-    col = nb.mix(white, col, (0.80, 0.78, 0.72))
-    col = nb.mix(boot, col, (0.02, 0.02, 0.02))
-    col = nb.mix(nb.math("SUBTRACT", 1.0, above), col, (0.10, 0.04, 0.03))
-    col = nb.mix(nb.math("MULTIPLY", seam, 0.85), col, (0.02, 0.015, 0.01))
-    # Salz-/Schmutzfahnen (senkrecht = entlang Umfang)
-    stv = nb.noise(nb.comb(nb.math("MULTIPLY", ux, 1.5), nb.math("MULTIPLY", uy, 0.12), 0.0), scale=1.0, detail=2)
-    sm = nb.node("ShaderNodeMapRange", clamp=True)
-    nb.link(nb.out(stv, "Fac"), sm.inputs["Value"])
-    sm.inputs["From Min"].default_value = 0.56
-    sm.inputs["From Max"].default_value = 0.72
-    col = nb.mix(nb.math("MULTIPLY", sm.outputs[0], 0.18), col, (0.30, 0.28, 0.25))
-    paint = nb.math("MAXIMUM", white, red)
-    rough = nb.mix(paint, rgh_v, 0.38, dtype="FLOAT")
-    rough = nb.mix(nb.math("SUBTRACT", 1.0, above), rough, 0.22, dtype="FLOAT")
-    p = fpv.principled(nb, Base_Color=col, Roughness=rough)
-    p.inputs["Coat Weight"].default_value = 0.12
-    # Plankenwölbung (sin) + Fugen als Bump
-    bulge = nb.math("SINE", nb.math("MULTIPLY", t, math.pi))
-    h = nb.math("SUBTRACT", nb.math("MULTIPLY", bulge, 1.0), nb.math("MULTIPLY", seam, 0.6))
-    nb.link(nb.bump(h, strength=0.55, distance=0.012), p.inputs["Normal"])
-    nb.link(p.outputs[0], out.inputs[0])
-    return mat
-
-
-def grain_wood(nb, along, across, rnd, dark=(0.06, 0.028, 0.012), mid=(0.12, 0.058, 0.024),
-               light=(0.20, 0.10, 0.045)):
+def grain_wood(nb, along, across, rnd, dark=(0.12, 0.058, 0.022), mid=(0.24, 0.12, 0.045),
+               light=(0.40, 0.21, 0.08)):
     """Holzmaserung: stark gestrecktes Rauschen (Fasern) + Jahresring-Wellen, Variation pro Brett."""
     v = nb.comb(nb.math("MULTIPLY", along, 0.35), nb.math("ADD", nb.math("MULTIPLY", across, 30.0),
                                                            nb.math("MULTIPLY", rnd, 40.0)), nb.math("MULTIPLY", rnd, 9.0))
@@ -315,6 +300,154 @@ def lawn_materials():
     return base, blade
 
 
+
+def hull_material():
+    """Rumpf nach dem farbigen Model Sheet: goldbraune Planken, rote U-Bordwand mit cremefarbener Kante,
+    schwarzes Band, roter Bugschild, Soldier-Dock-Ring mit „1“. Zonen aus UV 'Zone' (x = Abstand zur
+    Bordwand-Oberkante in m, y = 1 im U-Bereich) und Objektkoordinaten/-normalen."""
+    mat, nb, out = fpv.new_material("HullSunny")
+    uvn = nb.node("ShaderNodeUVMap")
+    uvn.uv_map = "UVMap"
+    ux, uy, _ = nb.sep(uvn.outputs[0])
+    zn = nb.node("ShaderNodeUVMap")
+    zn.uv_map = "Zone"
+    dtop, uflag, _ = nb.sep(zn.outputs[0])
+    tc = nb.node("ShaderNodeTexCoord")
+    co = tc.outputs["Object"]
+    x, y, z = nb.sep(co)
+    nx = nb.sep(tc.outputs["Normal"])[0]
+    # Planken + versetzte Stöße
+    rowf = nb.math("DIVIDE", uy, PLANK_W)
+    row = nb.math("FLOOR", rowf)
+    t = nb.math("FRACT", rowf)
+    rh = nb.node("ShaderNodeTexWhiteNoise")
+    rh.noise_dimensions = "1D"
+    nb.link(row, rh.inputs["W"])
+    segf = nb.math("DIVIDE", nb.math("ADD", ux, nb.math("MULTIPLY", nb.out(rh, "Value"), PLANK_L)), PLANK_L)
+    seg = nb.math("FLOOR", segf)
+    s = nb.math("FRACT", segf)
+    pid = nb.node("ShaderNodeTexWhiteNoise")
+    pid.noise_dimensions = "2D"
+    nb.link(nb.comb(row, seg, 0.0), pid.inputs["Vector"])
+    rnd = nb.out(pid, "Value")
+    wood, grain = grain_wood(nb, ux, nb.math("MULTIPLY", t, PLANK_W), rnd)
+    seam_t = nb.math("LESS_THAN", t, 0.04)
+    seam_s = nb.math("MAXIMUM", nb.math("LESS_THAN", s, 0.004), nb.math("GREATER_THAN", s, 0.996))
+    seam = nb.math("MAXIMUM", seam_t, seam_s)
+
+    def rng(val, a, b, soft=0.012):
+        lo = nb.node("ShaderNodeMapRange", clamp=True)
+        nb.link(val, lo.inputs["Value"])
+        lo.inputs["From Min"].default_value = a - soft
+        lo.inputs["From Max"].default_value = a + soft
+        hi = nb.node("ShaderNodeMapRange", clamp=True)
+        nb.link(val, hi.inputs["Value"])
+        hi.inputs["From Min"].default_value = b + soft
+        hi.inputs["From Max"].default_value = b - soft
+        return nb.math("MULTIPLY", lo.outputs[0], hi.outputs[0])
+
+    def step(val, a, b):
+        m = nb.node("ShaderNodeMapRange", clamp=True)
+        nb.link(val, m.inputs["Value"])
+        m.inputs["From Min"].default_value = a
+        m.inputs["From Max"].default_value = b
+        return m.outputs[0]
+
+    inU = step(uflag, 0.45, 0.55)
+    cream_t = nb.math("MULTIPLY", inU, rng(dtop, -0.5, 0.22))
+    red = nb.math("MULTIPLY", inU, rng(dtop, 0.22, 2.45))
+    cream_l = nb.math("MULTIPLY", inU, rng(dtop, 2.45, 2.57))
+    blk = nb.math("MAXIMUM", nb.math("MULTIPLY", inU, rng(dtop, 2.57, 2.9)),
+                  nb.math("MULTIPLY", nb.math("SUBTRACT", 1.0, inU), rng(z, 3.55, 3.9)))
+    # Bugschild (nach vorn zeigende Flächen), cremefarben gerahmt
+    fz = nb.math("MULTIPLY", step(z, 0.9, 1.1), step(x, X_B - 4.6, X_B - 4.4))
+    front = nb.math("MULTIPLY", step(nx, 0.52, 0.56), fz)
+    front_b = nb.math("MULTIPLY", nb.math("MULTIPLY", step(nx, 0.44, 0.47),
+                                          nb.math("SUBTRACT", 1.0, step(nx, 0.50, 0.53))), fz)
+    # Soldier-Dock: schwarzer Ring, Holztor mit „1“ (nur an den Bordwänden)
+    dx = nb.math("SUBTRACT", x, SD_X)
+    dz = nb.math("SUBTRACT", z, SD_Z)
+    r = nb.math("SQRT", nb.math("ADD", nb.math("MULTIPLY", dx, dx), nb.math("MULTIPLY", dz, dz)))
+    side = step(nb.math("ABSOLUTE", y), 3.0, 3.5)
+    ring = nb.math("MULTIPLY", rng(r, SD_R - 0.4, SD_R, soft=0.015), side)
+    inside = nb.math("MULTIPLY", step(r, SD_R - 0.38, SD_R - 0.42), side)
+    D = 3.2
+    du = nb.math("MULTIPLY", nb.math("DIVIDE", dx, D), nb.math("MULTIPLY", nb.math("SIGN", y), -1.0))
+    dec = nb.image(textures.number_decal("1", textures.OUT + "/soldier_dock_1.png"),
+                   nb.comb(nb.math("ADD", du, 0.5), nb.math("ADD", nb.math("DIVIDE", dz, D), 0.5), 0.0))
+    dec.extension = "CLIP"
+    one = nb.math("MULTIPLY", nb.out(dec, "Alpha"), inside)
+    col = wood
+    col = nb.mix(red, col, RED)
+    col = nb.mix(cream_t, col, CREAM)
+    col = nb.mix(cream_l, col, CREAM)
+    col = nb.mix(blk, col, BLACK)
+    col = nb.mix(front, col, RED)
+    col = nb.mix(front_b, col, CREAM)
+    col = nb.mix(inside, col, nb.vmath("SCALE", wood, scale=0.85))
+    col = nb.mix(one, col, BLACK)
+    col = nb.mix(ring, col, BLACK)
+    paint = nb.math("MINIMUM", nb.math("ADD", nb.math("ADD", red, nb.math("ADD", cream_t, cream_l)),
+                                       nb.math("ADD", nb.math("ADD", blk, front), nb.math("ADD", front_b, ring))), 1.0)
+    paint = nb.math("MULTIPLY", paint, nb.math("SUBTRACT", 1.0, nb.math("MULTIPLY", inside, nb.math("SUBTRACT", 1.0, ring))))
+    # Fugen (auch unter der Farbe sichtbar), Nässe/Algen an der Wasserlinie, Salzfahnen
+    col = nb.mix(nb.math("MULTIPLY", seam, nb.math("SUBTRACT", 0.85, nb.math("MULTIPLY", paint, 0.45))), col,
+                 (0.02, 0.015, 0.01))
+    grime = nb.noise(co, scale=0.5, detail=3)
+    wl = step(nb.math("ADD", z, nb.math("MULTIPLY", nb.out(grime, "Fac"), 0.25)), 0.18, 0.32)
+    col = nb.mix(nb.math("MULTIPLY", nb.math("SUBTRACT", 1.0, wl), 0.7), col,
+                 nb.vmath("MULTIPLY", col, (0.35, 0.42, 0.36)))
+    stv = nb.noise(nb.comb(nb.math("MULTIPLY", ux, 1.5), nb.math("MULTIPLY", uy, 0.12), 0.0), scale=1.0, detail=2)
+    sm = step(nb.out(stv, "Fac"), 0.56, 0.72)
+    col = nb.mix(nb.math("MULTIPLY", sm, 0.14), col, (0.30, 0.28, 0.25))
+    col = _wear(nb, col, edge_col=(0.45, 0.30, 0.16), cav_col=(0.03, 0.02, 0.015), edge=0.25, cav=0.35)
+    rgh_w = nb.math("MULTIPLY_ADD", grain, 0.25, 0.5)
+    rough = nb.mix(paint, rgh_w, 0.36, dtype="FLOAT")
+    rough = nb.mix(nb.math("SUBTRACT", 1.0, wl), rough, 0.2, dtype="FLOAT")
+    p = fpv.principled(nb, Base_Color=col, Roughness=rough)
+    p.inputs["Coat Weight"].default_value = 0.15
+    bulge = nb.math("SINE", nb.math("MULTIPLY", t, math.pi))
+    h = nb.math("SUBTRACT", nb.math("MULTIPLY", bulge, nb.math("SUBTRACT", 1.0, nb.math("MULTIPLY", paint, 0.5))),
+                nb.math("MULTIPLY", seam, 0.6))
+    h = nb.math("ADD", h, nb.math("MULTIPLY", ring, 0.8))
+    nb.link(nb.bump(h, strength=0.5, distance=0.012), p.inputs["Normal"])
+    nb.link(p.outputs[0], out.inputs[0])
+    return mat
+
+
+def stripe_dome_material(name="DomeStripes", n=12):
+    """Kuppel mit abwechselnd roten und gelben Segmenten (Ausguck und Rundturm)."""
+    mat, nb, out = fpv.new_material(name)
+    co = nb.coords("Object")
+    x, y, _ = nb.sep(co)
+    ang = nb.math("ARCTAN2", y, x)
+    k = nb.math("FLOOR", nb.math("MULTIPLY", nb.math("ADD", nb.math("DIVIDE", ang, 2 * math.pi), 0.5), n))
+    odd = nb.math("MODULO", k, 2.0)
+    col = nb.mix(odd, RED, YELLOW)
+    fine = nb.noise(co, scale=6.0, detail=3)
+    col = nb.mix(nb.math("MULTIPLY", nb.out(fine, "Fac"), 0.18), col, nb.vmath("SCALE", col, scale=0.7))
+    col = _wear(nb, col, edge_col=(0.45, 0.30, 0.16), cav_col=(0.05, 0.02, 0.01), edge=0.3, cav=0.3)
+    p = fpv.principled(nb, Base_Color=col, Roughness=0.4)
+    p.inputs["Coat Weight"].default_value = 0.25
+    nb.link(p.outputs[0], out.inputs[0])
+    return mat
+
+
+def metal_material(name, color, rough=0.35, metallic=0.85):
+    mat, nb, out = fpv.new_material(name)
+    co = nb.coords("Object")
+    n = nb.noise(co, scale=4.0, detail=3)
+    col = nb.mix(nb.math("MULTIPLY", nb.out(n, "Fac"), 0.3), color, [c * 0.6 for c in color])
+    p = fpv.principled(nb, Base_Color=col, Roughness=nb.math("MULTIPLY_ADD", nb.out(n, "Fac"), 0.2, rough - 0.1),
+                       Metallic=metallic)
+    nb.link(p.outputs[0], out.inputs[0])
+    return mat
+
+
+# --------------------------------------------------------------------------
+# Geometrie-Helfer
+# --------------------------------------------------------------------------
+
 # --------------------------------------------------------------------------
 # Geometrie-Helfer
 # --------------------------------------------------------------------------
@@ -426,82 +559,85 @@ def spheres_mesh(name, centers, r, mat, subdiv=1, flatten=0.5, normals=None):
     return ob
 
 
+
 # --------------------------------------------------------------------------
-# Rumpf, Deck, Rasen
+# Rumpf, Decks, Rasen
 # --------------------------------------------------------------------------
 
-def hull_mesh(mat_hull, mat_transom, nu=200, nv=48):
-    us = np.linspace(0, 1, nu)
-    vs = np.linspace(0, 1, nv)
+def hull_xs():
+    xs = list(np.linspace(X_S, X_B, 240)) + [X_CAST, X_CAST - 0.15, X_CAST - 0.02, X_CAST + 0.02]
+    return np.array(sorted(set(np.round(xs, 4))))
+
+
+def hull_mesh(mat_hull, mat_inner, nv=64):
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new("UVMap")
-    hvl = bm.loops.layers.uv.new("HullV")
+    zl = bm.loops.layers.uv.new("Zone")
     rows = []
-    for u in us:
-        x = -L / 2 + u * L
-        hw = half_beam(u)
-        k = keel(u)
-        s = sheer(u)
-        pts = [(x, -hw * section(v), k + (s - k) * v) for v in vs[::-1]] + \
-              [(x, hw * section(v), k + (s - k) * v) for v in vs[1:]]
-        vv = list(vs[::-1]) + list(vs[1:])
-        # Umfangslänge vom Kiel aus (für Planken)
-        half = np.array([(hw * section(v), k + (s - k) * v) for v in vs])
+    vs = np.linspace(0, 1, nv) ** 1.25     # dichter an der Kimm
+    for X in hull_xs():
+        k = float(keel(X))
+        G = float(sheer(X))
+        zs = k + (G - k) * vs
+        ys = section_y(np.full(nv, X), zs)
+        half = np.stack([ys, zs], 1)
         g = np.concatenate([[0], np.cumsum(np.linalg.norm(np.diff(half, axis=0), axis=1))])
-        gg = list(g[::-1]) + list(g[1:])
-        rows.append([(bm.verts.new(p), gi, vi) for p, gi, vi in zip(pts, gg, vv)])
-    nr = len(rows[0])
-    for i in range(nu - 1):
-        for j in range(nr - 1):
-            q = [rows[i][j], rows[i + 1][j], rows[i + 1][j + 1], rows[i][j + 1]]
+        uf = 1.0 if X >= X_CAST - 0.01 else 0.0
+        pts, meta = [], []
+        for i in range(nv - 1, -1, -1):
+            pts.append((X, -ys[i], zs[i]))
+            meta.append((g[i], G - zs[i]))
+        for i in range(1, nv):
+            pts.append((X, ys[i], zs[i]))
+            meta.append((g[i], G - zs[i]))
+        rows.append(([bm.verts.new(p) for p in pts], meta, uf, float(X)))
+    for (va, ma, fa, xa), (vb, mb, fb, xb) in zip(rows[:-1], rows[1:]):
+        for j in range(len(va) - 1):
             try:
-                f = bm.faces.new([e[0] for e in q])
+                f = bm.faces.new([va[j], vb[j], vb[j + 1], va[j + 1]])
             except ValueError:
                 continue
-            ui = [i, i + 1, i + 1, i]
-            for lp, e, uu in zip(f.loops, q, ui):
-                lp[uvl].uv = (us[uu] * L, e[1])
-                lp[hvl].uv = (e[2], 0.0)
-    tf = bm.faces.new([e[0] for e in rows[0][::-1]])
-    tf.material_index = 1
+            for lp, (mm, ff, xx) in zip(f.loops, [(ma[j], fa, xa), (mb[j], fb, xb), (mb[j + 1], fb, xb),
+                                                  (ma[j + 1], fa, xa)]):
+                lp[uvl].uv = (xx, mm[0])
+                lp[zl].uv = (mm[1], ff)
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.002)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     ob = fpv.mesh_from_bmesh(bm, "Hull", mat_hull)
-    ob.data.materials.append(mat_transom)
+    ob.data.materials.append(mat_inner)
     sol = ob.modifiers.new("solid", "SOLIDIFY")
-    sol.thickness = 0.22
+    sol.thickness = 0.24
     sol.offset = -1
+    sol.material_offset = 1
+    sol.material_offset_rim = 1
     ob.modifiers.new("wn", "WEIGHTED_NORMAL")
     return ob
 
 
-def deck_z(u):
-    return sheer(u) - 1.05
-
-
-def deck_mesh(mat, nu=90, nw=16):
-    us = np.linspace(0.02, 0.985, nu)
+def plan_mesh(name, x0, x1, z, mat, inset=0.3, nu=60, nw=16, thick=0.0):
+    """Deck/Platte im Grundriss des Rumpfes (Breite aus section_y in Höhe z)."""
     bm = bmesh.new()
     rows = []
-    for u in us:
-        x = -L / 2 + u * L
-        hw = max(half_beam(u) * section(0.86) - 0.25, 0.02)
-        z = deck_z(u)
-        rows.append([bm.verts.new((x, -hw + 2 * hw * t, z)) for t in np.linspace(0, 1, nw)])
+    for X in np.linspace(x0, x1, nu):
+        hw = max(float(section_y(X, z)) - inset, 0.03)
+        rows.append([bm.verts.new((X, -hw + 2 * hw * t, z)) for t in np.linspace(0, 1, nw)])
     for i in range(nu - 1):
         for j in range(nw - 1):
             bm.faces.new([rows[i][j], rows[i][j + 1], rows[i + 1][j + 1], rows[i + 1][j]])
-    return fpv.mesh_from_bmesh(bm, "Deck", mat)
+    ob = fpv.mesh_from_bmesh(bm, name, mat)
+    if thick:
+        sol = ob.modifiers.new("solid", "SOLIDIFY")
+        sol.thickness = thick
+    return ob
 
 
-def lawn_blades(mat, u0=0.30, u1=0.86, count=60000, seed=5):
-    """Echte Grashalme (Dreiecke) auf dem Rasendeck."""
+def lawn_blades(mat, count=70000, seed=5):
+    """Echte Grashalme (Dreiecke) auf dem Rasendeck zwischen Achterkastell und Vorschiff."""
     rng = np.random.default_rng(seed)
-    u = rng.uniform(u0, u1, count)
-    hw = np.maximum(half_beam(u) * section(0.86) - 0.4, 0.05)
-    x = -L / 2 + u * L
+    x = rng.uniform(X_CAST + 0.25, X_FORE - 0.25, count)
+    hw = np.maximum(section_y(x, np.full(count, Z_DECK)) - 0.45, 0.05)
     y = rng.uniform(-1, 1, count) * hw
-    z = deck_z(u) + 0.005
+    z = np.full(count, Z_DECK + 0.005)
     h = rng.uniform(0.05, 0.12, count)
     a = rng.uniform(0, 2 * np.pi, count)
     lean = rng.normal(0, 0.35, (count, 2)) * h[:, None]
@@ -531,11 +667,172 @@ def lawn_blades(mat, u0=0.30, u1=0.86, count=60000, seed=5):
     return ob
 
 
+def curve_tube(name, pts, radius, mat, res=3, cyclic=False):
+    cu = bpy.data.curves.new(name, "CURVE")
+    cu.dimensions = "3D"
+    sp = cu.splines.new("POLY")
+    sp.points.add(len(pts) - 1)
+    for p, c in zip(sp.points, pts):
+        p.co = (*c, 1)
+    sp.use_cyclic_u = cyclic
+    cu.bevel_depth = radius
+    cu.bevel_resolution = res
+    cu.use_fill_caps = True
+    ob = bpy.data.objects.new(name, cu)
+    ob.data.materials.append(mat)
+    fpv.link(ob)
+    return ob
+
+
+def local_matrix(p, tx, n):
+    """Lokales System an einer Wand: x = entlang der Wand, y = Außennormale, z = hoch."""
+    tz = tx.cross(n).normalized()
+    if tz.z < 0:
+        tz = -tz
+    tx = n.cross(tz).normalized()
+    M = Matrix((tx, n, tz)).transposed().to_4x4()
+    M.translation = p
+    return M
+
+
+def framed_window(name, M, w, h, mats, arch=False, frame="brown", depth=0.12, bars=True):
+    """Fenster in lokalem Wandsystem M (Ursprung = Fenstermitte auf der Wand):
+    dunkles Glas, Rahmen, Sprossenkreuz, optional Rundbogen."""
+    objs = []
+    bm = bmesh.new()
+    bmesh.ops.create_cube(bm, size=1.0)
+    bmesh.ops.scale(bm, vec=(w, 0.06, h), verts=bm.verts)
+    bmesh.ops.translate(bm, vec=(0, 0.02, 0), verts=bm.verts)
+    g = fpv.mesh_from_bmesh(bm, name + "Glass", mats["glass"], smooth=False)
+    g.matrix_world = M
+    objs.append(g)
+    fw = 0.08
+    segs = [((-w / 2, 0.06, -h / 2), (w / 2, 0.06, -h / 2)), ((-w / 2, 0.06, -h / 2), (-w / 2, 0.06, h / 2)),
+            ((w / 2, 0.06, -h / 2), (w / 2, 0.06, h / 2))]
+    if arch:
+        pts = [(-w / 2 * math.cos(a), 0.06, h / 2 + w / 2 * math.sin(a)) for a in np.linspace(0, math.pi, 13)]
+        segs += list(zip(pts[:-1], pts[1:]))
+        bm = bmesh.new()
+        bmesh.ops.create_cone(bm, cap_ends=True, segments=24, radius1=w / 2, radius2=w / 2, depth=0.06)
+        bmesh.ops.rotate(bm, verts=bm.verts, cent=(0, 0, 0), matrix=Matrix.Rotation(math.pi / 2, 3, "X"))
+        bmesh.ops.translate(bm, vec=(0, 0.02, h / 2), verts=bm.verts)
+        ag = fpv.mesh_from_bmesh(bm, name + "ArchGlass", mats["glass"])
+        ag.matrix_world = M
+        objs.append(ag)
+    else:
+        segs.append(((-w / 2, 0.06, h / 2), (w / 2, 0.06, h / 2)))
+    if bars:
+        segs.append(((0, 0.07, -h / 2), (0, 0.07, h / 2 + (w / 2 if arch else 0))))
+        segs.append(((-w / 2, 0.07, h * 0.1), (w / 2, 0.07, h * 0.1)))
+    fr = tubes_mesh(name + "Frame", segs, fw / 2 if not bars else fw * 0.45, mats[frame], sides=6)
+    fr.matrix_world = M
+    objs.append(fr)
+    return objs
+
+
+def porthole(name, p, n, r, mats):
+    """Bullauge: grauer Metallring + dunkles Glas, nach außen ausgerichtet."""
+    o1 = cyl(name + "Ring", p - n * 0.08, p + n * 0.1, r * 1.25, r * 1.25, mats["portring"], 28)
+    o2 = cyl(name + "Glass", p - n * 0.02, p + n * 0.13, r, r, mats["glass"], 28)
+    return [o1, o2]
+
+
+def volute(name, p, tx, n, r0, mat, turns=1.6, rad=0.11):
+    """Volute (Schnecke) am Ende der U-Bordwand, in der Ebene der Bordwand."""
+    tz = tx.cross(n).normalized()
+    if tz.z < 0:
+        tz = -tz
+    pts = []
+    for a in np.linspace(0, turns * 2 * math.pi, 60):
+        rr = r0 * (1 - a / (turns * 2 * math.pi) * 0.85)
+        pts.append(tuple(p + n * 0.12 + tx * (rr * math.cos(a)) + tz * (rr * math.sin(a))))
+    return curve_tube(name, pts, rad, mat)
+
+
+def castle_outline(x0, x1, z, inset, n=30):
+    xs = np.linspace(x0, x1, n)
+    hw = np.maximum(section_y(xs, np.full_like(xs, z)) - inset, 0.3)
+    return [(float(x), -float(w)) for x, w in zip(xs, hw)] + [(float(x), float(w)) for x, w in zip(xs[::-1], hw[::-1])]
+
+
+def prism(name, outline, z0, z1, mat, smooth=True):
+    bm = bmesh.new()
+    vs = [bm.verts.new((x, y, z0)) for (x, y) in outline]
+    f = bm.faces.new(vs)
+    ext = bmesh.ops.extrude_face_region(bm, geom=[f])
+    top = [e for e in ext["geom"] if isinstance(e, bmesh.types.BMVert)]
+    bmesh.ops.translate(bm, vec=(0, 0, z1 - z0), verts=top)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    ob = fpv.mesh_from_bmesh(bm, name, mat, smooth=smooth)
+    bevel_stack(ob, small=0.02, angle=40)
+    return ob
+
+
+def wall_frame(X, z, sy, inset):
+    """Punkt/Tangente/Normale an der Kastell-Seitenwand (Kontur section_y - inset)."""
+    e = 0.05
+    y0 = float(section_y(X, z)) - inset
+    y1 = float(section_y(X + e, z)) - inset
+    y2 = float(section_y(X - e, z)) - inset
+    p = Vector((X, sy * y0, z))
+    tx = Vector((2 * e, sy * (y1 - y2), 0)).normalized()
+    n = Vector((-tx.y, tx.x, 0)) if sy > 0 else Vector((tx.y, -tx.x, 0))
+    if n.y * sy < 0:
+        n = -n
+    return p, tx, n
+
+
+def stairs(name, p0, p1, width, steps, mat, axis="X"):
+    """Treppe von p0 (unten) nach p1 (oben); Stufen quer zur Laufrichtung, mit Wangen und Handlauf."""
+    p0, p1 = Vector(p0), Vector(p1)
+    run = p1 - p0
+    objs = []
+    horiz = Vector((run.x, run.y, 0))
+    d = horiz.normalized()
+    side = Vector((-d.y, d.x, 0))
+    bm = bmesh.new()
+    for k in range(steps):
+        c = p0 + horiz * ((k + 0.5) / steps)
+        ztop = p0.z + run.z * (k + 1) / steps
+        res = bmesh.ops.create_cube(bm, size=1.0)
+        L_ = horiz.length / steps + 0.05
+        M = Matrix((d, side, Vector((0, 0, 1)))).transposed().to_4x4()
+        M.translation = Vector((c.x, c.y, ztop - 0.04))
+        bmesh.ops.transform(bm, verts=res["verts"], matrix=M @ Matrix.Diagonal((L_, width, 0.08, 1)))
+    st = fpv.mesh_from_bmesh(bm, name, mat, smooth=False)
+    objs.append(st)
+    segs = []
+    for s in (-1, 1):
+        a = p0 + side * (s * width / 2)
+        b = p1 + side * (s * width / 2)
+        segs.append((tuple(a), tuple(b)))
+        segs.append((tuple(a + Vector((0, 0, 0.95))), tuple(b + Vector((0, 0, 0.95)))))
+        for t in np.linspace(0.05, 0.95, 6):
+            q = a + (b - a) * t
+            segs.append((tuple(q), tuple(q + Vector((0, 0, 0.95)))))
+    objs.append(tubes_mesh(name + "Rail", segs, 0.04, mat, sides=6))
+    return objs
+
+
+def balustrade(name, pts, h, mats, spacing=0.22, closed=False):
+    """Reling mit gedrechselten Docken (Model Sheet: Zinnenreihe) und Handlauf."""
+    segs = []
+    P = [Vector(p) for p in pts] + ([Vector(pts[0])] if closed else [])
+    for a, b in zip(P[:-1], P[1:]):
+        n = max(1, int((b - a).length / spacing))
+        for t in np.linspace(0, 1, n, endpoint=False):
+            q = a + (b - a) * t
+            segs.append((tuple(q), tuple(q + Vector((0, 0, h)))))
+    posts = tubes_mesh(name + "Posts", segs, 0.035, mats["cream"], sides=6)
+    top = curve_tube(name + "Top", [tuple(p + Vector((0, 0, h))) for p in P], 0.07, mats["cream"])
+    return [posts, top]
+
+
 # --------------------------------------------------------------------------
 # Segel
 # --------------------------------------------------------------------------
 
-def sail_mesh(name, width, height, bulge, mat, nx=34, ny=30, foot_arch=0.6, taper=0.06, twist=0.0):
+def sail_mesh(name, width, height, bulge, mat, nx=34, ny=30, foot_arch=0.6, taper=0.06, twist=0.0, rake=0.0):
     """Rahsegel mit glaubhafter Windform: Bauch mit Maximum bei ~40 % Tiefe, gerundetes Unterliek,
     Spannungsfalten zu den Schothörnern (Noise, gerichtet), leichte Verwindung."""
     rng = np.random.default_rng(abs(hash(name)) % 1000)
@@ -555,7 +852,7 @@ def sail_mesh(name, width, height, bulge, mat, nx=34, ny=30, foot_arch=0.6, tape
             depth += twist * sx * t
             # Spannungsfalten diagonal zu den unteren Ecken
             fold = 0.05 * np.sin(18 * (abs(sx) - t * 0.9)) * (t ** 2) * (1 - abs(sx) * 0.3)
-            row.append(bm.verts.new((depth + fold, y, z)))
+            row.append(bm.verts.new((depth + fold - rake * t ** 1.5, y, z)))
         rows.append(row)
     for j in range(ny - 1):
         for i in range(nx - 1):
@@ -601,25 +898,24 @@ def gaff_sail_mesh(name, luff, gaff_len, boom_len, gaff_rise, mat, nx=24, ny=26,
     return ob
 
 
+
 # --------------------------------------------------------------------------
 # Löwen-Galionsfigur
 # --------------------------------------------------------------------------
 
-def petal_mesh(name, length, width, thick, mat, bend=0.35):
-    """Blütenblatt der Mähne: gebogenes, verdicktes Blatt mit runder Spitze (Quad-Topologie)."""
+def petal_mesh(name, length, width, thick, mat, bend=0.3):
+    """Spitzes Mähnen-Blatt (Sonnenstrahl): breite Basis, zur Spitze verjüngt, leicht gewölbt."""
     nx, ny = 7, 12
     bm = bmesh.new()
     grid = []
     for j in range(ny):
         t = j / (ny - 1)
         row = []
-        wt = width * (np.sin(np.pi * min(t * 0.92 + 0.08, 1.0)) ** 0.6)
+        wt = width * (1 - t ** 1.25) * min(1.0, 0.75 + t * 2.5) + 0.02
         for i in range(nx):
             s = (i / (nx - 1)) * 2 - 1
-            x = s * wt / 2
-            z = t * length
-            y = -bend * (t ** 2) * length * 0.35 + 0.08 * (1 - s * s) * width
-            row.append(bm.verts.new((x, y, z)))
+            row.append(bm.verts.new((s * wt / 2, -bend * (t ** 2) * length * 0.35 + 0.1 * (1 - s * s) * width,
+                                     t * length)))
         grid.append(row)
     for j in range(ny - 1):
         for i in range(nx - 1):
@@ -633,88 +929,60 @@ def petal_mesh(name, length, width, thick, mat, bend=0.35):
     return ob
 
 
-def lion_head(body, mats, x0, z0):
-    """Löwenkopf: Gesicht ≈ 55 % des Mähnen-Durchmessers, Mähne (2 Kränze) an einer drehbaren Nabe,
-    gekreuzte Knochen dahinter wie ein Jolly Roger, Kiefer separat (Gaon-Cannon-Mündung)."""
-    K = 1.5
-    face_c = Vector((x0 + 1.3, 0, z0 + 2.2))
+def lion_head(body, mats):
+    """Sunny-Löwe (Model Sheet): gelbes rundes Gesicht, Mähne aus spitzen orangefarbenen Strahlen in zwei
+    Kränzen an einer drehbaren Nabe, gekreuzte Knochen dahinter, Hals zum Bugschild."""
+    c = Vector((X_B + 3.0, 0, 7.1))
+    R = 1.75
     parts = []
-    # Nabe für die Mähnen-Mechanik (Drehachse = Schiffslängsachse)
     hub = bpy.data.objects.new("ManeHub", None)
     fpv.link(hub)
     hub.parent = body
-    hub.location = face_c + Vector((-0.6, 0, 0))
-    # Sockel/Hals
-    neck = cyl("LionNeck", (x0 - 2.2, 0, z0 - 1.0), (face_c.x - 0.5, 0, face_c.z - 0.3), 1.8, 2.1, mats["mane_dark"], 40)
-    parts.append(neck)
-    # Rückplatte der Mähne (schließt Lücken)
-    back = cyl("ManeBack", (face_c.x - 1.4, 0, face_c.z), (face_c.x - 0.9, 0, face_c.z), 3.9, 3.7, mats["mane_dark"], 48)
+    hub.location = c + Vector((-0.7, 0, 0))
+    parts.append(cyl("LionNeck", (X_B - 0.8, 0, 6.3), (c.x - 0.6, 0, c.z - 0.1), 1.55, 1.75, mats["mane_dark"], 40))
+    back = cyl("ManeBack", (c.x - 1.25, 0, c.z), (c.x - 0.85, 0, c.z), 2.9, 2.7, mats["mane_dark"], 48)
     back.parent = hub
     back.location = back.location - hub.location
-    face = sphere("LionFace", face_c, 1.55 * K, mats["face"], scale=(0.78, 1.0, 0.95), seg=64, ring=32)
-    parts.append(face)
-    # Mähnen-Blätter: 2 Kränze à 20, Nabe als Parent (drehbar)
-    petal_tpl = {}
-    for layer, (n, rad, ln, wd, mk, off, tilt) in enumerate(((20, 1.9 * K, 1.35 * K, 0.95 * K, "mane", 0.0, -12),
-                                                             (20, 2.45 * K, 1.5 * K, 1.1 * K, "mane_dark", 9.0, -22))):
-        tpl = petal_mesh(f"PetalTpl{layer}", ln, wd, 0.16 * K, mats[mk])
-        petal_tpl[layer] = tpl
+    parts.append(sphere("LionFace", c, R, mats["face"], scale=(0.72, 1.0, 0.97), seg=64, ring=32))
+    for layer, (n, rad, ln, wd, mk, off, tilt, dx) in enumerate(((12, 1.5, 2.5, 1.9, "mane", 0.0, -14, -0.75),
+                                                                 (12, 1.4, 1.95, 1.4, "mane_light", 15.0, -6, -0.45))):
+        tpl = petal_mesh(f"PetalTpl{layer}", ln, wd, 0.2, mats[mk])
         for k in range(n):
-            a = math.radians(off + k * 360 / n)
+            a = math.radians(off + 90 + k * 360 / n)
             pet = tpl.copy()
             pet.data = tpl.data
             fpv.link(pet)
             dirv = Vector((0, math.cos(a), math.sin(a)))
-            base = face_c + dirv * rad * 0.62 + Vector((-0.55 - 0.45 * layer, 0, 0))
-            q = dirv.to_track_quat("Z", "X")  # lokale Z = radial
-            q = q @ Matrix.Rotation(math.radians(tilt), 4, "X").to_quaternion()
+            base = c + dirv * rad + Vector((dx, 0, 0))
+            q = dirv.to_track_quat("Z", "X") @ Matrix.Rotation(math.radians(tilt), 4, "X").to_quaternion()
             pet.rotation_mode = "QUATERNION"
             pet.rotation_quaternion = q
             pet.parent = hub
             pet.location = base - hub.location
         bpy.data.objects.remove(tpl)
-    # Gekreuzte Knochen hinter der Mähne
-    bx = face_c.x - 1.9
+    # gekreuzte Knochen hinter der Mähne
+    bx = c.x - 1.7
     for sgn in (1, -1):
-        a = math.radians(38 * sgn)
+        a = math.radians(35 * sgn)
         d = Vector((0, math.cos(a), math.sin(a)))
-        p0 = Vector((bx, 0, face_c.z)) - d * 5.4
-        p1 = Vector((bx, 0, face_c.z)) + d * 5.4
-        bone = cyl("Bone", p0, p1, 0.42, 0.42, mats["bone"], 20)
-        parts.append(bone)
+        p0 = Vector((bx, 0, c.z - 0.4)) - d * 5.5
+        p1 = Vector((bx, 0, c.z - 0.4)) + d * 5.5
+        parts.append(cyl("Bone", p0, p1, 0.42, 0.42, mats["bone"], 20))
         for p in (p0, p1):
-            side = d.cross(Vector((1, 0, 0))).normalized()
-            for off in (-0.42, 0.42):
-                parts.append(sphere("BoneKnob", p + side * off, 0.55, mats["bone"]))
-    # Gesicht: Augen, Brauen, Nase, Kiefer mit Maul
+            sd = d.cross(Vector((1, 0, 0))).normalized()
+            for o in (-0.42, 0.42):
+                parts.append(sphere("BoneKnob", p + sd * o, 0.56, mats["bone"]))
+    # Gesicht: runde Augen, Nase, lächelnder Mund, Wangen
+    f = c + Vector((R * 0.72, 0, 0))
     for sy in (-1, 1):
-        parts.append(sphere("Eye", face_c + Vector((1.08, 0.55 * sy, 0.38)) * K, 0.22 * K, mats["black"],
-                            scale=(0.6, 1, 1.25)))
-        parts.append(sphere("EyeHi", face_c + Vector((1.13, 0.5 * sy, 0.47)) * K, 0.06 * K, mats["white"]))
-        parts.append(cyl("Brow", face_c + Vector((1.02, 0.25 * sy, 0.78)) * K,
-                         face_c + Vector((0.95, 0.85 * sy, 0.70)) * K, 0.07 * K, 0.05 * K, mats["mane_dark"], 10))
-    nose = sphere("Nose", face_c + Vector((1.25 * K, 0, 0.0)), 0.3 * K, mats["mane_dark"], scale=(0.8, 1.2, 0.8))
-    parts.append(nose)
-    jaw = bpy.data.objects.new("Jaw", None)
-    fpv.link(jaw)
-    jaw.parent = body
-    jaw.location = face_c + Vector((0.4, 0, -0.1))
-    pts = []
-    for k in range(25):
-        a = math.radians(200 + k * (140 / 24))
-        pts.append(face_c + Vector((1.12 - 0.1 * abs(math.sin(a)), 0.7 * math.cos(a), -0.2 + 0.45 * math.sin(a))) * K)
-    cu = bpy.data.curves.new("Mouth", "CURVE")
-    cu.dimensions = "3D"
-    sp = cu.splines.new("POLY")
-    sp.points.add(len(pts) - 1)
-    for p, c in zip(sp.points, pts):
-        p.co = (*c, 1)
-    cu.bevel_depth = 0.06 * K
-    cu.bevel_resolution = 3
-    mo = bpy.data.objects.new("Mouth", cu)
-    mo.data.materials.append(mats["black"])
-    fpv.link(mo)
-    parts.append(mo)
+        parts.append(sphere("Eye", f + Vector((-0.12, 0.62 * sy, 0.42)), 0.26, mats["black"], scale=(0.45, 1, 1.2)))
+        parts.append(sphere("EyeHi", f + Vector((-0.02, 0.56 * sy, 0.55)), 0.07, mats["white"]))
+        parts.append(cyl("Brow", f + Vector((-0.22, 0.32 * sy, 0.95)), f + Vector((-0.3, 0.9 * sy, 0.88)), 0.07, 0.05,
+                         mats["mane_dark"], 10))
+    parts.append(sphere("Nose", f + Vector((0.2, 0, 0.02)), 0.34, mats["nose"], scale=(0.75, 1.25, 0.8)))
+    pts = [tuple(f + Vector((-0.06 - 0.25 * abs(math.cos(a)) ** 2, 0.72 * math.cos(a), -0.35 + 0.34 * math.sin(a))))
+           for a in np.linspace(math.radians(200), math.radians(340), 25)]
+    parts.append(curve_tube("Mouth", pts, 0.065, mats["black"]))
     for o in parts:
         o.parent = body
     return hub
@@ -723,6 +991,45 @@ def lion_head(body, mats, x0, z0):
 # --------------------------------------------------------------------------
 # Aufbau
 # --------------------------------------------------------------------------
+
+def _flag(name, loc, mats, fw=3.6, fh=2.4):
+    bm = bmesh.new()
+    uv_l = bm.loops.layers.uv.new("UVMap")
+    nx, ny = 24, 16
+    grid = [[bm.verts.new((-fw * i / (nx - 1), 0, -fh * j / (ny - 1))) for i in range(nx)] for j in range(ny)]
+    for j in range(ny - 1):
+        for i in range(nx - 1):
+            f = bm.faces.new([grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]])
+            for lp, (ii, jj) in zip(f.loops, [(i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1)]):
+                lp[uv_l].uv = (ii / (nx - 1), 1 - jj / (ny - 1))
+    flag = fpv.mesh_from_bmesh(bm, name, mats["flag"])
+    flag.location = loc
+    wv = flag.modifiers.new("wave", "WAVE")
+    wv.use_x = True
+    wv.use_y = False
+    wv.use_normal = True
+    wv.height = 0.22
+    wv.width = 1.4
+    wv.speed = -0.12
+    return flag
+
+
+def round_room(name, cx, z0, h, r, mats, n_win=10, dome_r=None, dome_h=0.72):
+    """Rundes Häuschen: cremefarbene Wand, Fensterkranz, rot-gelbe Kuppel mit Knauf."""
+    parts = [cyl(name + "Wall", (cx, 0, z0), (cx, 0, z0 + h), r, r, mats["cream"], 48)]
+    for k in range(n_win):
+        a = (k + 0.5) * 2 * math.pi / n_win
+        d = Vector((math.cos(a), math.sin(a), 0))
+        p = Vector((cx, 0, z0 + h * 0.55)) + d * r
+        M = local_matrix(p, Vector((-d.y, d.x, 0)), d)
+        parts += framed_window(name + "Win", M, 0.55 * r / 1.6, h * 0.42, mats, arch=True, frame="brown")
+    dr = dome_r or r * 1.06
+    parts.append(cyl(name + "Eave", (cx, 0, z0 + h - 0.05), (cx, 0, z0 + h + 0.12), dr + 0.1, dr + 0.1, mats["brown"], 48))
+    dome = sphere(name + "Dome", (cx, 0, z0 + h + 0.1), dr, mats["dome"], scale=(1, 1, dome_h), seg=48, ring=24)
+    parts.append(dome)
+    parts.append(sphere(name + "Knob", (cx, 0, z0 + h + 0.1 + dr * dome_h + 0.12), 0.18, mats["yellow"]))
+    return parts
+
 
 def build(name="ThousandSunny"):
     root = bpy.data.objects.new(name, None)  # Kurs
@@ -733,233 +1040,234 @@ def build(name="ThousandSunny"):
     lawn_base, blade = lawn_materials()
     mats = {
         "hull": hull_material(),
-        "transom": wood_material("Transom", dark=0.8, axis="X"),
-        "rail": paint_material("RailWhite", (0.80, 0.78, 0.72), rough=0.38),
-        "wood": wood_material("CabinWood", dark=1.1),
-        "mast": wood_material("MastWood", dark=1.25, board=5.0),
+        "inner": wood_material("BulwarkInner", dark=0.9, axis="X", board=0.3),
+        "deckwood": wood_material("DeckWood", dark=0.95, axis="X", board=0.18),
+        "brown": wood_material("TrimWood", dark=0.7),
+        "mast": wood_material("MastWood", dark=1.0, board=5.0),
+        "cream": paint_material("Cream", CREAM, rough=0.42, under=(0.45, 0.3, 0.16)),
+        "red": paint_material("RedPaint", RED, rough=0.4),
+        "yellow": paint_material("Yellow", YELLOW, rough=0.4),
+        "dome": stripe_dome_material(),
         "lawn": lawn_base,
         "blade": blade,
         "sail": sail_material("Sail"),
         "sail_jr": sail_material("SailJR", textures.jolly_roger_sail()),
-        "sail_stripe": sail_material("SailStripe", stripes=7.0),
+        "sail_stripe": sail_material("SailStripe", stripes=5.0),
         "flag": flag_material(),
-        "mane": paint_material("Mane", (0.95, 0.62, 0.08), rough=0.45, under=(0.55, 0.35, 0.18)),
-        "mane_dark": paint_material("ManeDark", (0.85, 0.36, 0.04), rough=0.45, under=(0.5, 0.3, 0.15)),
-        "face": paint_material("LionFace", (0.95, 0.72, 0.16), rough=0.4, under=(0.6, 0.45, 0.25)),
+        "mane": paint_material("Mane", (0.85, 0.20, 0.012), rough=0.45, under=(0.55, 0.3, 0.12)),
+        "mane_light": paint_material("ManeLight", (0.92, 0.40, 0.02), rough=0.45, under=(0.55, 0.35, 0.15)),
+        "mane_dark": paint_material("ManeDark", (0.66, 0.2, 0.025), rough=0.45, under=(0.45, 0.25, 0.1)),
+        "face": paint_material("LionFace", (0.93, 0.56, 0.035), rough=0.4, under=(0.6, 0.45, 0.25)),
+        "nose": paint_material("LionNose", (0.40, 0.13, 0.03), rough=0.35),
         "bone": paint_material("Bone", (0.86, 0.83, 0.74), rough=0.5),
-        "black": fpv.simple_mat("Black", (0.015, 0.012, 0.01), rough=0.3),
-        "white": paint_material("WhitePaint", (0.80, 0.78, 0.72), rough=0.38),
-        "red": paint_material("RedPaint", (0.45, 0.05, 0.035), rough=0.4),
+        "black": fpv.simple_mat("Black", BLACK, rough=0.3),
+        "white": paint_material("WhitePaint", (0.85, 0.83, 0.78), rough=0.38),
         "iron": iron_material(),
+        "cannon": metal_material("CannonIron", (0.09, 0.065, 0.045), rough=0.45, metallic=0.7),
+        "portring": metal_material("PortRing", (0.42, 0.42, 0.41), rough=0.3),
         "rope": fpv.simple_mat("Rope", (0.24, 0.18, 0.11), rough=0.9),
-        "glass": fpv.simple_mat("DarkGlass", (0.015, 0.02, 0.025), rough=0.05),
-        "roofblue": paint_material("CrowRoof", (0.12, 0.28, 0.55), rough=0.35),
+        "glass": fpv.simple_mat("DarkGlass", (0.012, 0.018, 0.025), rough=0.05),
+        "leaf": fpv.simple_mat("TangerineLeaf", (0.03, 0.09, 0.02), rough=0.6),
+        "fruit": fpv.simple_mat("Tangerine", (0.85, 0.25, 0.02), rough=0.45),
     }
-    parts = []
-    parts.append(hull_mesh(mats["hull"], mats["transom"]))
-    parts.append(deck_mesh(mats["lawn"]))
-    parts.append(lawn_blades(mats["blade"]))
+    P = []
+    hull = hull_mesh(mats["hull"], mats["inner"])
+    P.append(hull)
+    P.append(plan_mesh("LawnDeck", X_CAST, X_FORE, Z_DECK, mats["lawn"], inset=0.25))
+    P.append(lawn_blades(mats["blade"]))
+    P.append(plan_mesh("ForeDeck", X_FORE, X_B - 0.25, Z_FORE, mats["deckwood"], inset=0.25, thick=0.25))
 
-    # Reling-Handlauf (weiß), Speigatten-Leiste (rot)
+    # Deckskappe (cremefarben) entlang der U-Bordwand und ums Vorschiff
+    xs = np.linspace(X_CAST, X_B, 160)
+    G = sheer(xs)
+    cap = [(float(x), -float(section_y(x, g)) + 0.02, float(g) + 0.06) for x, g in zip(xs, G)]
+    cap += [(float(x), float(section_y(x, g)) - 0.02, float(g) + 0.06) for x, g in zip(xs[::-1], G[::-1])]
+    P.append(curve_tube("CapRail", cap, 0.15, mats["cream"]))
+    # Voluten an den Armen des U, Bullaugen im roten Band
     for sy in (-1, 1):
-        pts = [(-L / 2 + u * L, sy * (half_beam(u) - 0.05), sheer(u) + 0.10) for u in np.linspace(0.0, 0.975, 80)]
-        cu = bpy.data.curves.new("Rail", "CURVE")
-        cu.dimensions = "3D"
-        sp = cu.splines.new("POLY")
-        sp.points.add(len(pts) - 1)
-        for p, c in zip(sp.points, pts):
-            p.co = (*c, 1)
-        cu.bevel_depth = 0.16
-        cu.bevel_resolution = 3
-        ro = bpy.data.objects.new("Rail", cu)
-        ro.data.materials.append(mats["rail"])
-        fpv.link(ro)
-        parts.append(ro)
-        # Kanonenpforten mit Rahmen + Deckel-Scharnier
-        for k in range(7):
-            u = 0.20 + k * 0.078
-            if 0.43 < u < 0.52:  # Platz für das Soldier-Dock-Tor
-                continue
-            p, tu, tv, n = hull_frame(u, 0.70, sy)
-            port = cyl("Port", p - n * 0.2, p + n * 0.09, 0.36, 0.36, mats["iron"], 24)
-            parts.append(port)
-            inner = cyl("PortIn", p - n * 0.05, p + n * 0.12, 0.27, 0.27, mats["black"], 24)
-            parts.append(inner)
-        # Soldier-Dock-Tor (mittschiffs, über der Wasserlinie), Rahmen, Rippen, Nieten
-        p, tu, tv, n = hull_frame(0.475, 0.50, sy)
-        M = Matrix((tu, n, tv)).transposed().to_4x4()
-        gw, gh = 4.6, 2.5
-        gate_objs = []
-        rivets, rnorm = [], []
-        for (a, b, m) in (((-gw / 2, 0.05, -gh / 2), (gw / 2, 0.20, gh / 2), "wood"),
-                          ((-gw / 2 - 0.18, 0.0, gh / 2), (gw / 2 + 0.18, 0.28, gh / 2 + 0.18), "iron"),
-                          ((-gw / 2 - 0.18, 0.0, -gh / 2 - 0.18), (gw / 2 + 0.18, 0.28, -gh / 2), "iron"),
-                          ((-gw / 2 - 0.18, 0.0, -gh / 2), (-gw / 2, 0.28, gh / 2), "iron"),
-                          ((gw / 2, 0.0, -gh / 2), (gw / 2 + 0.18, 0.28, gh / 2), "iron"),
-                          ((-0.06, 0.18, -gh / 2), (0.06, 0.26, gh / 2), "iron")):
-            ob = box("DockGate", a, b, mats[m], bevel=0.02)
-            ob.matrix_world = Matrix.Translation(p) @ M
-            gate_objs.append(ob)
-        for k in range(5):  # Rippen
-            zz = -gh / 2 + (k + 0.5) * gh / 5
-            ob = box("DockRib", (-gw / 2, 0.18, zz - 0.05), (gw / 2, 0.24, zz + 0.05), mats["iron"], bevel=0.01)
-            ob.matrix_world = Matrix.Translation(p) @ M
-            gate_objs.append(ob)
-        for xx in np.arange(-gw / 2 - 0.09, gw / 2 + 0.1, 0.3):
-            for zz in (gh / 2 + 0.09, -gh / 2 - 0.09):
-                rivets.append(p + M.to_3x3() @ Vector((xx, 0.30, zz)))
-                rnorm.append(n)
-        for zz in np.arange(-gh / 2, gh / 2 + 0.01, 0.3):
-            for xx in (-gw / 2 - 0.09, gw / 2 + 0.09):
-                rivets.append(p + M.to_3x3() @ Vector((xx, 0.30, zz)))
-                rnorm.append(n)
-        rv = spheres_mesh("DockRivets", rivets, 0.045, mats["iron"], normals=rnorm)
-        parts += gate_objs + [rv]
+        for (X, z, r0) in ((3.35, 7.25, 0.55), (-3.45, 7.0, 0.5)):
+            p, tx, tz, n = hull_frame(X, z, sy)
+            P.append(volute("Volute", p, tx, n, r0, mats["cream"]))
+        for (X, dz) in ((4.9, 1.3), (3.85, 1.25), (-3.9, 1.25), (-4.7, 1.25)):
+            z = float(sheer(X)) - dz
+            p, tx, tz, n = hull_frame(X, z, sy)
+            P += porthole("Port", p, n, 0.36, mats)
+        for (X, z) in ((3.0, 3.05), (-4.3, 3.0), (6.9, 5.2), (8.0, 4.6)):
+            p, tx, tz, n = hull_frame(X, z, sy)
+            P += porthole("PortLow", p, n, 0.3, mats)
+        # Soldier-Dock-Ring als Relief (folgt der Rumpfhaut)
+        pts = []
+        for a in np.linspace(0, 2 * math.pi, 73):
+            X, z = SD_X + (SD_R - 0.2) * math.cos(a), SD_Z + (SD_R - 0.2) * math.sin(a)
+            p, tx, tz, n = hull_frame(X, z, sy)
+            pts.append(tuple(p + n * 0.06))
+        P.append(curve_tube("DockRing", pts, 0.2, mats["black"], cyclic=True))
+    # Bugschild: gelbe Nieten im Bogen unter dem Löwen
+    for a in list(np.linspace(math.radians(200), math.radians(340), 9)) + [math.radians(v) for v in (165, 150, 30, 15)]:
+        yy, zz = 4.3 * math.cos(a), 6.2 + 4.3 * math.sin(a)
+        fp = hull_front_point(yy, zz)
+        if fp is None:
+            continue
+        p, n = fp
+        P.append(sphere("Stud", p + n * 0.05, 0.3, mats["yellow"], scale=(1, 1, 1)))
 
-    # Heck: Fenster mit Rahmen, Coup-de-Burst-Öffnung mit Eisenring
-    for yy in (-2.5, -0.85, 0.85, 2.5):
-        parts.append(cyl("SternWin", (-L / 2 - 0.25, yy, 3.3), (-L / 2 + 0.1, yy, 3.3), 0.55, 0.55, mats["glass"], 28))
-        parts.append(cyl("SternFrame", (-L / 2 - 0.15, yy, 3.3), (-L / 2 + 0.05, yy, 3.3), 0.7, 0.7, mats["white"], 28))
-    parts.append(cyl("CoupDeBurst", (-L / 2 - 0.35, 0, 1.2), (-L / 2 + 0.2, 0, 1.2), 1.15, 1.15, mats["black"], 40))
-    parts.append(cyl("CoupRing", (-L / 2 - 0.25, 0, 1.2), (-L / 2 + 0.15, 0, 1.2), 1.45, 1.45, mats["iron"], 40))
-
-    # Achterdeck-Haus mit echten Fensterrahmen, Dachreling, Treppe
-    d_aft = deck_z(0.1)
-    cab_len, cab_x0 = 7.8, -L / 2 + 0.6
-    hwc = half_beam(0.12) * 0.86
-    parts.append(box("AftCabin", (cab_x0, -hwc, d_aft), (cab_x0 + cab_len, hwc, d_aft + 3.3), mats["wood"], bevel=0.05))
-    for k in range(4):
-        xw = cab_x0 + 1.25 + k * 1.8
-        for sy in (-1, 1):
-            parts.append(box("CabWin", (xw - 0.45, sy * hwc - 0.07, d_aft + 1.3), (xw + 0.45, sy * hwc + 0.07, d_aft + 2.5),
-                             mats["glass"], bevel=0.0))
-            parts.append(box("CabWinFrame", (xw - 0.55, sy * hwc - 0.1, d_aft + 1.2), (xw + 0.55, sy * hwc + 0.1, d_aft + 1.3),
-                             mats["white"], bevel=0.01))
-            parts.append(box("CabWinFrameT", (xw - 0.55, sy * hwc - 0.1, d_aft + 2.5), (xw + 0.55, sy * hwc + 0.1, d_aft + 2.6),
-                             mats["white"], bevel=0.01))
-    parts.append(box("CabRoof", (cab_x0 - 0.25, -hwc - 0.25, d_aft + 3.3), (cab_x0 + cab_len + 0.35, hwc + 0.25, d_aft + 3.6),
-                     mats["white"], bevel=0.04))
-    for k in range(7):
-        parts.append(box("Step", (cab_x0 + cab_len + k * 0.34, -1.3, d_aft), (cab_x0 + cab_len + k * 0.34 + 0.34, 1.3,
-                                                                                d_aft + 3.3 - k * 0.47), mats["wood"], bevel=0.02))
-    posts = []
-    for xx in np.linspace(cab_x0, cab_x0 + cab_len, 12):
-        for sy in (-1, 1):
-            posts.append(((xx, sy * (hwc + 0.1), d_aft + 3.6), (xx, sy * (hwc + 0.1), d_aft + 4.5)))
+    # Vorschiff: Rückwand mit Tür und Rundfenstern, Treppen, Steuerrad
+    hw_f = float(section_y(X_FORE, Z_FORE)) - 0.25
+    P.append(box("ForeWall", (X_FORE - 0.3, -hw_f, Z_DECK), (X_FORE, hw_f, Z_FORE), mats["deckwood"], bevel=0.03))
+    M = local_matrix(Vector((X_FORE - 0.3, 0, Z_DECK + 1.15)), Vector((0, 1, 0)), Vector((-1, 0, 0)))
+    P += framed_window("ForeDoor", M, 1.3, 2.0, mats, arch=True, frame="brown", bars=False)
     for sy in (-1, 1):
-        posts.append(((cab_x0, sy * (hwc + 0.1), d_aft + 4.5), (cab_x0 + cab_len, sy * (hwc + 0.1), d_aft + 4.5)))
-    parts.append(tubes_mesh("CabRail", posts, 0.045, mats["white"], sides=8))
+        p = Vector((X_FORE - 0.3, sy * 1.9, Z_DECK + 2.6))
+        P += porthole("ForePort", p, Vector((-1, 0, 0)), 0.38, mats)
+        P += stairs("ForeStairs", (X_FORE - 3.4, sy * 3.5, Z_DECK), (X_FORE - 0.3, sy * 3.5, Z_FORE), 1.2, 14,
+                    mats["deckwood"])
+    hx = X_FORE + 1.9
+    P.append(box("HelmPost", (hx - 0.25, -0.25, Z_FORE), (hx + 0.25, 0.25, Z_FORE + 1.35), mats["brown"], bevel=0.03))
+    wheel = []
+    for k in range(10):
+        a = k * 2 * math.pi / 10
+        d = Vector((0, math.cos(a), math.sin(a)))
+        c0 = Vector((hx - 0.32, 0, Z_FORE + 1.45))
+        wheel.append((tuple(c0), tuple(c0 + d * 1.0)))
+        a2 = (k + 1) * 2 * math.pi / 10
+        wheel.append((tuple(c0 + d * 0.78), tuple(c0 + Vector((0, math.cos(a2), math.sin(a2))) * 0.78)))
+    P.append(tubes_mesh("HelmWheel", wheel, 0.05, mats["brown"], sides=8))
 
-    # Masten mit Eisenbändern, Rahen, Gaffel/Baum
-    d_main = deck_z(0.45)
-    main_x, fore_x = -3.0, 7.0
-    main_top, fore_top = d_main + 27.0, d_main + 17.0
-    parts.append(cyl("MainMast", (main_x, 0, d_main - 0.5), (main_x, 0, main_top), 0.52, 0.30, mats["mast"], 24))
-    parts.append(cyl("ForeMast", (fore_x, 0, d_main - 0.5), (fore_x, 0, fore_top), 0.44, 0.26, mats["mast"], 24))
-    for mx, top, r0 in ((main_x, main_top, 0.52), (fore_x, fore_top, 0.44)):
-        for zz in np.arange(d_main + 1.5, top - 1.0, 3.0):
-            f = (zz - d_main) / (top - d_main)
-            rr = r0 + (0.3 - r0) * f
-            ring = cyl("MastBand", (mx, 0, zz - 0.08), (mx, 0, zz + 0.08), rr + 0.035, rr + 0.035, mats["iron"], 24)
-            parts.append(ring)
-    yards = [(main_x, d_main + 21.2, 8.6), (main_x, d_main + 8.8, 9.2), (fore_x, d_main + 12.6, 6.4), (fore_x, d_main + 5.2, 6.8)]
+    # Achterkastell: zwei Stockwerke, cremefarben, braune Gesimse, Bogenfenster; Dach mit Balustrade
+    X0c, X1c = X_CAST, X_S + 0.35
+    out = castle_outline(X0c, X1c, 4.6, 0.14)
+    P.append(prism("AftCastle", out, 4.35, Z_ROOF - 0.05, mats["cream"]))
+    P.append(prism("CastleBase", castle_outline(X0c + 0.03, X1c, 4.6, 0.08), 4.3, 4.75, mats["brown"]))
+    P.append(prism("CastleBelt", castle_outline(X0c + 0.03, X1c, 6.3, 0.08), 6.15, 6.35, mats["brown"]))
+    roof = castle_outline(X0c + 0.05, X_S + 0.05, Z_ROOF, -0.12)
+    P.append(prism("CastleRoof", roof, Z_ROOF - 0.08, Z_ROOF + 0.18, mats["deckwood"]))
+    for sy in (-1, 1):
+        for X in (-6.0, -7.05, -8.1, -9.15):   # Obergeschoss: vier Bogenfenster
+            p, tx, n = wall_frame(X, 7.2, sy, 0.14)
+            P += framed_window("CastleArch", local_matrix(p, tx, n), 0.72, 0.95, mats, arch=True)
+        for (X, w, h, arch) in ((-6.2, 1.2, 0.95, False), (-7.65, 0.95, 1.6, True), (-9.0, 0.8, 0.95, False)):
+            p, tx, n = wall_frame(X, 5.35 if not arch else 5.3, sy, 0.14)
+            P += framed_window("CastleLow", local_matrix(p, tx, n), w, h, mats, arch=arch,
+                               bars=not arch)
+    # Front zum Rasendeck: Doppeltür, Fenster oben; Seitentreppen hinauf aufs Kastelldach
+    front_n = Vector((1, 0, 0))
+    M = local_matrix(Vector((X_CAST + 0.02, 0, 5.35)), Vector((0, -1, 0)), front_n)
+    P += framed_window("CastleDoor", M, 1.5, 1.9, mats, arch=True, bars=False)
+    for yy in (-3.3, -1.4, 1.4, 3.3):
+        M = local_matrix(Vector((X_CAST + 0.02, yy, 7.3)), Vector((0, -1, 0)), front_n)
+        P += framed_window("CastleFrontWin", M, 0.8, 0.95, mats, arch=True)
+    for sy in (-1, 1):
+        P += stairs("AftStairs", (X_CAST + 0.75, sy * 1.25, Z_DECK), (X_CAST + 0.75, sy * 5.0, Z_ROOF), 1.1, 16,
+                    mats["deckwood"])
+    rp = [(x, y, Z_ROOF + 0.18) for (x, y) in castle_outline(X_CAST - 0.35, X_S + 0.1, Z_ROOF, 0.05, n=18)]
+    P += balustrade("RoofRail", rp[:18], 0.9, mats)
+    P += balustrade("RoofRail2", rp[18:], 0.9, mats)
+
+    # Heckkanone (Gaon Cannon / Coup de Burst) + Rundturm mit rot-gelber Kuppel darüber
+    P.append(cyl("Cannon", (-9.4, 0, 4.0), (-14.6, 0, 4.0), 1.85, 1.7, mats["cannon"], 48))
+    for X in (-10.9, -12.4, -13.8):
+        P.append(cyl("CannonBand", (X - 0.14, 0, 4.0), (X + 0.14, 0, 4.0), 1.95, 1.95, mats["iron"], 48))
+    P.append(cyl("CannonMuzzle", (-14.45, 0, 4.0), (-15.1, 0, 4.0), 2.15, 2.1, mats["brown"], 48))
+    P.append(cyl("CannonBore", (-14.2, 0, 4.0), (-15.15, 0, 4.0), 1.3, 1.3, mats["black"], 40))
+    TX = -12.0
+    P.append(cyl("TowerPedestal", (TX, 0, 5.6), (TX, 0, Z_ROOF - 0.1), 1.0, 2.2, mats["cream"], 40))
+    P.append(cyl("TowerFloor", (TX, 0, Z_ROOF - 0.12), (TX, 0, Z_ROOF + 0.18), 2.85, 2.85, mats["deckwood"], 48))
+    P += round_room("Tower", TX, Z_ROOF + 0.18, 1.9, 2.4, mats, n_win=10)
+    ring = [(TX + 2.75 * math.cos(a), 2.75 * math.sin(a), Z_ROOF + 0.18) for a in np.linspace(0, 2 * math.pi, 33)[:-1]]
+    P += balustrade("TowerRail", ring, 0.85, mats, closed=True)
+
+    # Mandarinenbäume (Nami) in Pflanzkästen auf dem Rasendeck
+    rng = np.random.default_rng(12)
+    for (X, yy) in ((-4.15, -2.6), (-4.15, 2.6), (1.0, -3.9), (1.0, 3.9)):
+        P.append(box("Planter", (X - 0.55, yy - 0.55, Z_DECK), (X + 0.55, yy + 0.55, Z_DECK + 0.6), mats["brown"],
+                     bevel=0.03))
+        P.append(cyl("TTrunk", (X, yy, Z_DECK + 0.5), (X, yy, Z_DECK + 1.5), 0.09, 0.06, mats["brown"], 8))
+        bush = sphere("TBush", (X, yy, Z_DECK + 2.0), 0.85, mats["leaf"], scale=(1, 1, 0.85))
+        fpv.displace_obj(bush, "CLOUDS", size=0.25, strength=0.22, depth=2, subdiv=1, name="TBush_d")
+        P.append(bush)
+        fr = []
+        for _ in range(26):
+            d = Vector(rng.normal(size=3)).normalized()
+            fr.append(tuple(Vector((X, yy, Z_DECK + 2.0)) + Vector((d.x * 0.88, d.y * 0.88, d.z * 0.76))))
+        P.append(spheres_mesh("Tangerines", fr, 0.075, mats["fruit"], subdiv=1, flatten=1.0))
+
+    # Masten: Fockmast (Rasendeck) mit Ausguck, Großmast durch das Achterkastell
+    FT, MT = 19.0, 29.6
+    P.append(cyl("ForeMast", (FORE_X, 0, Z_DECK - 0.4), (FORE_X, 0, FT + 0.2), 0.46, 0.34, mats["mast"], 24))
+    P.append(cyl("MainMast", (MAIN_X, 0, Z_ROOF - 0.2), (MAIN_X, 0, MT), 0.5, 0.26, mats["mast"], 24))
+    for mx, z0, top, r0, r1 in ((FORE_X, Z_DECK, FT, 0.46, 0.34), (MAIN_X, Z_ROOF, MT, 0.5, 0.26)):
+        for zz in np.arange(z0 + 1.6, top - 0.8, 2.6):
+            f = (zz - z0) / (top - z0)
+            rr = r0 + (r1 - r0) * f
+            P.append(cyl("MastBand", (mx, 0, zz - 0.08), (mx, 0, zz + 0.08), rr + 0.04, rr + 0.04, mats["iron"], 24))
+    # Ausguck auf dem Fockmast: Konus, Plattform mit Reling, Rundhaus, Kuppel
+    P.append(cyl("CrowCone", (FORE_X, 0, FT - 0.9), (FORE_X, 0, FT + 0.8), 0.45, 1.7, mats["brown"], 40))
+    P.append(cyl("CrowFloor", (FORE_X, 0, FT + 0.75), (FORE_X, 0, FT + 0.95), 2.1, 2.1, mats["deckwood"], 48))
+    P += round_room("Crow", FORE_X, FT + 0.95, 1.8, 1.6, mats, n_win=8)
+    ring = [(FORE_X + 2.0 * math.cos(a), 2.0 * math.sin(a), FT + 0.95) for a in np.linspace(0, 2 * math.pi, 25)[:-1]]
+    P += balustrade("CrowRail", ring, 0.75, mats, closed=True)
+    crow_top = FT + 0.95 + 1.8 + 0.1 + 1.7 * 0.72
+    P.append(cyl("ForePole", (FORE_X, 0, crow_top), (FORE_X, 0, crow_top + 2.6), 0.07, 0.05, mats["iron"], 8))
+    P.append(_flag("ForeFlag", (FORE_X - 0.1, 0, crow_top + 2.55), mats, fw=2.6, fh=1.75))
+    P.append(cyl("MainPole", (MAIN_X, 0, MT), (MAIN_X, 0, MT + 2.9), 0.08, 0.06, mats["iron"], 8))
+    P.append(_flag("MainFlag", (MAIN_X - 0.1, 0, MT + 2.85), mats))
+    P.append(cyl("MainTop", (MAIN_X, 0, 25.7), (MAIN_X, 0, 25.9), 1.2, 1.2, mats["deckwood"], 32))
+
+    # Rahen und Segel (Model Sheet: Fock ~20 m breit mit Jolly Roger, Großsegel ~14 m, Gaffel rot-schwarz)
+    yards = [(FORE_X, FT - 0.25, 10.0), (MAIN_X, 25.5, 7.2)]
     for (x, z, hw) in yards:
-        parts.append(cyl("YardL", (x + 0.45, 0, z), (x + 0.45, -hw, z), 0.24, 0.13, mats["mast"], 12))
-        parts.append(cyl("YardR", (x + 0.45, 0, z), (x + 0.45, hw, z), 0.24, 0.13, mats["mast"], 12))
-    s_main, e_main = sail_mesh("MainSail", 16.6, 12.2, 2.1, mats["sail_jr"], foot_arch=0.7)
-    s_main.location = (main_x + 0.7, 0, d_main + 21.0)
-    parts.append(s_main)
-    s_fore, e_fore = sail_mesh("ForeSail", 12.2, 7.2, 1.5, mats["sail"], foot_arch=0.5)
-    s_fore.location = (fore_x + 0.7, 0, d_main + 12.4)
-    parts.append(s_fore)
-    # Liektaue entlang der Segelkanten + Schoten zum Deck
+        for sy in (-1, 1):
+            P.append(cyl("Yard", (x + 0.5, 0, z), (x + 0.5, sy * hw, z), 0.26, 0.13, mats["mast"], 12))
+    s_fore, e_fore = sail_mesh("ForeSail", 19.4, 10.6, 3.1, mats["sail_jr"], foot_arch=0.9, rake=2.2)
+    s_fore.location = (FORE_X + 0.75, 0, FT - 0.45)
+    P.append(s_fore)
+    s_main, e_main = sail_mesh("MainSail", 13.8, 6.2, 1.9, mats["sail"], foot_arch=0.5, rake=0.6)
+    s_main.location = (MAIN_X + 0.75, 0, 25.3)
+    P.append(s_main)
+    gaff = gaff_sail_mesh("GaffSail", luff=6.1, gaff_len=5.6, boom_len=5.6, gaff_rise=0.2, mat=mats["sail_stripe"],
+                          bulge=0.8)
+    gaff.location = (MAIN_X - 0.5, 0, 12.25)
+    P.append(gaff)
+    P.append(cyl("Boom", (MAIN_X - 0.4, 0, 12.2), (MAIN_X - 6.3, 0, 12.2), 0.17, 0.12, mats["mast"], 12))
+    P.append(cyl("Gaff", (MAIN_X - 0.4, 0, 18.4), (MAIN_X - 6.3, 0, 18.6), 0.15, 0.1, mats["mast"], 12))
+
+    # Takelage: Liektaue, Schoten, Wanten mit Webeleinen, Stagen
     ropes = []
-    for (so, ep, loc) in ((s_main, e_main, Vector((main_x + 0.7, 0, d_main + 21.0))),
-                          (s_fore, e_fore, Vector((fore_x + 0.7, 0, d_main + 12.4)))):
+    for (ep, loc) in ((e_fore, s_fore.location), (e_main, s_main.location)):
+        loc = Vector(loc)
         for e in ep:
             for a, b in zip(e[:-1], e[1:]):
                 ropes.append((tuple(Vector(a) + loc), tuple(Vector(b) + loc)))
-        lo = [Vector(ep[1][0]) + loc, Vector(ep[1][-1]) + loc]
-        for c in lo:
-            u = (c.x + L / 2) / L
-            tgt = Vector((c.x - 3.0, np.sign(c.y) * (half_beam(u) - 0.2), sheer(u) + 0.1))
-            ropes += catenary(tuple(c), tuple(tgt), 0.15, 8)
-    # Gaffelsegel rot-schwarz achtern am Großmast
-    gaff = gaff_sail_mesh("GaffSail", luff=10.0, gaff_len=6.5, boom_len=7.2, gaff_rise=2.2, mat=mats["sail_stripe"])
-    gaff.location = (main_x - 0.55, 0, d_main + 4.2)
-    parts.append(gaff)
-    parts.append(cyl("Boom", (main_x - 0.4, 0, d_main + 4.15), (main_x - 7.8, 0, d_main + 4.15), 0.17, 0.12, mats["mast"], 12))
-    parts.append(cyl("Gaff", (main_x - 0.4, 0, d_main + 14.2), (main_x - 7.0, 0, d_main + 16.4), 0.15, 0.1, mats["mast"], 12))
-
-    # Ausguck-Haus: Plattform, Geländer, Fensterband mit Rahmen, Kuppel
-    cz = d_main + 22.2
-    parts.append(cyl("CrowFloor", (main_x, 0, cz - 0.25), (main_x, 0, cz), 2.9, 2.9, mats["wood"], 48))
-    parts.append(cyl("CrowRoom", (main_x, 0, cz), (main_x, 0, cz + 2.6), 2.2, 2.2, mats["white"], 48))
-    wins = []
-    for k in range(12):
-        a = k * 2 * math.pi / 12
-        d = Vector((math.cos(a), math.sin(a), 0))
-        c = Vector((main_x, 0, cz + 1.45)) + d * 2.2
-        parts.append(cyl("CrowWin", c - d * 0.08, c + d * 0.05, 0.42, 0.42, mats["glass"], 20))
-        parts.append(cyl("CrowWinFrame", c - d * 0.02, c + d * 0.07, 0.52, 0.52, mats["iron"], 20))
-    dome = sphere("CrowDome", (main_x, 0, cz + 2.6), 2.25, mats["roofblue"], scale=(1, 1, 0.5), seg=48, ring=24)
-    parts.append(dome)
-    rail = []
-    for k in range(20):
-        a = k * 2 * math.pi / 20
-        p = (main_x + math.cos(a) * 2.8, math.sin(a) * 2.8)
-        rail.append(((p[0], p[1], cz), (p[0], p[1], cz + 1.0)))
-        a2 = (k + 1) * 2 * math.pi / 20
-        rail.append(((p[0], p[1], cz + 1.0), (main_x + math.cos(a2) * 2.8, math.sin(a2) * 2.8, cz + 1.0)))
-    parts.append(tubes_mesh("CrowRail", rail, 0.05, mats["iron"], sides=8))
-
-    # Flagge an der Mastspitze
-    bm = bmesh.new()
-    uv_l = bm.loops.layers.uv.new("UVMap")
-    nx, ny = 24, 16
-    fw, fh = 4.4, 2.9
-    grid = [[bm.verts.new((-fw * i / (nx - 1), 0, -fh * j / (ny - 1))) for i in range(nx)] for j in range(ny)]
-    for j in range(ny - 1):
-        for i in range(nx - 1):
-            f = bm.faces.new([grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]])
-            for lp, (ii, jj) in zip(f.loops, [(i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1)]):
-                lp[uv_l].uv = (ii / (nx - 1), 1 - jj / (ny - 1))
-    flag = fpv.mesh_from_bmesh(bm, "Flag", mats["flag"])
-    flag.location = (main_x - 0.2, 0, main_top + 2.7)
-    wv = flag.modifiers.new("wave", "WAVE")
-    wv.use_x = True
-    wv.use_y = False
-    wv.use_normal = True
-    wv.height = 0.25
-    wv.width = 1.6
-    wv.speed = -0.12
-    parts.append(flag)
-    parts.append(cyl("FlagPole", (main_x, 0, main_top), (main_x, 0, main_top + 2.9), 0.08, 0.06, mats["iron"], 8))
-
-    # Takelage: Wanten, Webeleinen, Stagen
-    bow_z = sheer(1.0)
+    for c in (Vector(e_fore[1][0]) + Vector(s_fore.location), Vector(e_fore[1][-1]) + Vector(s_fore.location)):
+        X = -2.9
+        tgt = Vector((X, np.sign(c.y) * float(section_y(X, 7.0)), float(sheer(X)) + 0.1))
+        ropes += catenary(tuple(c), tuple(tgt), 0.2, 8)
     for sy in (-1, 1):
-        for (mx, top, u0, n_sh) in ((main_x, main_top, 0.34, 4), (fore_x, fore_top, 0.66, 3)):
+        for (mx, top, xs_, zfn) in ((FORE_X, FT - 0.9, (1.3, 2.1, 2.9, 3.7), None),
+                                    (MAIN_X, 25.0, (-6.6, -7.4, -8.2, -9.0), Z_ROOF + 0.2)):
             chain = []
-            for k in range(n_sh):
-                u = u0 + k * 0.03
-                a = (-L / 2 + u * L, sy * (half_beam(u) + 0.05), sheer(u) + 0.2)
-                b = (mx, 0.35 * sy, top - 1.2)
+            for X in xs_:
+                if zfn is None:
+                    z = float(sheer(X)) + 0.1
+                    yw = float(section_y(X, z - 0.1)) + 0.05
+                else:
+                    z = zfn
+                    yw = float(section_y(X, 4.6)) - 0.1
+                a = (X, sy * yw, z)
+                b = (mx, 0.35 * sy, top)
                 ropes.append((a, b))
                 chain.append((np.array(a), np.array(b)))
-            # Webeleinen alle 0,45 m zwischen benachbarten Wanten
             for (a1, b1), (a2, b2) in zip(chain[:-1], chain[1:]):
-                for t in np.arange(0.04, 0.9, 0.45 / np.linalg.norm(b1 - a1)):
+                for t in np.arange(0.05, 0.85, 0.45 / np.linalg.norm(b1 - a1)):
                     ropes.append((tuple(a1 + (b1 - a1) * t), tuple(a2 + (b2 - a2) * t)))
-    ropes.append(((fore_x, 0, fore_top - 0.5), (main_x, 0, main_top - 0.6)))
-    ropes.append(((L / 2 - 0.3, 0, bow_z + 2.0), (fore_x, 0, fore_top - 0.8)))
-    rig = tubes_mesh("Rigging", ropes, 0.028, mats["rope"], sides=6)
-    parts.append(rig)
+    ropes.append(((FORE_X, 0, crow_top - 1.4), (MAIN_X, 0, MT - 0.5)))
+    ropes.append(((X_B - 0.4, 0, 9.7), (FORE_X, 0, FT - 1.0)))
+    P.append(tubes_mesh("Rigging", ropes, 0.03, mats["rope"], sides=6))
 
     # Galionsfigur
-    hub = lion_head(body, mats, L / 2 - 0.4, bow_z - 0.2)
+    lion_head(body, mats)
 
-    for p in parts:
+    for p in P:
         if p.parent is None:
             p.parent = body
     return root, body, mats

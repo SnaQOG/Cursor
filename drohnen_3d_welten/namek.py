@@ -103,8 +103,8 @@ def grass_blade_material(name="NamekBlade"):
     wn = nb.node("ShaderNodeTexWhiteNoise")
     wn.noise_dimensions = "3D"
     nb.link(nb.coords("Object"), wn.inputs["Vector"])
-    root = nb.mix(nb.out(wn, "Value"), (0.018, 0.07, 0.07), (0.03, 0.10, 0.10))
-    tip = nb.mix(nb.out(wn, "Value"), (0.08, 0.28, 0.27), (0.14, 0.40, 0.37))
+    root = nb.mix(nb.out(wn, "Value"), (0.008, 0.04, 0.15), (0.015, 0.06, 0.21))
+    tip = nb.mix(nb.out(wn, "Value"), (0.04, 0.19, 0.50), (0.08, 0.29, 0.62))
     col = nb.mix(nb.math("POWER", v, 0.8), root, tip)
     p = fpv.principled(nb, Base_Color=col, Roughness=0.55)
     tr = nb.node("ShaderNodeBsdfTranslucent")
@@ -320,10 +320,10 @@ def ajisa_variant(name, leaf_mat, bark_mat, height=8.0, crown_r=3.2, leaves=2600
         c = np.array([lean[0] * t ** 2 + 0.08 * np.sin(t * 9 + seed), lean[1] * t ** 2 + 0.08 * np.cos(t * 7 + seed),
                       height * t])
         tw = t * turns * 2 * np.pi
-        rbase = height * (0.03 - 0.013 * t) * (1 + 0.6 * np.exp(-t * 14))
+        rbase = (0.16 + 0.008 * height) * (1 - 0.35 * t) * (1 + 0.5 * np.exp(-t * 14))  # schlank (Referenz)
         for k in range(ns):
             a = 2 * np.pi * k / ns
-            rr = rbase * (1 + 0.28 * np.cos(lobes * (a - tw)))  # verdrehte Rippen
+            rr = rbase * (1 + 0.15 * np.cos(lobes * (a - tw)))  # leicht verdrehte Rippen
             verts.append(tuple(c + np.array([np.cos(a) * rr, np.sin(a) * rr, 0])))
     for i in range(n - 1):
         for k in range(ns):
@@ -337,10 +337,16 @@ def ajisa_variant(name, leaf_mat, bark_mat, height=8.0, crown_r=3.2, leaves=2600
     top = np.array([lean[0], lean[1], height])
     c0 = top + np.array([0, 0, crown_r * 0.85])
     lv, lf = [], []
+    lump_dirs = rng.normal(0, 1, (9, 3))
+    lump_dirs /= np.linalg.norm(lump_dirs, axis=1)[:, None]
+
+    def lump(d):  # wolkig-bauschige Kugel (Anime-Krone): ~9 Beulen
+        return float(np.max(lump_dirs @ d))
+
     for j in range(leaves):
         d = rng.normal(0, 1, 3)
         d /= np.linalg.norm(d)
-        rr = crown_r * (0.94 + 0.06 * rng.random())  # nahezu perfekte Kugel
+        rr = crown_r * (0.86 + 0.12 * lump(d) ** 3 + 0.04 * rng.random())
         p = c0 + d * rr
         nrm = d + rng.normal(0, 0.45, 3)
         nrm /= np.linalg.norm(nrm)
@@ -357,7 +363,7 @@ def ajisa_variant(name, leaf_mat, bark_mat, height=8.0, crown_r=3.2, leaves=2600
     lme.from_pydata(lv, [], lf)
     lme.materials.append(leaf_mat)
     bm = bmesh.new()
-    bmesh.ops.create_icosphere(bm, subdivisions=4, radius=crown_r * 0.93)
+    bmesh.ops.create_icosphere(bm, subdivisions=4, radius=crown_r * 0.86)
     bmesh.ops.translate(bm, vec=tuple(c0), verts=bm.verts)
     cme = bpy.data.meshes.new(name + "_core")
     bm.to_mesh(cme)
@@ -561,3 +567,105 @@ def spaceship(mats, cx, cy, z0, R=16.0):
         foot = add(fpv.mesh_from_bmesh(bm, "ShipFoot", mats["rim"]))
         foot.location = p1
     return objs
+
+
+# --------------------------------------------------------------------------
+# Bodendetails nach den Referenzen: Sandflecken im blauen Gras, rote Pilze
+# --------------------------------------------------------------------------
+
+def sand_material(name="NamekSand"):
+    """Beige Sand-/Erdflecken mit weich ausfransendem Rand (Alpha aus radialem UV + Rauschen)."""
+    mat, nb, out = fpv.new_material(name)
+    uv = nb.coords("UV")
+    co = nb.coords("Object")
+    u, v, _ = nb.sep(uv)
+    du, dv = nb.math("SUBTRACT", u, 0.5), nb.math("SUBTRACT", v, 0.5)
+    r = nb.math("MULTIPLY", nb.math("SQRT", nb.math("ADD", nb.math("MULTIPLY", du, du), nb.math("MULTIPLY", dv, dv))), 2.0)
+    n1 = nb.noise(co, scale=0.35, detail=4, rough=0.6)
+    rr = nb.math("ADD", r, nb.math("MULTIPLY", nb.math("SUBTRACT", nb.out(n1, "Fac"), 0.5), 0.45))
+    al = nb.node("ShaderNodeMapRange", clamp=True)
+    nb.link(rr, al.inputs["Value"])
+    al.inputs["From Min"].default_value = 0.62
+    al.inputs["From Max"].default_value = 0.95
+    al.inputs["To Min"].default_value = 1.0
+    al.inputs["To Max"].default_value = 0.0
+    n2 = nb.noise(co, scale=2.5, detail=4, rough=0.65)
+    col = nb.mix(nb.out(n2, "Fac"), (0.40, 0.28, 0.18), (0.62, 0.46, 0.31))
+    n3 = nb.noise(co, scale=14.0, detail=2)
+    col = nb.mix(nb.math("MULTIPLY", nb.out(n3, "Fac"), 0.35), col, (0.30, 0.22, 0.15))
+    p = fpv.principled(nb, Base_Color=col, Roughness=0.92)
+    nb.link(al.outputs[0], p.inputs["Alpha"])
+    nb.link(nb.bump(nb.math("ADD", nb.out(n2, "Fac"), nb.math("MULTIPLY", nb.out(n3, "Fac"), 0.4)), strength=0.5,
+                    distance=0.03), p.inputs["Normal"])
+    nb.link(p.outputs[0], out.inputs[0])
+    return mat
+
+
+def sand_patches(name, patches, height_fn, mat, n_r=10, n_a=48):
+    """patches: Liste (cx, cy, rx, ry, rot). Flache Scheiben, die dem Gelände folgen (+3 cm)."""
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new("UVMap")
+    for (cx, cy, rx, ry, rot) in patches:
+        ca, sa = math.cos(rot), math.sin(rot)
+        grid = []
+        for i in range(n_r + 1):
+            f = i / n_r
+            ring = []
+            for k in range(n_a if i else 1):
+                a = 2 * math.pi * k / n_a
+                lx, ly = f * rx * math.cos(a), f * ry * math.sin(a)
+                x, y = cx + lx * ca - ly * sa, cy + lx * sa + ly * ca
+                z = float(height_fn(np.array([x]), np.array([y]))[0]) + 0.03
+                ring.append((bm.verts.new((x, y, z)), (0.5 + 0.5 * f * math.cos(a), 0.5 + 0.5 * f * math.sin(a))))
+            grid.append(ring)
+        for k in range(n_a):
+            k2 = (k + 1) % n_a
+            q = [grid[0][0], grid[1][k], grid[1][k2]]
+            f = bm.faces.new([e[0] for e in q])
+            for lp, e in zip(f.loops, q):
+                lp[uvl].uv = e[1]
+        for i in range(1, n_r):
+            for k in range(n_a):
+                k2 = (k + 1) % n_a
+                q = [grid[i][k], grid[i + 1][k], grid[i + 1][k2], grid[i][k2]]
+                f = bm.faces.new([e[0] for e in q])
+                for lp, e in zip(f.loops, q):
+                    lp[uvl].uv = e[1]
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    ob = fpv.mesh_from_bmesh(bm, name, mat)
+    for p in ob.data.polygons:
+        if p.normal.z < 0:
+            p.flip()
+    return ob
+
+
+def mushrooms(name, clusters, height_fn, rng):
+    """Kleine rote Pilze (Referenz: Manga-Farbtafel/Anime) in Gruppen zu 3–7."""
+    cap = fpv.new_material(name + "Cap")
+    mat_c, nb, out = cap
+    co = nb.coords("Object")
+    sp = nb.voronoi(co, scale=22.0, feature="F1")
+    dots = nb.node("ShaderNodeMapRange", clamp=True)
+    nb.link(nb.out(sp, "Distance"), dots.inputs["Value"])
+    dots.inputs["From Min"].default_value = 0.16
+    dots.inputs["From Max"].default_value = 0.10
+    col = nb.mix(nb.math("MULTIPLY", dots.outputs[0], 0.8), (0.50, 0.025, 0.02), (0.85, 0.80, 0.72))
+    p = fpv.principled(nb, Base_Color=col, Roughness=0.35)
+    p.inputs["Coat Weight"].default_value = 0.3
+    nb.link(p.outputs[0], out.inputs[0])
+    mat_s = fpv.simple_mat(name + "Stem", (0.78, 0.74, 0.64), rough=0.6)
+    bm_c, bm_s = bmesh.new(), bmesh.new()
+    for (cx, cy) in clusters:
+        for _ in range(int(rng.integers(3, 8))):
+            x, y = cx + rng.normal(0, 0.28), cy + rng.normal(0, 0.28)
+            z = float(height_fn(np.array([x]), np.array([y]))[0]) - 0.02
+            h = rng.uniform(0.05, 0.16)
+            rs = rng.uniform(0.012, 0.026)
+            rc = rng.uniform(0.04, 0.11)
+            res = bmesh.ops.create_cone(bm_s, cap_ends=True, segments=8, radius1=rs * 1.2, radius2=rs, depth=h)
+            bmesh.ops.translate(bm_s, vec=(x, y, z + h / 2), verts=res["verts"])
+            res = bmesh.ops.create_uvsphere(bm_c, u_segments=14, v_segments=7, radius=rc)
+            lean = rng.normal(0, 0.12, 2)
+            M = Matrix.Translation((x + lean[0] * h, y + lean[1] * h, z + h)) @ Matrix.Diagonal((1, 1, 0.55, 1))
+            bmesh.ops.transform(bm_c, verts=res["verts"], matrix=M)
+    return fpv.mesh_from_bmesh(bm_c, name + "Caps", mat_c), fpv.mesh_from_bmesh(bm_s, name + "Stems", mat_s)

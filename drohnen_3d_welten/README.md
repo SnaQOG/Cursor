@@ -7,9 +7,9 @@ Wow-Motiv hinter einer Verdeckung, stabilisierte Weitwinkel-Action-Cam (kein Fis
 
 | Video | Welt | Flug |
 |---|---|---|
-| `videos/01_OnePiece_ThousandSunny.mp4` | Grand Line: Karstfelsen im Meer, Thousand Sunny | tief über den Wellen durch ein Felsentor, Linkskurve um die große Felsnadel → Reveal der Thousand Sunny (Löwenkopf, Jolly-Roger-Segel), Vorbeiflug am Bug |
+| `videos/01_OnePiece_ThousandSunny.mp4` | Grand Line: tiefblaues Meer, Karstfelsen, Thousand Sunny | tief über den Wellen durch ein Felsentor, Linkskurve um die große Felsnadel → Reveal der Thousand Sunny, die frontal entgegenkommt (Sonnen-Löwe, gekreuzte Knochen, Jolly-Roger-Segel) → Endbild dicht vor dem Bug |
 | `videos/02_Naruto_Konoha.mp4` | Konohagakure mit Hokage-Felsen | Waldstraße → Durchflug durch das あ/ん-Tor → Hauptstraße auf Dachhöhe (Laternen, Wassertanks) → S-Kurve um den alten Baum → Steigflug an der 火-Residenz vorbei → die fünf Hokage-Gesichter füllen das Bild |
-| `videos/03_DragonBall_Namek.mp4` | Planet Namek | grüner Himmel mit drei Sonnen, smaragdgrünes Meer, Felsnadeln → Steigflug an der Tafelberg-Wand → Reveal über der Kante: Namekianer-Dorf, sieben Dragon Balls auf einem Steinsockel, Friezas Raumschiff → Flug über die Nordkante aufs Meer |
+| `videos/03_DragonBall_Namek.mp4` | Planet Namek | grasgrüner Himmel mit drei Sonnen, grünes Meer, beige Felsnadeln mit blauen Ajisa-Bäumen → Steigflug an der Tafelberg-Wand → Reveal über der Kante: blaues Gras mit Sandflecken und roten Pilzen, Namekianer-Dorf, sieben Dragon Balls auf einem Steinsockel, Friezas Raumschiff → Flug über die Nordkante aufs Meer |
 
 ## Aufbau
 
@@ -19,9 +19,9 @@ Wow-Motiv hinter einer Verdeckung, stabilisierte Weitwinkel-Action-Cam (kein Fis
 | `post.py` | Action-Cam-Look: Dunst aus Tiefenpass, geglättete Auto-Belichtung, AgX-Tonemapping, dezentes Sensorrauschen/Vignette, Lanczos auf 1080×1920, H.264 |
 | `ocean.py` | FFT-Ozean (Ocean-Modifier) + Geometry Nodes: Bugwelle, Kelvin-Heckwelle (19,47°), Rumpf-Schaum, Brandung über ein Küsten-Abstandsfeld |
 | `nature.py` | Fels (Karst, Schichtbänke, Kavität), Palmen, Lianen, Bäume |
-| `sunny.py` | Thousand Sunny: Planken-Rumpf mit Farbbändern, Löwenkopf mit Blütenmähne, Rasendeck, Masten, Takelage, Segel |
+| `sunny.py` | Thousand Sunny nach den Model Sheets (三面図/決定稿): bauchiger Planken-Rumpf, rote U-Bordwand mit Voluten und Bullaugen, Soldier-Dock-Ring „1“, Bugschild, Sonnen-Löwe mit gekreuzten Knochen, Vorschiff mit Steuerrad, Achterkastell mit Bogenfenstern, rot-gelbe Kuppeln, Heckkanone, Rasendeck mit Mandarinenbäumen, 20-m-Jolly-Roger-Segel, gestreiftes Gaffelsegel |
 | `konoha.py` | Konoha: Putz-/Pflaster-PBR, Rundziegel-Dächer, Fenster, Rohre, Stromleitungen, 火-Residenz, Hokage-Felsen (Scan-Köpfe + Haar per Voxel-Remesh verschmolzen, Risse) |
-| `namek.py` | Namek: Lehm-Kuppelhäuser (Boolean + Normalen-Transfer), verdrehte Ajisa-Bäume, Grashalme, Dragon Balls, Friezas Raumschiff |
+| `namek.py` | Namek: Lehm-Kuppelhäuser (Boolean + Normalen-Transfer), schlanke Ajisa-Bäume mit blauen Kugelkronen, blaue Grashalme, Sandflecken, rote Pilze, Dragon Balls, Friezas Raumschiff |
 | `world_*.py` | die drei Welten inkl. Flugroute |
 | `params/*.py` | Farbkorrektur/Dunst je Welt |
 
@@ -36,6 +36,8 @@ Wow-Motiv hinter einer Verdeckung, stabilisierte Weitwinkel-Action-Cam (kein Fis
   - [ambientCG](https://ambientcg.com) über das Repo `ubyjvovk/asciicity`: Putz, Pflaster, Metallplatten (CC0)
   - [Godot TPS-Demo](https://github.com/godotengine/tps-demo): Nietenplatten für Friezas Raumschiff
     (J. Linietsky, F. M. Calabró, CC BY 3.0)
+- Farb- und Formreferenzen vom Auftraggeber: Thousand-Sunny-Model-Sheets (Seiten-, Front-, Heck- und
+  Deckansicht), One-Piece-Meer/Himmel, Namek-Anime- und Manga-Bilder (Farben per Pixelmessung übernommen).
 - Design-Referenzen per Websuche: Thousand Sunny (Brigantine, Löwen-Galionsfigur mit Sonnenmähne,
   Rasendeck), Konoha (Hokage-Felsen über dem Dorf, Residenz mittig darunter), Namek (grüner Himmel,
   grünes Wasser, blau-grünes Gras, Ajisa-Bäume, weiße Kuppelhäuser, drei Sonnen).

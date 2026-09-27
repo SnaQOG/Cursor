@@ -44,6 +44,11 @@ POSES.update({
                   "elbow.L": (30, 0, 0)},
     "wave_both2": {"shoulder.R": (10, -125, 0), "elbow.R": (70, 0, 0), "shoulder.L": (10, 125, 0),
                    "elbow.L": (70, 0, 0)},
+    # zur Drohne hinaufschauen und winken
+    "wave_up": {"spine": (8, 0, 0), "head": (22, 0, 0), "shoulder.R": (10, -155, 0), "elbow.R": (25, 0, 0),
+                "shoulder.L": (10, 155, 0), "elbow.L": (25, 0, 0)},
+    "wave_up2": {"spine": (8, 0, 0), "head": (22, 0, 0), "shoulder.R": (10, -128, 0), "elbow.R": (70, 0, 0),
+                 "shoulder.L": (10, 128, 0), "elbow.L": (70, 0, 0)},
     "sit_wave": {"hip.R": (90, 0, 0), "knee.R": (-90, 0, 0), "hip.L": (90, 0, 0), "knee.L": (-90, 0, 0),
                  "shoulder.R": (10, -150, 0), "elbow.R": (30, 0, 0), "shoulder.L": (20, 10, 0), "elbow.L": (40, 0, 0)},
     "sit_wave2": {"hip.R": (90, 0, 0), "knee.R": (-90, 0, 0), "hip.L": (90, 0, 0), "knee.L": (-90, 0, 0),
@@ -379,12 +384,14 @@ def place_crew(body, frames, sunny):
         crew.append(fig)
         return fig
 
-    put(luffy((0, 0, 0), 0), (12.9, 0.0, 0), BOW - 40, seat=8.78, anim=["sit_wave", "sit_wave2"], period=14)
+    # Ruffy sitzt auf der Steuerbord-Reling am Bug, Beine außenbords (Mähne würde ihn auf dem Löwenkopf verdecken)
+    put(luffy((0, 0, 0), 0), (7.9, -4.3, 0), SB, seat=9.5, anim=["sit_wave", "sit_wave2"], period=14)
     put(jinbe((0, 0, 0), 0), (6.75, 0.0, 0), BOW, "helm", ground=Z_FORE)
-    put(brook((0, 0, 0), 0), (8.3, -3.1, 0), SB - 25, ground=Z_FORE, anim=["violin", "violin_b"], period=16)
-    put(usopp((0, 0, 0), 0), (1.9, -4.9, 0), SB, ground=Z_DECK, anim=["wave_both", "wave_both2"], period=12)
-    put(chopper((0, 0, 0), 0), (3.2, -4.7, 0), SB + 10, ground=Z_DECK, anim=["wave_both", "wave_both2"], period=10)
-    put(nami((0, 0, 0), 0), (-0.4, -2.9, 0), SB - 25, ground=Z_DECK, anim=["wave_R", "wave_R2"], period=16)
+    put(brook((0, 0, 0), 0), (8.9, -1.5, 0), SB - 25, ground=Z_FORE, anim=["violin", "violin_b"], period=16)
+    # Lysop und Chopper auf dem Rasen an der Steuerbord-Bordwand, genau wo die Drohne übers Deck fliegt
+    put(usopp((0, 0, 0), 0), (-2.1, -4.5, 0), SB, ground=Z_DECK, anim=["wave_up", "wave_up2"], period=12)
+    put(chopper((0, 0, 0), 0), (-0.8, -4.5, 0), SB + 10, ground=Z_DECK, anim=["wave_up", "wave_up2"], period=10)
+    put(nami((0, 0, 0), 0), (0.3, -2.7, 0), SB - 25, ground=Z_DECK, anim=["wave_R", "wave_R2"], period=16)
     put(zoro((0, 0, 0), 0), (2.95, -0.62, 0), SB, "nap", ground=Z_DECK)
     put(sanji((0, 0, 0), 0), (-2.5, -1.3, 0), SB - 40, "pockets", ground=Z_DECK)
     put(robin((0, 0, 0), 0), (-2.95, 2.3, 0), SB + 30, "read", seat=Z_DECK + 0.45)

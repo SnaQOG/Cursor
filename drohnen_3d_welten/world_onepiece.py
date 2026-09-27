@@ -34,10 +34,10 @@ SUN_ELEV, SUN_AZIM = 32.0, 200.0
 
 ROUTE = [
     (0, -8, 3.0), (0, 40, 3.1), (-1, 80, 3.4), (9, 118, 4.3), (13, 150, 5.4), (4, 184, 7.0),
-    (-18, 207, 9.3), (-45, 231, 9.8), (-75, 254, 9.6), (-108, 276, 9.0), (-140, 296, 8.5),
+    (-18, 207, 8.7), (-45, 231, 9.1), (-75, 254, 9.3), (-108, 276, 9.0), (-140, 296, 8.5),
 ]
 CAM = dict(look_pitch=-3.0, pitch_follow=0.5, bank_gain=1.0, max_bank=32, micro=1.0, seed=5,
-           pitch_overrides=[(14.0, 16.5, -7.0)])      # beim Anflug leicht auf das Deck hinunterblicken
+           pitch_overrides=[(14.0, 16.4, -9.0)])      # beim Anflug leicht auf das Deck hinunterblicken
 
 SHIP_SPEED = 3.0
 T_CROSS = 16.0      # Zeitpunkt des Überflugs über die Mittellinie

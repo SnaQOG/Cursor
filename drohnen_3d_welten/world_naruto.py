@@ -1,11 +1,14 @@
 """Welt 2 – Naruto: Konohagakure mit Hokage-Felsen.
 
-Flug (20 s, konstant 16 m/s, eine durchgehende Aufnahme):
+Flug (20 s, konstant 19 m/s, eine durchgehende Aufnahme):
   0–5 s   tief auf der Waldstraße auf das große A-un-Tor zu, Durchflug durch das offene Tor
   5–9 s   Hauptstraße auf Dachhöhe: Wassertanks, Strommasten, Banner ziehen vorbei
   9–12 s  S-Kurve links um den alten Baum auf dem Platz
-  12–16 s Steigflug rechts an der roten Hokage-Residenz (火) vorbei
-  16–20 s die Hokage-Gesichter im Fels füllen das Bild, Kamera fliegt weiter darauf zu
+  12–16 s Steigflug auf die Hokage-Residenz (火) zu und knapp über ihr Flachdach mit den weißen Hörnern,
+          wo Naruto und Sasuke (Model Sheets) zum Felsen hinaufschauen
+  16–20 s Steigflug auf die fünf Hokage-Gesichter im Zickzack, die das Bild füllen
+Referenzen: Anime-/Spiel-Standbilder von Konoha (Pastellfassaden, bunte Dächer, Wassertanks,
+ockerfarbener Sandstein-Felsen mit Laufspuren, Treppen, Kuppelbauten), Model Sheets Naruto/Sasuke.
 """
 import argparse
 import math
@@ -15,33 +18,37 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import bpy  # noqa: E402
+import bmesh  # noqa: E402,I100
 import numpy as np  # noqa: E402
-from mathutils import Vector  # noqa: E402
+from mathutils import Matrix, Vector  # noqa: E402
 
 import fpv  # noqa: E402
 import konoha  # noqa: E402
 import nature  # noqa: E402
+import ninja  # noqa: E402
 import sunny  # noqa: E402
 import textures  # noqa: E402
 
 FPS = 24
 SECONDS = 20
-SPEED = 16.0
-SUN_ELEV, SUN_AZIM = 17.0, 222.0  # goldene Stunde von links hinten: Gesichter modelliert, lange Schatten
+SPEED = 19.0
+SUN_ELEV, SUN_AZIM = 40.0, 222.0  # heller Tag (Referenzen), Sonne links hinten: Gesichter modelliert
 
 WALL_C, WALL_R = (0.0, 190.0), 190.0
 STREET_HW = 12.0
 TREE_POS = (4.0, 118.0)
 RES_POS = (-20.0, 232.0)
-CLIFF_Y = 328.0
-HEAD_S = 8.5
-HEAD_Z = 85.0
-HEADS = [(-104, "hashirama"), (-52, "tobirama"), (0, "hiruzen"), (52, "minato"), (104, "tsunade")]
+CLIFF_Y = 360.0
+HEAD_S = 10.0
+HEAD_Z = 92.0
+# Zickzack wie in den Referenzen: 1., 3., 5. oben, 2. und 4. tiefer (x, Höhenversatz, Haar)
+HEADS = [(-110, 10.0, "hashirama"), (-55, -13.0, "tobirama"), (0, 14.0, "hiruzen"), (56, -13.0, "minato"),
+         (112, 10.0, "tsunade")]
 
 ROUTE = [
-    (0, -80, 4.4), (0, -40, 4.8), (0, 0, 5.5), (0, 35, 7.6), (-2, 75, 10.0), (-7, 112, 11.0),
-    (-3, 145, 12.5), (2, 170, 15.0), (11, 194, 25.0), (17, 216, 38.0), (17, 238, 51.0),
-    (15, 256, 61.0), (13, 272, 67.0), (12, 290, 72.0),
+    (0, -60, 4.4), (0, -30, 4.8), (0, 0, 5.5), (0, 35, 7.6), (-2, 75, 10.0), (-7, 112, 11.0),
+    (-3, 145, 12.5), (-4, 170, 18.0), (-10, 192, 30.0), (-16, 211, 38.6), (-19, 232, 37.9),
+    (-19, 251, 38.3), (-17, 270, 49.0), (-14, 290, 62.0), (-11, 308, 76.0), (-9, 322, 86.0),
 ]
 
 
@@ -54,8 +61,85 @@ def terrain_height(X, Y):
     valley = np.where(Y < 30, np.clip((np.abs(X) - 22) / 70.0, 0, 1), 1.0)
     hills = hills * valley ** 1.5
     north = np.clip((Y - (CLIFF_Y + 14)) / 16.0, 0, 1)
-    plateau = north * (152 + 22 * fpv.fbm2(X / 160, Y / 160, 5, seed=4))
-    return np.maximum(hills, plateau)
+    plateau = north * (168 + 22 * fpv.fbm2(X / 160, Y / 160, 5, seed=4))
+    # Bergspitze links hinter dem Felsen (Referenz)
+    peak = 250 * np.exp(-((X + 190) ** 2 + (Y - CLIFF_Y - 260) ** 2) / (2 * 150.0 ** 2))
+    return np.maximum(hills, plateau + north * peak)
+
+
+def cliff_details(cliff_ob, mats, rng):
+    """Zickzack-Treppen mit Geländer links der Gesichter, Wachhütten im Fels, Kuppelbauten auf der Kante
+    (Referenzbilder). Positionen per Raycast auf die Felswand."""
+    def hit(x, z):
+        ok, loc, nrm, _ = cliff_ob.ray_cast(Vector((x, CLIFF_Y - 160, z)), Vector((0, 1, 0)))
+        if not ok:
+            return None, None
+        n = Vector((nrm.x, nrm.y, 0))
+        if n.length < 0.2 or n.y > 0:
+            n = Vector((0, -1, 0))
+        return loc, n.normalized()
+
+    bm = bmesh.new()
+
+    def add_box(center, ex, ey, size):
+        res = bmesh.ops.create_cube(bm, size=1.0)
+        M = Matrix((ex, ey, Vector((0, 0, 1)))).transposed().to_4x4()
+        M.translation = center
+        bmesh.ops.transform(bm, verts=res["verts"], matrix=M @ Matrix.Diagonal((*size, 1)))
+
+    xa, xb, z = -238.0, -186.0, 3.0
+    for k in range(6):
+        x0, x1 = (xa, xb) if k % 2 == 0 else (xb, xa)
+        z1 = z + 25.0
+        n_s = int(abs(x1 - x0) / 0.5)
+        rail = []
+        for i in range(n_s):
+            t = (i + 0.5) / n_s
+            x, zz = x0 + (x1 - x0) * t, z + (z1 - z) * t
+            p, n = hit(x, zz)
+            if p is None:
+                continue
+            ex = Vector((math.copysign(1.0, x1 - x0), 0, 0))
+            ex = (ex - n * ex.dot(n)).normalized()
+            add_box(p + n * 0.8 + Vector((0, 0, -0.2)), ex, n, (0.56, 1.7, 0.4))
+            if i % 4 == 0:
+                add_box(p + n * 1.62 + Vector((0, 0, 0.5)), ex, n, (0.08, 0.08, 1.0))
+            rail.append(tuple(p + n * 1.62 + Vector((0, 0, 1.0))))
+        p, n = hit(x1, z1)
+        if p is not None:
+            add_box(p + n * 1.0 + Vector((0, 0, -0.2)), Vector((1, 0, 0)), n, (3.0, 2.1, 0.4))
+        if len(rail) > 2:
+            konoha.curve_tube(f"StairRail{k}", rail, 0.04, mats["rail"], res=0)
+        z = z1
+    # Wachhütten im Fels (unter den tieferen Köpfen und seitlich)
+    for (x, zz) in ((-55, 34.0), (56, 32.0), (-160, 20.0), (165, 52.0)):
+        p, n = hit(x, zz)
+        if p is None:
+            continue
+        ex = Vector((-n.y, n.x, 0)).normalized()
+        c = p + n * 1.9
+        add_box(c + Vector((0, 0, -0.3)), ex, n, (7.0, 4.6, 0.5))
+        rot = math.atan2(ex.y, ex.x)
+        konoha.box(f"Hut{x}", c.x, c.y, zz, 5.0, 3.6, 3.6, mats["parapet"], rot=rot, bevel=0.05)
+        konoha.hip_roof(f"HutRoof{x}", c.x, c.y, zz + 3.6, 4.2, 6.0, 1.6, mats["roofs"][0], rot=rot, overhang=0.5)
+    me = bpy.data.meshes.new("CliffStairs")
+    bm.to_mesh(me)
+    bm.free()
+    ob = bpy.data.objects.new("CliffStairs", me)
+    me.materials.append(mats["stone"])
+    fpv.link(ob)
+    # Kuppelbauten auf der Felskante (weiße Rundbauten mit rotbraunen Kuppeln)
+    for (x, dy, r) in ((-84, 44, 11.0), (-22, 62, 9.0), (34, 46, 10.0), (98, 70, 12.0)):
+        y = CLIFF_Y + dy
+        zg = float(terrain_height(np.array([x]), np.array([y]))[0]) - 1.0
+        konoha.cylinder(f"Dome{x}", x, y, zg, r, 8.5, mats["horn"], seg=48)
+        konoha.cylinder(f"DomeWin{x}", x, y, zg + 4.2, r + 0.05, 1.4, mats["glass"], seg=48, cap=False)
+        bpy.ops.mesh.primitive_uv_sphere_add(segments=48, ring_count=24, radius=r * 1.05, location=(x, y, zg + 8.5))
+        d = bpy.context.object
+        d.scale = (1, 1, 0.5)
+        d.data.materials.append(mats["roofs"][0])
+        for pp in d.data.polygons:
+            pp.use_smooth = True
 
 
 def build(args):
@@ -63,28 +147,34 @@ def build(args):
     frames = FPS * SECONDS
     fpv.setup_render(args.out, res=args.res, fps=FPS, seconds=SECONDS, samples=args.samples,
                      motion_blur=not args.no_mblur, mist_depth=6000.0)
-    fpv.build_world(sun_elev=SUN_ELEV, sun_azim=SUN_AZIM, sky_strength=0.1, clouds=True, cloud_cover=0.45,
-                    cloud_ref=9.0, aerosol=2.4, cloud_color=(1.0, 0.82, 0.62))
-    fpv.add_sun(SUN_ELEV, SUN_AZIM, strength=6.2, color=(1.0, 0.74, 0.48), angle_deg=0.3)
+    fpv.build_world(sun_elev=SUN_ELEV, sun_azim=SUN_AZIM, sky_strength=0.1, clouds=True, cloud_cover=0.4,
+                    cloud_ref=9.0, aerosol=0.9, ozone=1.6, cloud_color=(1.0, 0.98, 0.95))
+    fpv.add_sun(SUN_ELEV, SUN_AZIM, strength=5.2, color=(1.0, 0.95, 0.87), angle_deg=0.5)
     rng = np.random.default_rng(12)
 
     mats = {
         "plaster": konoha.plaster_material("Plaster"),
         "parapet": konoha.plaster_material("Parapet", window=False),
         "rooftop": fpv.simple_mat("RoofTop", (0.22, 0.2, 0.18), rough=0.9),
+        # bunte Dächer wie in den Referenzen: rote/orange Ziegel, blaue, grüne, violette, türkise Bleche
         "roofs": [konoha.roof_material("RoofRed", (0.42, 0.08, 0.04)),
                   konoha.roof_material("RoofOrange", (0.55, 0.20, 0.06)),
-                  konoha.roof_material("RoofGreen", (0.08, 0.18, 0.10)),
-                  konoha.roof_material("RoofBlue", (0.10, 0.14, 0.20)),
-                  konoha.roof_material("RoofBrown", (0.25, 0.12, 0.06))],
+                  konoha.roof_material("RoofGreen", (0.10, 0.28, 0.13)),
+                  konoha.roof_material("RoofBlue", (0.07, 0.19, 0.46)),
+                  konoha.roof_material("RoofPurple", (0.25, 0.11, 0.36)),
+                  konoha.roof_material("RoofTeal", (0.05, 0.28, 0.29))],
         "awnings": [fpv.simple_mat("AwnRed", (0.45, 0.06, 0.04), rough=0.7),
-                    fpv.simple_mat("AwnBlue", (0.08, 0.14, 0.30), rough=0.7),
-                    fpv.simple_mat("AwnCream", (0.60, 0.52, 0.38), rough=0.7)],
+                    fpv.simple_mat("AwnBlue", (0.08, 0.16, 0.40), rough=0.7),
+                    fpv.simple_mat("AwnOrange", (0.70, 0.25, 0.04), rough=0.7),
+                    fpv.simple_mat("AwnGreen", (0.10, 0.26, 0.14), rough=0.7)],
         "gate": konoha.roof_material("GateWood", (0.34, 0.10, 0.05), var=0.1),
         "gate_roof": konoha.roof_material("GateRoof", (0.12, 0.10, 0.09), var=0.1),
         "stone": nature.rock_material("GateStone", c1=(0.2, 0.19, 0.17), c2=(0.36, 0.34, 0.3), c3=(0.3, 0.28, 0.25),
                                       wet=False, bump=0.4, crack_w=0.3),
-        "red": konoha.roof_material("ResRed", (0.50, 0.09, 0.04), var=0.1),
+        "red": konoha.roof_material("ResRed", (0.58, 0.12, 0.045), var=0.08),
+        "res_tile": konoha.terracotta_material("ResTile", (0.62, 0.30, 0.06)),
+        "horn": sunny.paint_material("HornWhite", (0.80, 0.78, 0.72), rough=0.4),
+        "cable": fpv.simple_mat("ResCable", (0.07, 0.05, 0.09), rough=0.5),
         "red_dark": konoha.roof_material("ResRedDark", (0.30, 0.05, 0.03), var=0.1),
         "red_roof": konoha.roof_material("ResRoof", (0.46, 0.07, 0.035), var=0.15),
         "glass": fpv.simple_mat("ResGlass", (0.02, 0.025, 0.03), rough=0.1),
@@ -94,11 +184,13 @@ def build(args):
         "sill": fpv.simple_mat("Sill", (0.42, 0.40, 0.37), rough=0.8),
         "shutter": sunny.paint_material("Shutter", (0.10, 0.22, 0.15), rough=0.5),
         "beam": sunny.wood_material("BeamWood", dark=0.75, board=5.0),
+        "roofdeck": sunny.wood_material("RoofDeckWood", dark=0.9, axis="X", board=0.2),
         "pipe": konoha.rust_metal_material("PipeMetal", tint=(0.6, 0.6, 0.6)),
         "ac": sunny.paint_material("ACUnit", (0.62, 0.62, 0.60), rough=0.45),
         "tiles": [konoha.terracotta_material("TileRed", (0.40, 0.07, 0.035)),
                   konoha.terracotta_material("TileOrange", (0.50, 0.17, 0.05)),
-                  konoha.terracotta_material("TileSlate", (0.12, 0.14, 0.17))],
+                  konoha.terracotta_material("TileBlue", (0.08, 0.16, 0.34)),
+                  konoha.terracotta_material("TileGreen", (0.10, 0.24, 0.12))],
         "iron": fpv.simple_mat("Iron", (0.06, 0.055, 0.05), rough=0.5, metal=0.7),
         "wood": nature.bark_material("PoleWood", c=(0.16, 0.11, 0.07)),
         "wire": fpv.simple_mat("Wire", (0.01, 0.01, 0.01), rough=0.4),
@@ -148,7 +240,7 @@ def build(args):
     road = fpv.grid_mesh("Road", 12, 300, 2, 2, None, konoha.dirt_road_material(), origin=(0, -148))
     road.location.z = 0.04
     fpv.grid_mesh("VillageGround", 420, 420, 2, 2, None, gmat, origin=(0, 190))
-    st = fpv.grid_mesh("MainStreet", 2 * STREET_HW + 2, 178, 2, 2, None, cobble, origin=(0, 88))
+    st = fpv.grid_mesh("MainStreet", 2 * STREET_HW + 2, 178, 2, 2, None, konoha.sand_street_material(), origin=(0, 88))
     st.location.z = 0.02
     pz = fpv.grid_mesh("Plaza", 140, 100, 2, 2, None, cobble, origin=(0, 226))
     pz.location.z = 0.02
@@ -222,7 +314,11 @@ def build(args):
             w, d = rng.uniform(8, 13), rng.uniform(8, 13)
             floors = int(rng.integers(1, 5))
             foot.append((x, y, max(w, d) / 2 + 2.5))
-            konoha.building(rng, mats, tanks, x, y, w, d, floors, math.radians(rng.uniform(-6, 6)), idx)
+            if rng.random() < 0.06:   # runde Stufentürme (Referenz)
+                konoha.tiered_tower(f"Tower{idx}", x, y, min(w, d) / 2, int(rng.integers(2, 4)), mats,
+                                    mats["roofs"][int(rng.choice([3, 5, 2]))], rng)
+            else:
+                konoha.building(rng, mats, tanks, x, y, w, d, floors, math.radians(rng.uniform(-6, 6)), idx)
             idx += 1
     # c) Platz-Randbebauung (größere Gebäude)
     for (x, y, w, d, fl, st) in ((52, 205, 22, 16, 5, "barrel"), (50, 246, 18, 18, 4, "round"),
@@ -233,7 +329,14 @@ def build(args):
         idx += 1
     print("buildings", idx)
 
-    konoha.residence(mats, RES_POS[0], RES_POS[1], r=20.0, h=24.0)
+    _, res_top = konoha.residence(mats, RES_POS[0], RES_POS[1], r=21.0)
+    # Naruto und Sasuke (Model Sheets) auf dem Flachdach der Residenz, Blick hinauf zum Hokage-Felsen
+    deck = res_top + 0.65
+    ninja.naruto((RES_POS[0] - 1.1, RES_POS[1] + 16.2, deck), 0.0)
+    ninja.sasuke((RES_POS[0] + 1.2, RES_POS[1] + 16.0, deck), -8.0)
+    for (x, y, rr, tiers, rm) in ((-44, 150, 5.5, 3, 3), (40, 128, 5.0, 2, 5)):   # Stufentürme an der Straße
+        konoha.tiered_tower(f"StreetTower{x}", x, y, rr, tiers, mats, mats["roofs"][rm], rng)
+        foot.append((x, y, rr + 3))
 
     # Strommasten + Leitungen entlang der Straße
     poles = []
@@ -280,27 +383,31 @@ def build(args):
                        mats["rail"], rot=rng.uniform(0, 3), bevel=0.02)
 
     # Hokage-Felsen
-    rock = nature.rock_material("CliffRock", c1=(0.085, 0.07, 0.06), c2=(0.36, 0.30, 0.235), c3=(0.24, 0.19, 0.14),
-                                wet=False, moss=(0.04, 0.06, 0.02), moss_amount=0.3, scale=2.0, bump=1.0,
-                                crack_w=0.3, strata_scale=1.2, lichen=0.25)
-    face_rock = nature.rock_material("FaceRock", c1=(0.15, 0.125, 0.10), c2=(0.44, 0.37, 0.29), c3=(0.33, 0.26, 0.19),
-                                     wet=False, scale=1.5, bump=0.5, crack_w=0.12, lichen=0.2,
-                                     moss=(0.06, 0.09, 0.03), moss_amount=0.18, cavity=0.75)
-    konoha.cliff_mesh("Cliff", -420, 420, CLIFF_Y, -2, 160, rock, seed=8, res=1.0,
-                      panel=(-150, 150, 45, 140), chin=HEAD_Z - 1.2 * HEAD_S)
+    # ockerfarbener Sandstein mit dunklen Laufspuren (Referenzen)
+    rock = nature.rock_material("CliffRock", c1=(0.16, 0.10, 0.05), c2=(0.60, 0.42, 0.22), c3=(0.44, 0.28, 0.13),
+                                wet=False, moss=(0.05, 0.10, 0.02), moss_amount=0.3, scale=2.0, bump=1.0,
+                                crack_w=0.3, strata_scale=1.2, lichen=0.12)
+    face_rock = nature.rock_material("FaceRock", c1=(0.22, 0.15, 0.08), c2=(0.66, 0.48, 0.27), c3=(0.50, 0.35, 0.18),
+                                     wet=False, scale=1.5, bump=0.5, crack_w=0.12, lichen=0.1,
+                                     moss=(0.06, 0.10, 0.03), moss_amount=0.15, cavity=0.75)
+    hx_ = np.array([h[0] for h in HEADS], float)
+    chin_ = np.array([HEAD_Z + h[1] - 1.2 * HEAD_S for h in HEADS])
+    konoha.cliff_mesh("Cliff", -420, 420, CLIFF_Y, -2, 176, rock, seed=8, res=1.0,
+                      panel=(-172, 172, 40, 168), chin=lambda X: np.interp(X, hx_, chin_))
     cliff_ob = bpy.data.objects["Cliff"]
     head_path = os.path.join(fpv.ASSETS, "LeePerrySmith.glb")
     tpl = konoha.import_head(head_path)
     tpl.hide_render = True
     tpl.hide_viewport = True
-    for (hx, hair) in HEADS:
-        parts = konoha.hokage_head(tpl, f"Head_{hair}", (hx, CLIFF_Y + 2.0, HEAD_Z), HEAD_S, face_rock, hair,
+    for (hx, dz, hair) in HEADS:
+        parts = konoha.hokage_head(tpl, f"Head_{hair}", (hx, CLIFF_Y + 2.0, HEAD_Z + dz), HEAD_S, face_rock, hair,
                                    face_rock, rng)
-        konoha.fuse_parts(f"Hokage_{hair}", parts, voxel=0.2, mat=face_rock)
+        konoha.fuse_parts(f"Hokage_{hair}", parts, voxel=0.22, mat=face_rock)
+    cliff_details(cliff_ob, mats, rng)
 
     # Bäume
-    leaf = nature.leaf_material("KLeaves", c1=(0.03, 0.06, 0.012), c2=(0.10, 0.14, 0.03))
-    leaf2 = nature.leaf_material("KLeaves2", c1=(0.05, 0.075, 0.015), c2=(0.14, 0.15, 0.04))
+    leaf = nature.leaf_material("KLeaves", c1=(0.035, 0.10, 0.018), c2=(0.12, 0.22, 0.04))
+    leaf2 = nature.leaf_material("KLeaves2", c1=(0.05, 0.12, 0.02), c2=(0.16, 0.24, 0.05))
     bark = nature.bark_material("KBark")
     variants = [nature.tree_variant(f"KTree{i}", leaf if i % 2 == 0 else leaf2, bark, height=h, crown_r=cr,
                                     n_clusters=nc, leaves_per=90, seed=60 + i, leaf_size=0.4)
@@ -355,7 +462,7 @@ def build(args):
     me.polygons.foreach_get("area", area)
     nrm = nrm.reshape(-1, 3)
     ctr = ctr.reshape(-1, 3)
-    ok = (nrm[:, 2] > 0.55) & (ctr[:, 2] > 8) & ~((np.abs(ctr[:, 0]) < 150) & (ctr[:, 2] > 50) & (ctr[:, 2] < 140))
+    ok = (nrm[:, 2] > 0.55) & (ctr[:, 2] > 8) & ~((np.abs(ctr[:, 0]) < 175) & (ctr[:, 2] > 42) & (ctr[:, 2] < 168))
     cand = np.where(ok)[0]
     if len(cand):
         w = area[cand] * nrm[cand, 2] ** 2
@@ -382,7 +489,7 @@ def build(args):
     # Kamera
     pos, quats, info = fpv.fpv_path(ROUTE, SPEED, FPS, frames, look_pitch=-2.0, pitch_follow=0.45,
                                     bank_gain=1.0, max_bank=30, micro=1.0, seed=9,
-                                    pitch_overrides=[(13.5, 21.0, 16.0)])
+                                    pitch_overrides=[(16.6, 21.0, 12.0)])
     fpv.make_camera(pos, quats, fov_deg=92.0)
     print(f"route length {info['total']:.1f} m, used {info['used']:.1f} m")
     return sc

@@ -8,7 +8,7 @@ Wow-Motiv hinter einer Verdeckung, stabilisierte Weitwinkel-Action-Cam (kein Fis
 | Video | Welt | Flug |
 |---|---|---|
 | `videos/01_OnePiece_ThousandSunny.mp4` | Grand Line: tiefblaues Meer, Karstfelsen, Thousand Sunny | tief über den Wellen durch ein Felsentor, Linkskurve um die große Felsnadel → Reveal der Thousand Sunny, die frontal entgegenkommt (Sonnen-Löwe, gekreuzte Knochen, Jolly-Roger-Segel) → Endbild dicht vor dem Bug |
-| `videos/02_Naruto_Konoha.mp4` | Konohagakure mit Hokage-Felsen | Waldstraße → Durchflug durch das あ/ん-Tor → Hauptstraße auf Dachhöhe (Laternen, Wassertanks) → S-Kurve um den alten Baum → Steigflug an der 火-Residenz vorbei → die fünf Hokage-Gesichter füllen das Bild |
+| `videos/02_Naruto_Konoha.mp4` | Konohagakure mit Hokage-Felsen | Waldstraße → Durchflug durch das あ/ん-Tor → sandfarbene Hauptstraße mit Pastellhäusern, bunten Dächern, Wassertanks und Laternen → S-Kurve um den alten Baum → Steigflug über das Flachdach der 火-Residenz, auf dem Naruto und Sasuke zum Felsen hinaufschauen → die fünf Hokage-Gesichter im Zickzack füllen das Bild |
 | `videos/03_DragonBall_Namek.mp4` | Planet Namek | grasgrüner Himmel mit drei Sonnen, grünes Meer, beige Felsnadeln mit blauen Ajisa-Bäumen → Steigflug an der Tafelberg-Wand → Reveal über der Kante: blaues Gras mit Sandflecken und roten Pilzen, Namekianer-Dorf, sieben Dragon Balls auf einem Steinsockel, Friezas Raumschiff → Flug über die Nordkante aufs Meer |
 
 ## Aufbau
@@ -20,7 +20,8 @@ Wow-Motiv hinter einer Verdeckung, stabilisierte Weitwinkel-Action-Cam (kein Fis
 | `ocean.py` | FFT-Ozean (Ocean-Modifier) + Geometry Nodes: Bugwelle, Kelvin-Heckwelle (19,47°), Rumpf-Schaum, Brandung über ein Küsten-Abstandsfeld |
 | `nature.py` | Fels (Karst, Schichtbänke, Kavität), Palmen, Lianen, Bäume |
 | `sunny.py` | Thousand Sunny nach den Model Sheets (三面図/決定稿): bauchiger Planken-Rumpf, rote U-Bordwand mit Voluten und Bullaugen, Soldier-Dock-Ring „1“, Bugschild, Sonnen-Löwe mit gekreuzten Knochen, Vorschiff mit Steuerrad, Achterkastell mit Bogenfenstern, rot-gelbe Kuppeln, Heckkanone, Rasendeck mit Mandarinenbäumen, 20-m-Jolly-Roger-Segel, gestreiftes Gaffelsegel |
-| `konoha.py` | Konoha: Putz-/Pflaster-PBR, Rundziegel-Dächer, Fenster, Rohre, Stromleitungen, 火-Residenz, Hokage-Felsen (Scan-Köpfe + Haar per Voxel-Remesh verschmolzen, Risse) |
+| `konoha.py` | Konoha: Pastell-Putzfassaden, bunte Ziegel-/Blechdächer, Stufentürme, Sandstraße, Fenster, Rohre, Stromleitungen, 火-Residenz nach Anime-Vorlage (Fensterreihen, Ziegelkragen, weiße Hörner), Hokage-Felsen aus ockerfarbenem Sandstein (Scan-Köpfe + Haar per Voxel-Remesh verschmolzen, Zickzack-Anordnung, Treppen, Felshütten, Kuppelbauten) |
+| `ninja.py` | Naruto und Sasuke (Shippuden) nach den Model Sheets: Skin-Modifier-Körper, Kleidung mit Farbzonen, Stachelhaar, Stirnband, Uzumaki-Spirale und Uchiha-Wappen als Rücken-Decals, Seilgürtel, Kusanagi |
 | `namek.py` | Namek: Lehm-Kuppelhäuser (Boolean + Normalen-Transfer), schlanke Ajisa-Bäume mit blauen Kugelkronen, blaue Grashalme, Sandflecken, rote Pilze, Dragon Balls, Friezas Raumschiff |
 | `world_*.py` | die drei Welten inkl. Flugroute |
 | `params/*.py` | Farbkorrektur/Dunst je Welt |
@@ -37,7 +38,8 @@ Wow-Motiv hinter einer Verdeckung, stabilisierte Weitwinkel-Action-Cam (kein Fis
   - [Godot TPS-Demo](https://github.com/godotengine/tps-demo): Nietenplatten für Friezas Raumschiff
     (J. Linietsky, F. M. Calabró, CC BY 3.0)
 - Farb- und Formreferenzen vom Auftraggeber: Thousand-Sunny-Model-Sheets (Seiten-, Front-, Heck- und
-  Deckansicht), One-Piece-Meer/Himmel, Namek-Anime- und Manga-Bilder (Farben per Pixelmessung übernommen).
+  Deckansicht), One-Piece-Meer/Himmel, Namek-Anime- und Manga-Bilder (Farben per Pixelmessung übernommen), Konoha-Standbilder aus Anime und
+  Spiel, Model Sheets von Naruto und Sasuke.
 - Design-Referenzen per Websuche: Thousand Sunny (Brigantine, Löwen-Galionsfigur mit Sonnenmähne,
   Rasendeck), Konoha (Hokage-Felsen über dem Dorf, Residenz mittig darunter), Namek (grüner Himmel,
   grünes Wasser, blau-grünes Gras, Ajisa-Bäume, weiße Kuppelhäuser, drei Sonnen).

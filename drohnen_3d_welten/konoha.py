@@ -21,9 +21,10 @@ def plaster_material(name="Plaster", window=True):
     mat, nb, out = fpv.new_material(name)
     oi = nb.node("ShaderNodeObjectInfo")
     rnd = nb.out(oi, "Random")
-    col = nb.ramp(rnd, [(0.0, (0.55, 0.50, 0.41)), (0.2, (0.62, 0.60, 0.55)), (0.4, (0.50, 0.44, 0.36)),
-                        (0.55, (0.60, 0.53, 0.42)), (0.7, (0.42, 0.45, 0.42)), (0.82, (0.55, 0.42, 0.34)),
-                        (1.0, (0.64, 0.62, 0.58))], interp="CONSTANT")
+    # Pastellfassaden wie in den Anime-Referenzen: creme, rosa, mintgrün, hellblau, weiß, pfirsich, blassgrün
+    col = nb.ramp(rnd, [(0.0, (0.66, 0.57, 0.40)), (0.16, (0.58, 0.36, 0.31)), (0.30, (0.33, 0.45, 0.29)),
+                        (0.44, (0.36, 0.45, 0.54)), (0.58, (0.68, 0.66, 0.60)), (0.72, (0.66, 0.44, 0.27)),
+                        (0.86, (0.45, 0.53, 0.36)), (1.0, (0.64, 0.58, 0.46))], interp="CONSTANT")
     wpos = nb.out(nb.node("ShaderNodeNewGeometry"), "Position")
     nrm = nb.out(nb.node("ShaderNodeNewGeometry"), "Normal")
     tcol, trgh, tnrm = pbr_box(nb, "plaster", nb.coords("Object"), scale=0.35)
@@ -428,20 +429,42 @@ def door_material(name, path):
 # Hokage-Residenz
 # --------------------------------------------------------------------------
 
-def residence(mats, cx, cy, r=20.0, h=24.0):
+def residence(mats, cx, cy, r=21.0):
+    """Hokage-Residenz nach den Anime-Referenzen: orangeroter Rundbau mit Reihen kleiner Fenster,
+    ockerfarbenem Ziegel-Kragen auf halber Höhe, 火-Emblem im Ring, Flachdach mit weißen gebogenen
+    Hörnern und Mittelspitze, wellige Kabel um den Oberbau, Torbau mit Ziegeldach nach Süden."""
     objs = []
-    objs.append(cylinder("ResBase", cx, cy, 0, r + 1.5, 2.0, mats["stone"], seg=64))
-    objs.append(cylinder("ResBody", cx, cy, 2.0, r, h, mats["red"], seg=64))
-    # Fensterbänder
-    for k in range(3):
-        objs.append(cylinder(f"ResWin{k}", cx, cy, 6 + k * 6.5, r + 0.08, 1.8, mats["glass"], seg=64, cap=False))
-    # Dach: Kegel + Rand
-    R1, R2, RH = r + 2.4, r * 0.35, 12.0
-    objs.append(cylinder("ResEave", cx, cy, h + 2.0, r + 3.0, 1.0, mats["red_dark"], seg=64))
-    objs.append(cylinder("ResRoof", cx, cy, h + 3.0, R1, RH, mats["red_roof"], seg=64, r_top=R2))
-    objs.append(cylinder("ResTop", cx, cy, h + 3.0 + RH, R2 * 1.05, 3.0, mats["red_dark"], seg=48))
-    # 火-Emblem vorn am Dach (Richtung Süden, -Y), fast senkrecht montiert
-    disc_r = 5.0
+    Z_SK, Z_TOP = 15.0, 31.0
+    r2 = r * 0.93
+    objs.append(cylinder("ResBase", cx, cy, 0, r + 2.0, 1.5, mats["stone"], seg=72))
+    objs.append(cylinder("ResBody", cx, cy, 1.5, r, Z_SK - 1.5, mats["red"], seg=72))
+    objs.append(cylinder("ResSkirt", cx, cy, Z_SK, r + 4.2, 4.2, mats["res_tile"], seg=72, r_top=r2 - 0.1))
+    objs.append(cylinder("ResSkirtEave", cx, cy, Z_SK - 0.35, r + 4.35, 0.4, mats["red_dark"], seg=72))
+    objs.append(cylinder("ResUpper", cx, cy, Z_SK + 4.0, r2, Z_TOP - Z_SK - 4.0, mats["red"], seg=72))
+    objs.append(cylinder("ResCap", cx, cy, Z_TOP, r2 + 0.5, 0.6, mats["red_dark"], seg=72))
+    objs.append(cylinder("ResParapet", cx, cy, Z_TOP + 0.6, r2 + 0.3, 1.1, mats["red"], seg=72, cap=False))
+    objs.append(cylinder("ResRoofDeck", cx, cy, Z_TOP + 0.1, r2 - 0.2, 0.55, mats.get("roofdeck", mats["rooftop"]), seg=72))
+    # Reihen kleiner quadratischer Fenster (ein Mesh), Emblem-Bereich im Süden ausgespart
+    bm = bmesh.new()
+    for (zc, rr, n) in ((5.5, r, 44), (10.0, r, 44), (22.5, r2, 40), (26.5, r2, 40)):
+        for j in range(n):
+            a = 2 * math.pi * (j + 0.5) / n
+            if zc > 20 and abs(math.atan2(math.sin(a + math.pi / 2), math.cos(a + math.pi / 2))) < 0.36:
+                continue
+            res = bmesh.ops.create_cube(bm, size=1.0)
+            bmesh.ops.scale(bm, vec=(0.25, 1.0, 1.15), verts=res["verts"])
+            bmesh.ops.rotate(bm, verts=res["verts"], cent=(0, 0, 0), matrix=Matrix.Rotation(a, 3, "Z"))
+            bmesh.ops.translate(bm, vec=(cx + math.cos(a) * (rr - 0.06), cy + math.sin(a) * (rr - 0.06), zc),
+                                verts=res["verts"])
+    me = bpy.data.meshes.new("ResWindows")
+    bm.to_mesh(me)
+    bm.free()
+    wo = bpy.data.objects.new("ResWindows", me)
+    me.materials.append(mats["glass"])
+    fpv.link(wo)
+    objs.append(wo)
+    # 火-Emblem: helle Scheibe mit rotem 火 in dunklem Metallring, nach Süden (-Y)
+    disc_r = 3.6
     bm = bmesh.new()
     uvl = bm.loops.layers.uv.new("UVMap")
     bmesh.ops.create_circle(bm, cap_ends=True, segments=48, radius=disc_r)
@@ -454,41 +477,87 @@ def residence(mats, cx, cy, r=20.0, h=24.0):
     disc = bpy.data.objects.new("HiDisc", me)
     fpv.link(disc)
     me.materials.append(mats["hi"])
-    f = 0.25
-    rr = R1 - (R1 - R2) * f
-    disc.location = (cx, cy - rr - 0.8, h + 3.0 + RH * f + disc_r * 0.75)
-    disc.rotation_euler = (math.radians(78), 0, 0)
+    disc.location = (cx, cy - r2 - 0.45, 25.2)
+    disc.rotation_euler = (math.radians(90), 0, 0)
     objs.append(disc)
-    # Fenstersprossen (Mullions) an den Fensterbändern und Sparrenköpfe an der Traufe (je ein Mesh)
-    bm = bmesh.new()
-    for k in range(3):
-        zb = 6 + k * 6.5
-        for j in range(56):
-            a = 2 * math.pi * j / 56
-            res = bmesh.ops.create_cube(bm, size=1.0)
-            bmesh.ops.scale(bm, vec=(0.18, 0.25, 1.9), verts=res["verts"])
-            bmesh.ops.rotate(bm, verts=res["verts"], cent=(0, 0, 0), matrix=Matrix.Rotation(a, 3, "Z"))
-            bmesh.ops.translate(bm, vec=(cx + math.cos(a) * (r + 0.1), cy + math.sin(a) * (r + 0.1), zb + 0.9),
-                                verts=res["verts"])
-    for j in range(96):
-        a = 2 * math.pi * j / 96
-        res = bmesh.ops.create_cube(bm, size=1.0)
-        bmesh.ops.scale(bm, vec=(2.4, 0.22, 0.28), verts=res["verts"])
-        bmesh.ops.rotate(bm, verts=res["verts"], cent=(0, 0, 0), matrix=Matrix.Rotation(a, 3, "Z"))
-        bmesh.ops.translate(bm, vec=(cx + math.cos(a) * (r + 2.2), cy + math.sin(a) * (r + 2.2), h + 2.75),
-                            verts=res["verts"])
-    me = bpy.data.meshes.new("ResDetail")
-    bm.to_mesh(me)
-    bm.free()
-    det = bpy.data.objects.new("ResDetail", me)
-    me.materials.append(mats["red_dark"])
-    fpv.link(det)
-    objs.append(det)
-    rim = cylinder("HiRim", 0, 0, -0.25, disc_r * 1.08, 0.24, mats["red_dark"], seg=48)
-    rim.parent = disc
-    rim.location = (0, 0, -0.26)
-    objs.append(rim)
-    return objs
+    tube = [(cx + math.cos(t) * (disc_r + 0.3), cy - r2 - 0.5, 25.2 + math.sin(t) * (disc_r + 0.3))
+            for t in np.linspace(0, 2 * math.pi, 65)]
+    objs.append(curve_tube("HiRingTube", tube, 0.28, mats["iron"], res=3))
+    # wellige Kabel/Rohre um den Oberbau (Referenzbild)
+    for k, zb in enumerate((20.6, 29.2)):
+        pts = []
+        for t in np.linspace(0, 2 * math.pi, 181):
+            rr = r2 + 0.35
+            pts.append((cx + math.cos(t) * rr, cy + math.sin(t) * rr, zb + 0.6 * math.sin(t * 9 + k)))
+        objs.append(curve_tube(f"ResCable{k}", pts, 0.2, mats["cable"], res=2))
+    # weiße gebogene Hörner auf dem Dachrand + Mittelspitze
+    for j in range(8):
+        a = math.radians(j * 45 + 22.5)
+        d = Vector((math.cos(a), math.sin(a), 0))
+        base = Vector((cx, cy, Z_TOP + 0.6)) + d * (r2 - 0.8)
+        pts = [tuple(base + d * (1.6 * t * t) + Vector((0, 0, 6.0 * t))) for t in np.linspace(0, 1, 12)]
+        cu = bpy.data.curves.new(f"Horn{j}", "CURVE")
+        cu.dimensions = "3D"
+        sp = cu.splines.new("POLY")
+        sp.points.add(len(pts) - 1)
+        for pp, c, t in zip(sp.points, pts, np.linspace(0, 1, len(pts))):
+            pp.co = (*c, 1)
+            pp.radius = 1.0 - 0.85 * t
+        cu.bevel_depth = 0.55
+        cu.bevel_resolution = 3
+        cu.use_fill_caps = True
+        ho = bpy.data.objects.new(f"Horn{j}", cu)
+        ho.data.materials.append(mats["horn"])
+        fpv.link(ho)
+        objs.append(ho)
+    objs.append(cylinder("ResSpire", cx, cy, Z_TOP + 0.6, 0.9, 2.6, mats["horn"], seg=24, r_top=0.1))
+    # Torbau nach Süden: Block, Ziegel-Walmdach, große Holztüren
+    gy = cy - r - 3.0
+    objs.append(box("ResGate", cx, gy, 0, 15.0, 8.0, 8.0, mats["red"], bevel=0.1))
+    objs.append(hip_roof("ResGateRoof", cx, gy, 8.0, 9.5, 17.5, 3.4, mats["res_tile"], rot=math.pi / 2, overhang=1.0))
+    objs.append(box("ResDoor", cx, gy - 4.05, 0.3, 5.0, 0.3, 5.6, mats["beam"], bevel=0.04))
+    objs.append(box("ResDoorFrame", cx, gy - 4.2, 5.9, 6.2, 0.4, 0.5, mats["red_dark"], bevel=0.04))
+    for sx in (-1, 1):
+        objs.append(box("ResDoorPost", cx + sx * 2.85, gy - 4.2, 0, 0.5, 0.4, 6.4, mats["red_dark"], bevel=0.04))
+    return objs, Z_TOP
+
+
+def sand_street_material(name="SandStreet"):
+    """Festgetretene, sandfarbene Dorfstraße (Referenz: helle Lehmstraße mit Spuren)."""
+    mat, nb, out = fpv.new_material(name)
+    wpos = nb.out(nb.node("ShaderNodeNewGeometry"), "Position")
+    c = nb.image(os.path.join(fpv.ASSETS, "bab", "textures_dirt.jpg"), nb.mapping(wpos, scale=(0.22, 0.22, 0.22)))
+    lum = nb.vmath("DOT_PRODUCT", nb.out(c, "Color"), (0.33, 0.33, 0.33))
+    n1 = nb.noise(wpos, scale=0.05, detail=3)
+    n2 = nb.noise(wpos, scale=0.9, detail=3)
+    col = nb.mix(nb.out(n1, "Fac"), (0.44, 0.35, 0.21), (0.66, 0.55, 0.36))
+    col = nb.vmath("SCALE", col, scale=nb.math("MULTIPLY_ADD", lum, 0.9, 0.55))
+    # Fahrspuren/Fußwege dunkler in Straßenrichtung
+    x = nb.sep(wpos)[0]
+    track = nb.math("MULTIPLY", nb.math("SINE", nb.math("MULTIPLY", x, 0.9)), nb.math("SUBTRACT", nb.out(n2, "Fac"), 0.3))
+    col = nb.mix(nb.math("MULTIPLY", nb.math("MAXIMUM", track, 0.0), 0.35), col, (0.30, 0.23, 0.14))
+    p = fpv.principled(nb, Base_Color=col, Roughness=0.93)
+    nb.link(nb.bump(nb.math("ADD", lum, nb.math("MULTIPLY", nb.out(n2, "Fac"), 0.4)), strength=0.35, distance=0.04),
+            p.inputs["Normal"])
+    nb.link(p.outputs[0], out.inputs[0])
+    return mat
+
+
+def tiered_tower(name, cx, cy, r, tiers, mats, roof_mat, rng):
+    """Runder Stufenturm (Referenz: türkiser/blauer Rundturm mit mehreren ausladenden Traufkränzen)."""
+    objs = []
+    z = 0.0
+    rr = r
+    for k in range(tiers):
+        h = 3.2 * (2 if k == 0 else 1)
+        objs.append(cylinder(f"{name}_w{k}", cx, cy, z, rr, h, mats["plaster"], seg=40))
+        z += h
+        objs.append(cylinder(f"{name}_e{k}", cx, cy, z, rr + 1.6, 1.1, roof_mat, seg=40, r_top=rr * 0.86))
+        z += 1.1
+        rr *= 0.8
+    objs.append(cylinder(f"{name}_top", cx, cy, z, rr * 1.15, rr * 0.9, roof_mat, seg=40, r_top=0.2))
+    objs[0]["h"] = z
+    return objs, z + rr * 0.9
 
 
 # --------------------------------------------------------------------------
@@ -524,7 +593,8 @@ def cliff_mesh(name, x0, x1, y_face, z0, z1, mat, seed=5, res=0.8, panel=None, c
     if chin is not None and panel is not None:
         # unterhalb der Kinne tritt der Fels vor (verdeckt die Schultern des Scans)
         mxc = np.clip(np.minimum(X - panel[0], panel[1] - X) / 30.0, 0, 1)
-        cz = np.clip((chin - Z) / 10.0, 0, 1)
+        chz = chin(X) if callable(chin) else chin
+        cz = np.clip((chz - Z) / 10.0, 0, 1)
         cz = cz * cz * (3 - 2 * cz)
         Y = Y - 13.0 * cz * mxc
     # tiefe Setzrisse

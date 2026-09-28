@@ -319,8 +319,8 @@ def fight_plan(cam_t, cam_pos):
           (15.35, "recoil", R(8.0, 5.4, 2.0), R(0, 6.5, 1), True),
           (15.8, "land", R(8.9, 4.3), R(0, 6.5), False),
           (16.4, "stand", R(8.7, 3.9), R(6.3, -4.6, 1.0), False),             # steht auf, dreht sich zur Kamera
-          (17.2, "stand", R(8.4, 3.6), R(6.6, -0.9, 1.2), False),
-          (20.1, "stand", R(8.4, 3.6), R(6.6, -0.9, 1.2), False)]
+          (17.0, "hero", R(8.4, 3.6), R(6.6, -0.9, 1.2), False),               # Faust zur Kamera
+          (20.1, "hero", R(8.4, 3.6), R(6.6, -0.9, 1.2), False)]
     S += [(11.3, "land", R(-3.5, Y), R(10, Y), False), (11.6, "guard", R(-3.5, Y), R(10, Y), False),
           (12.4, "guard", R(3.0, Y), R(8, Y), False), (12.6, "guard", R(3.3, Y), R(6, Y), False),   # blockt
           (12.9, "kick_L", R(3.6, Y), R(7, Y), False),                         # Drehtritt als Konter
@@ -338,16 +338,128 @@ def fight_plan(cam_t, cam_pos):
     return N, S, P
 
 
-def stage_fight(N_keys, S_keys):
-    """Figuren anlegen und das Blocking keyframen (Schritt 3.4 ersetzt das durch gebackene Animation)."""
+HITS = [(1.15, 3), (4.1, 3), (5.65, 3), (6.85, 3), (12.6, 3), (13.15, 3), (T_CLASH, 4)]   # (Zeit, Halte-Frames)
+ATTACKS = ("punch_R", "punch_L", "kick_R", "kick_L", "dash_thrust_R", "dash_thrust_L")
+POSES.update({
+    # Schlussbild: rechte Faust nach vorn zur Kamera gestreckt (Versprechen), links locker, leicht eingedreht
+    "hero": {"spine": (4, 0, 7), "head": (4, 0, -5), "shoulder.R": (84, 4, 0), "elbow.R": (8, 0, 0),
+             "wrist.R": (-10, 0, 0), "shoulder.L": (-6, 14, 0), "elbow.L": (18, 0, 0), "hip.R": (0, -5, 0),
+             "hip.L": (0, 7, 0), "root": (0, 0, 2)},
+})
+
+
+def _style(pose):
+    """(Dauer, Ausholen, Überschwingen) je Posenart: Angriffe mit Ausholen und Überschwingen, Treffer-Reaktion
+    schnell mit Nachschwingen, Landung federt, Lauf knapp, Halteposen weich."""
+    if pose in ATTACKS:
+        return 0.36, 0.2, 0.14
+    if pose == "recoil":
+        return 0.12, 0.0, 0.18
+    if pose in ("land", "squat"):
+        return 0.14, 0.0, 0.14
+    if pose == "jump":
+        return 0.2, 0.1, 0.06
+    if pose.startswith("run"):
+        return 0.14, 0.0, 0.05
+    if pose.startswith("crouch_charge"):
+        return 0.3, 0.1, 0.06
+    return 0.32, 0.06, 0.07
+
+
+def hit_warp(t):
+    """Zeitverzerrung für Treffer-Halte-Frames (Hit-Stop): an jedem Treffer steht die Zeit n Frames still und holt
+    danach in n Frames wieder auf – kein bleibender Versatz zur Kamera."""
+    tau = np.array(t, dtype=float)
+    for h, nf in HITS:
+        H = nf / FPS
+        a = (t >= h) & (t < h + H)
+        b = (t >= h + H) & (t < h + 2 * H)
+        tau[a] = h
+        tau[b] = h + 2 * (t[b] - h - H)
+    return tau
+
+
+def bake_fighter(fig, keys, n, cam_pos=None, look_win=None, seed=0):
+    """Blocking -> gebackene Animation: Posenwechsel mit Ausholen/Überschwingen (crew._prog), Nachziehen von
+    Unterarm/Hand/Kopf, Atmen/Mikrobewegung, Hit-Stop an Treffern, weiche Bahn (monoton-kubisch) mit Bodenkontakt
+    über Vorwärtskinematik, Blick zur Kamera im Fenster look_win."""
+    import crew
+    ks = []
+    for k in sorted(keys, key=lambda k: k[0]):
+        if ks and abs(k[0] - ks[-1][0]) < 1e-6:
+            ks[-1] = k
+        else:
+            ks.append(k)
+    tk = np.array([k[0] for k in ks])
+    t = (np.arange(n) - 1.0) / FPS
+    tw = hit_warp(t)
+    # Posenplan
+    sched = [(0.0, ks[0][1], 1.0, 0.0, 0.0)]
+    for k in range(1, len(ks)):
+        dur, a, o = _style(ks[k][1])
+        d = min(dur, max(tk[k] - tk[k - 1], 1.0 / FPS))
+        sched.append((tk[k] - d, ks[k][1], d, a, o))
+    R = {}
+    for j in fig.J:
+        lag = crew.LAG.get(j.split(".")[0], 0.0)
+        R[j] = crew._eval_schedule(sched, j, tw - lag)
+    rng = np.random.default_rng(seed)
+    ph = rng.uniform(0, 6.28, 4)
+    br = np.sin(2 * np.pi * 0.28 * t + ph[0])
+    R["spine"][:, 0] += 1.0 * br
+    R["shoulder.R"][:, 1] += 0.6 * br
+    R["shoulder.L"][:, 1] -= 0.6 * br
+    R["head"][:, 0] += 1.0 * np.sin(2 * np.pi * 0.41 * t + ph[1])
+    R["head"][:, 2] += 1.4 * np.sin(2 * np.pi * 0.23 * t + ph[2])
+    # Bahn: Basis-z je Schlüssel (Boden: Fußkontakt), monoton-kubisch dazwischen
+    P = np.array([tuple(k[2]) for k in ks], dtype=float)
+    air = np.array([k[4] for k in ks])
+    rot_at = lambda pose: POSES[pose] if isinstance(pose, str) else pose
+    bz = np.array([P[k, 2] if air[k] else P[k, 2] - fig.foot_drop(rot_at(ks[k][1])) for k in range(len(ks))])
+    L = np.stack([_pchip(tk, P[:, 0], np.clip(tw, tk[0], tk[-1])), _pchip(tk, P[:, 1], np.clip(tw, tk[0], tk[-1])),
+                  _pchip(tk, bz, np.clip(tw, tk[0], tk[-1]))], axis=1)
+    seg = np.clip(np.searchsorted(tk, tw, side="right") - 1, 0, len(ks) - 2)
+    ground_seg = (~air[seg]) & (~air[seg + 1])
+    for f in np.where(ground_seg)[0]:
+        u = np.clip((tw[f] - tk[seg[f]]) / max(tk[seg[f] + 1] - tk[seg[f]], 1e-6), 0, 1)
+        gz = P[seg[f], 2] * (1 - u) + P[seg[f] + 1, 2] * u
+        L[f, 2] = gz - fig.foot_drop({j: tuple(R[j][f]) for j in ("root", "hip.R", "knee.R", "ankle.R",
+                                                                  "hip.L", "knee.L", "ankle.L")})
+    # Blickrichtung (Yaw) je Schlüssel, stetig
+    yaw_k = np.unwrap(np.array([math.atan2(-(k[3] - k[2]).x, (k[3] - k[2]).y) for k in ks]))
+    yaw = _pchip(tk, yaw_k, np.clip(tw, tk[0], tk[-1]))
+    # Blick zur Kamera (Hals/Kopf), weich ein- und ausgeblendet
+    if cam_pos is not None and look_win:
+        w = _smooth(look_win[0], look_win[0] + 0.6, t) * (1 - _smooth(look_win[1] - 0.4, look_win[1], t))
+        head = L + np.array([0, 0, 1.5 * fig.s])
+        d = cam_pos[:n] - head
+        dyaw = np.degrees(np.arctan2(-d[:, 0], d[:, 1]) - yaw)
+        dyaw = (dyaw + 180) % 360 - 180
+        dpit = np.degrees(np.arctan2(d[:, 2], np.hypot(d[:, 0], d[:, 1])))
+        ay = crew._zero_phase(np.clip(dyaw - R["head"][:, 2] - R["spine"][:, 2], -60, 60) * w, 0.15)
+        ap = crew._zero_phase(np.clip(dpit - R["head"][:, 0] - R["spine"][:, 0], -25, 30) * w, 0.15)
+        R["neck"][:, 2] += 0.6 * ay
+        R["head"][:, 2] += 0.4 * ay
+        R["neck"][:, 0] += 0.5 * ap
+        R["head"][:, 0] += 0.5 * ap
+    for j, e in fig.J.items():
+        e.rotation_mode = "XYZ"
+        crew._bake(e, "rotation_euler", np.radians(R[j]))
+    crew._bake(fig.base, "location", L)
+    fig.base.rotation_mode = "XYZ"
+    crew._bake(fig.base, "rotation_euler", np.stack([np.zeros(n), np.zeros(n), yaw], axis=1))
+
+
+def stage_fight(N_keys, S_keys, n=None, cam_pos=None):
+    """Figuren anlegen und das Blocking als Animation backen (Schritt 3.4)."""
     nar = ninja.naruto((0, 0, 0), 0.0)
     sas = ninja.sasuke((0, 0, 0), 0.0)
-    for fig, keys in ((nar, N_keys), (sas, S_keys)):
-        for (t, pose, pos, look, air) in sorted(keys, key=lambda k: k[0]):
-            d = look - pos
-            yaw = math.degrees(math.atan2(-d.x, d.y))
-            fig.pose(int(round(t * FPS)) + 1, POSES[pose], loc=(pos.x, pos.y, pos.z), yaw=yaw,
-                     ground=None if air else pos.z)
+    for fig in (nar, sas):          # Modell-Keyframes der Konstruktion entfernen
+        for o in [fig.base] + list(fig.J.values()):
+            o.animation_data_clear()
+    n = n or FPS * SECONDS + 2
+    bake_fighter(nar, N_keys, n, cam_pos=cam_pos, look_win=(17.0, 21.0), seed=1)
+    bake_fighter(sas, S_keys, n, seed=2)
     return nar, sas
 
 
@@ -787,7 +899,7 @@ def build(args):
     # Kamera + Kämpfer (Schritt 3.1)
     cam_t, cam_p, _ = camera_positions(frames)
     N_keys, S_keys, _ = fight_plan(cam_t, cam_p)
-    nar, sas = stage_fight(N_keys, S_keys)
+    nar, sas = stage_fight(N_keys, S_keys, n=frames + 2, cam_pos=cam_p)
     fpv.rim_light([nar.base, sas.base], RIM["elev"], RIM["azim"], strength=RIM["strength"], kelvin=RIM["kelvin"],
                   angle=RIM["angle"])
     pos, quats, info = camera_path(frames, N_keys, S_keys)

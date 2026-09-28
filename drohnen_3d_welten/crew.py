@@ -9,7 +9,7 @@ import math
 
 import bmesh
 import numpy as np
-from mathutils import Vector
+from mathutils import Euler, Matrix, Vector
 
 import fpv
 from figures import POSES, REST, Figure
@@ -365,40 +365,298 @@ def _loop(fig, poses, f0, f1, period, loc=None, yaw=None, ground=None):
         k += 1
 
 
-def place_crew(body, frames, sunny):
+# ------------------------------------------------------------------------------------ Schauspiel (Acting)
+FPS = 24
+LAG = {"elbow": 0.07, "wrist": 0.12, "neck": 0.03, "head": 0.06}   # Nachziehen (Follow-through) in s
+
+POSES.update({
+    "hands_hips_r": {"shoulder.R": (-10, -35, 0), "elbow.R": (95, 0, -40), "shoulder.L": (-10, 35, 0),
+                     "elbow.L": (95, 0, 40), "root": (0, 0, 4), "spine": (0, 0, -3)},
+    # Sanji führt die Zigarette zum Mund
+    "smoke": {"shoulder.R": (62, -18, 28), "elbow.R": (138, 0, 0), "shoulder.L": (-12, 14, 0),
+              "elbow.L": (35, 0, 10), "head": (4, 0, 8)},
+    # Robin blättert um
+    "read_turn": {"spine": (-4, 0, 6), "head": (-14, 0, 10), "hip.R": (90, 0, 0), "knee.R": (-90, 0, 0),
+                  "hip.L": (90, 0, 0), "knee.L": (-90, 0, 0), "shoulder.R": (40, -34, 50), "elbow.R": (68, 0, 0),
+                  "shoulder.L": (38, 8, -25), "elbow.L": (95, 0, 0)},
+    # Franky holt aus (tief in die Knie, Arme nach hinten unten) für SUPER!
+    "super_prep": {"spine": (-16, 0, 0), "head": (-6, 0, 0), "shoulder.R": (-28, -22, 0), "elbow.R": (55, 0, 0),
+                   "shoulder.L": (-28, 22, 0), "elbow.L": (55, 0, 0), "hip.R": (42, -6, 0), "knee.R": (-72, 0, 0),
+                   "ankle.R": (28, 0, 0), "hip.L": (42, 6, 0), "knee.L": (-72, 0, 0), "ankle.L": (28, 0, 0)},
+    # Chopper: Hocke vor dem Sprung, gezogene Beine in der Luft
+    "squat": {"spine": (-22, 0, 0), "head": (14, 0, 0), "shoulder.R": (-25, -15, 0), "elbow.R": (40, 0, 0),
+              "shoulder.L": (-25, 15, 0), "elbow.L": (40, 0, 0), "hip.R": (55, 0, 0), "knee.R": (-95, 0, 0),
+              "ankle.R": (40, 0, 0), "hip.L": (55, 0, 0), "knee.L": (-95, 0, 0), "ankle.L": (40, 0, 0)},
+    "tuck": {"spine": (10, 0, 0), "head": (20, 0, 0), "shoulder.R": (10, -160, 0), "elbow.R": (20, 0, 0),
+             "shoulder.L": (10, 160, 0), "elbow.L": (20, 0, 0), "hip.R": (65, 0, 0), "knee.R": (-105, 0, 0),
+             "hip.L": (65, 0, 0), "knee.L": (-105, 0, 0)},
+})
+
+
+def _ss(x):
+    x = np.clip(x, 0.0, 1.0)
+    return x * x * (3.0 - 2.0 * x)
+
+
+def _prog(u, a, o):
+    """Fortschritt einer Posenänderung (0 -> 1) über u = 0..1: erst Ausholen um a (Anteil der Strecke in
+    Gegenrichtung), dann schneller Schwung bis 1 + o (Überschwingen), dann Einschwingen auf 1."""
+    u = np.clip(u, 0.0, 1.0)
+    if a <= 0 and o <= 0:
+        return _ss(u)
+    la = 0.3 if a > 0 else 0.0
+    lo = 0.28 if o > 0 else 0.0
+    lm = 1.0 - la - lo
+    p = np.full_like(u, 1.0)
+    if la:
+        m = u < la
+        p[m] = -a * _ss(u[m] / la)
+    m = (u >= la) & (u < la + lm)
+    x = (u[m] - la) / lm
+    p[m] = -a + (1.0 + o + a) * (1.0 - (1.0 - x) ** 3) * _ss(x * 3.0)
+    if lo:
+        m = u >= la + lm
+        p[m] = 1.0 + o - o * _ss((u[m] - la - lm) / lo)
+    return p
+
+
+def _pose_vec(pose, j):
+    return np.array((POSES[pose] if isinstance(pose, str) else pose).get(j, (0, 0, 0)), dtype=float)
+
+
+def _eval_schedule(sched, j, t):
+    """sched = [(t0, pose, dauer, ausholen, überschwingen), ...]; erster Eintrag = Startpose.
+    Ergebnis (n, 3) Grad für Gelenk j zu den Zeiten t."""
+    prev = _pose_vec(sched[0][1], j)
+    val = np.tile(prev, (len(t), 1))
+    for (t0, pose, dur, a, o) in sched[1:]:
+        b = _pose_vec(pose, j)
+        val += (b - prev)[None, :] * _prog((t - t0) / dur, a, o)[:, None]
+        prev = b
+    return val
+
+
+def wave_loop(t0, t1, pa, pb, half, o=0.08):
+    """Winken als Folge kurzer Posenwechsel mit leichtem Überschwingen."""
+    out, k, t = [], 0, t0
+    while t < t1:
+        out.append((t, pb if k % 2 == 0 else pa, half, 0.0, o))
+        t += half
+        k += 1
+    return out
+
+
+def _fcurves_of(ob):
+    ad = ob.animation_data
+    if ad is None or ad.action is None:
+        return []
+    act = ad.action
+    if hasattr(act, "fcurves"):
+        return list(act.fcurves)
+    out = []
+    for layer in act.layers:
+        for strip in layer.strips:
+            for cb in strip.channelbags:
+                out += list(cb.fcurves)
+    return out
+
+
+def _bake(ob, path, arr):
+    """arr (n, 3) pro Frame 0..n-1 schnell als F-Kurven schreiben."""
+    ob.keyframe_insert(path, frame=0)
+    n = len(arr)
+    fr = np.arange(n, dtype=np.float32)
+    for fc in _fcurves_of(ob):
+        if fc.data_path != path:
+            continue
+        kp = fc.keyframe_points
+        kp.add(n - len(kp))
+        co = np.empty((n, 2), dtype=np.float32)
+        co[:, 0] = fr
+        co[:, 1] = arr[:, fc.array_index]
+        kp.foreach_set("co", co.ravel())
+        fc.update()
+
+
+def _matrix_track(ob, n):
+    """Weltmatrix eines Objekts mit animiertem Ort/Rotation (auch über Eltern) für Frames 0..n-1."""
+    chain = []
+    o = ob
+    while o is not None:
+        chain.append(o)
+        o = o.parent
+    fcs = {id(o): {(fc.data_path, fc.array_index): fc for fc in _fcurves_of(o)} for o in chain}
+    out = []
+    for f in range(n):
+        M = Matrix.Identity(4)
+        for o in reversed(chain):
+            d = fcs[id(o)]
+            loc = [d[("location", k)].evaluate(f) if ("location", k) in d else o.location[k] for k in range(3)]
+            rot = [d[("rotation_euler", k)].evaluate(f) if ("rotation_euler", k) in d else o.rotation_euler[k]
+                   for k in range(3)]
+            M = M @ Matrix.Translation(loc) @ Euler(rot, "XYZ").to_matrix().to_4x4()
+        out.append(M)
+    return out
+
+
+def _zero_phase(x, tau, fps=FPS):
+    """Exponentielle Glättung vor- und rückwärts (ohne Verzögerung)."""
+    a = 1.0 - math.exp(-1.0 / (tau * fps))
+    y = x.copy()
+    for i in range(1, len(y)):
+        y[i] = y[i - 1] + a * (y[i] - y[i - 1])
+    for i in range(len(y) - 2, -1, -1):
+        y[i] = y[i + 1] + a * (y[i] - y[i + 1])
+    return y
+
+
+def act(fig, sched, n, loc, yaw, body_M=None, cam=None, ground=None, seat_z=None, look=1.0, breathe=1.0,
+        sway=1.0, seed=0, jump=None, shake=None):
+    """Ganze Figur backen: Posenfolge mit Ausholen/Überschwingen, Nachziehen von Unterarm/Hand/Kopf,
+    Atmen, Gewichtsverlagerung, Kopf-Mikrobewegung, Blick zur Kamera (Hals/Kopf) und Bodenkontakt.
+    jump = (t0, t1, höhe): Parabel auf die Basis; shake = (t0, t1, grad): Zittern (Kraftpose halten)."""
+    rng = np.random.default_rng(seed)
+    t = (np.arange(n) - 1.0) / FPS
+    R = {}
+    for j in fig.J:
+        lag = LAG.get(j.split(".")[0], 0.0)
+        R[j] = _eval_schedule(sched, j, t - lag)
+    # Atmen (Rumpf, Schultern), Gewichtsverlagerung, Kopf-Mikrobewegung
+    fb = rng.uniform(0.2, 0.3)
+    ph = rng.uniform(0, 2 * math.pi, 6)
+    br = np.sin(2 * math.pi * fb * t + ph[0])
+    R["spine"][:, 0] += 1.1 * breathe * br
+    R["shoulder.R"][:, 1] += 0.7 * breathe * br
+    R["shoulder.L"][:, 1] -= 0.7 * breathe * br
+    fs = rng.uniform(0.06, 0.1)
+    sw = np.sin(2 * math.pi * fs * t + ph[1])
+    R["root"][:, 2] += 1.4 * sway * sw
+    R["spine"][:, 2] -= 0.9 * sway * sw
+    R["root"][:, 1] += 0.8 * sway * np.sin(2 * math.pi * fs * t + ph[2])
+    R["head"][:, 0] += sway * (1.2 * np.sin(2 * math.pi * 0.37 * t + ph[3]) + 0.6 * np.sin(2 * math.pi * 0.83 * t + ph[4]))
+    R["head"][:, 2] += sway * (1.6 * np.sin(2 * math.pi * 0.23 * t + ph[5]) + 0.5 * np.sin(2 * math.pi * 0.71 * t))
+    if shake:
+        s0, s1, amp = shake
+        env = _ss((t - s0) / 0.15) * (1 - _ss((t - s1) / 0.2))
+        for j, k in (("shoulder.R", 1), ("shoulder.L", 1), ("spine", 0)):
+            R[j][:, k] += amp * env * np.sin(2 * math.pi * 9.0 * t + rng.uniform(0, 6))
+    # Blick zur Kamera
+    if look > 0 and body_M is not None and cam is not None:
+        neck = fig.rest["neck"]
+        yaw_r = math.radians(yaw)
+        Mb = Matrix.Translation(loc) @ Euler((0, 0, yaw_r), "XYZ").to_matrix().to_4x4()
+        ly = np.zeros(n)
+        lp = np.zeros(n)
+        w = np.zeros(n)
+        for f in range(n):
+            M = body_M[f] @ Mb
+            hp = M @ neck
+            d = M.to_3x3().inverted() @ (Vector(cam[f]) - hp)
+            ly[f] = math.degrees(math.atan2(-d.x, d.y))
+            lp[f] = math.degrees(math.atan2(d.z, math.hypot(d.x, d.y)))
+            dist = d.length
+            w[f] = float(_ss((30.0 - dist) / 12.0) * _ss((125.0 - abs(ly[f])) / 35.0))
+        pose_yaw = R["root"][:, 2] + R["spine"][:, 2] + R["head"][:, 2]
+        pose_pit = R["spine"][:, 0] + R["head"][:, 0]
+        ay = np.clip(ly - pose_yaw, -65, 65) * w * look
+        ap = np.clip(lp - pose_pit, -25, 40) * w * look
+        ay = _zero_phase(ay, 0.14)
+        ap = _zero_phase(ap, 0.14)
+        R["neck"][:, 2] += 0.6 * ay
+        R["head"][:, 2] += 0.4 * ay
+        R["neck"][:, 0] += 0.5 * ap
+        R["head"][:, 0] += 0.5 * ap
+    for j, e in fig.J.items():
+        e.rotation_mode = "XYZ"
+        _bake(e, "rotation_euler", np.radians(R[j]))
+    # Basis: Ort (Bodenkontakt pro Frame über Vorwärtskinematik), Yaw
+    L = np.tile(np.array(loc, dtype=float), (n, 1))
+    if seat_z is not None:
+        L[:, 2] = seat_z
+    elif ground is not None:
+        for f in range(n):
+            L[f, 2] = ground - fig.foot_drop({j: tuple(R[j][f]) for j in ("root", "hip.R", "knee.R", "ankle.R",
+                                                                          "hip.L", "knee.L", "ankle.L")})
+    if jump:
+        j0, j1, hgt = jump
+        u = np.clip((t - j0) / (j1 - j0), 0, 1)
+        L[:, 2] += np.where((t > j0) & (t < j1), 4 * hgt * u * (1 - u), 0.0)
+    _bake(fig.base, "location", L)
+    fig.base.rotation_euler = (0, 0, math.radians(yaw))
+
+
+def place_crew(body, frames, sunny, cam_pos=None):
     """Crew an Bord: an 'body' (Schiffskörper mit Stampfen/Rollen) gehängt, Koordinaten im Schiffssystem
     (+X Bug, +Y Backbord). Blickrichtungen überwiegend nach Steuerbord (-Y), wo die Kamera vorbeifliegt.
-    Figuren-Yaw: 0 = Blick +Y, -90 = Blick +X (Bug), 180 = Blick -Y (Steuerbord)."""
+    Figuren-Yaw: 0 = Blick +Y, -90 = Blick +X (Bug), 180 = Blick -Y (Steuerbord).
+    Animation (Schritt 3.4): pro Figur eine Posenfolge mit Ausholen/Überschwingen, versetzte Phasen,
+    Atmen/Schwanken, Blick zur vorbeifliegenden Kamera (cam_pos je Frame, Weltkoordinaten)."""
     Z_DECK, Z_FORE, Z_ROOF = sunny.Z_DECK, sunny.Z_FORE, sunny.Z_ROOF
     SB, BOW = 180.0, -90.0
+    n = frames + 2
+    body_M = _matrix_track(body, n) if cam_pos is not None else None
     crew = []
 
-    def put(fig, loc, yaw, pose=None, ground=None, seat=None, anim=None, period=18):
+    def put(fig, loc, yaw, sched, ground=None, seat=None, **kw):
         fig.base.parent = body
+        seat_z = None
         if seat is not None:            # sitzend: Gesäß (≈ Wurzel − 9 cm) auf Sitzhöhe
-            loc = (loc[0], loc[1], seat - (REST_ROOT - 0.09) * fig.s)
-        if anim:
-            _loop(fig, anim, 1, frames + 2, period, loc=loc, yaw=yaw, ground=ground)
-        else:
-            fig.pose(1, POSES[pose], loc=loc, yaw=yaw, ground=ground)
+            seat_z = seat - (REST_ROOT - 0.09) * fig.s
+        loc3 = (loc[0], loc[1], seat_z if seat_z is not None else (ground or 0.0))
+        act(fig, sched, n, loc3, yaw, body_M=body_M, cam=cam_pos, ground=ground, seat_z=seat_z, **kw)
         crew.append(fig)
         return fig
 
-    # Ruffy sitzt auf der Steuerbord-Reling am Bug, Beine außenbords (Mähne würde ihn auf dem Löwenkopf verdecken)
-    put(luffy((0, 0, 0), 0), (7.9, -4.3, 0), SB, seat=9.5, anim=["sit_wave", "sit_wave2"], period=14)
-    put(jinbe((0, 0, 0), 0), (6.75, 0.0, 0), BOW, "helm", ground=Z_FORE)
-    put(brook((0, 0, 0), 0), (8.9, -1.5, 0), SB - 25, ground=Z_FORE, anim=["violin", "violin_b"], period=16)
-    # Lysop und Chopper auf dem Rasen an der Steuerbord-Bordwand, genau wo die Drohne übers Deck fliegt
-    put(usopp((0, 0, 0), 0), (-2.0, -1.0, 0), SB, ground=Z_DECK, anim=["wave_up", "wave_up2"], period=12)
-    put(chopper((0, 0, 0), 0), (-0.7, -0.8, 0), SB + 10, ground=Z_DECK, anim=["wave_up", "wave_up2"], period=10)
-    put(nami((0, 0, 0), 0), (0.6, 0.6, 0), SB - 25, ground=Z_DECK, anim=["wave_R", "wave_R2"], period=16)
-    put(zoro((0, 0, 0), 0), (2.95, -0.62, 0), SB, "nap", ground=Z_DECK)
-    put(sanji((0, 0, 0), 0), (-3.2, 0.6, 0), SB - 40, "pockets", ground=Z_DECK)
-    put(robin((0, 0, 0), 0), (-2.95, 2.3, 0), SB + 30, "read", seat=Z_DECK + 0.45)
+    def hold(pose):
+        return [(0.0, pose, 1.0, 0, 0)]
+
+    # Ruffy sitzt auf der Steuerbord-Reling am Bug und winkt die ganze Zeit (Phase versetzt)
+    put(luffy((0, 0, 0), 0), (7.9, -4.3, 0), SB,
+        [(0.0, "sit_wave", 1, 0, 0)] + wave_loop(0.1, 20.5, "sit_wave", "sit_wave2", 0.3, o=0.1), seat=9.5,
+        seed=1, sway=0.6)
+    # Jinbei am Steuer: kleine Korrekturen am Rad, Blick zur Kamera
+    put(jinbe((0, 0, 0), 0), (6.75, 0.0, 0), BOW,
+        [(0.0, "helm", 1, 0, 0), (6.0, {**POSES["helm"], "shoulder.R": (68, -12, 8), "shoulder.L": (56, 12, -8),
+                                        "spine": (-6, 0, -5)}, 1.2, 0.05, 0.08),
+         (12.5, "helm", 1.2, 0.05, 0.08)], ground=Z_FORE, seed=2, look=0.8)
+    put(brook((0, 0, 0), 0), (8.9, -1.5, 0), SB - 25,
+        [(0.0, "violin", 1, 0, 0)] + wave_loop(0.2, 20.5, "violin", "violin_b", 0.34, o=0.05),
+        ground=Z_FORE, seed=3, look=0.5)
+    # Lysop und Chopper auf dem Rasen: stehen, holen aus und winken, sobald die Drohne kommt
+    put(usopp((0, 0, 0), 0), (-2.0, -1.0, 0), SB,
+        [(0.0, "stand", 1, 0, 0), (9.3, "wave_up", 0.55, 0.15, 0.12)]
+        + wave_loop(9.9, 15.0, "wave_up", "wave_up2", 0.3, o=0.1) + [(15.1, "stand", 0.7, 0.05, 0.08)],
+        ground=Z_DECK, seed=4)
+    put(chopper((0, 0, 0), 0), (-0.7, -0.8, 0), SB + 10,
+        [(0.0, "stand", 1, 0, 0), (9.1, "wave_up", 0.5, 0.15, 0.12)]
+        + wave_loop(9.65, 10.35, "wave_up", "wave_up2", 0.25, o=0.1)
+        + [(10.35, "squat", 0.27, 0.0, 0.05), (10.62, "stand", 0.08, 0.0, 0.0), (10.72, "tuck", 0.12, 0.0, 0.0),
+           (11.18, "squat", 0.14, 0.0, 0.1), (11.4, "wave_up", 0.35, 0.0, 0.12)]
+        + wave_loop(11.8, 15.0, "wave_up", "wave_up2", 0.25, o=0.1) + [(15.1, "stand", 0.6, 0.05, 0.08)],
+        ground=Z_DECK, seed=5, jump=(10.66, 11.22, 0.45))
+    put(nami((0, 0, 0), 0), (0.6, 0.6, 0), SB - 25,
+        [(0.0, "hands_hips", 1, 0, 0), (9.6, "wave_R", 0.5, 0.12, 0.12)]
+        + wave_loop(10.15, 14.2, "wave_R", "wave_R2", 0.36, o=0.1) + [(14.3, "hands_hips_r", 0.6, 0.0, 0.08)],
+        ground=Z_DECK, seed=6)
+    # Zorro schläft: tiefes Atmen, kein Blick
+    put(zoro((0, 0, 0), 0), (2.95, -0.62, 0), SB, hold("nap"), ground=Z_DECK, seed=7, look=0.0, breathe=2.4,
+        sway=0.15)
+    # Sanji: Hände in den Taschen, führt die Zigarette zum Mund, schaut der Drohne nach
+    put(sanji((0, 0, 0), 0), (-3.2, 0.6, 0), SB - 40,
+        [(0.0, "pockets", 1, 0, 0), (11.4, "smoke", 0.5, 0.1, 0.08), (13.2, "pockets", 0.6, 0.05, 0.06)],
+        ground=Z_DECK, seed=8)
+    # Robin liest, blättert um und blickt kurz auf
+    put(robin((0, 0, 0), 0), (-2.95, 2.3, 0), SB + 30,
+        [(0.0, "read", 1, 0, 0), (12.0, "read_turn", 0.35, 0.08, 0.1), (12.45, "read", 0.4, 0.0, 0.06)],
+        seat=Z_DECK + 0.45, seed=9, look=0.6, sway=0.4)
     chair = fpv.simple_mat("DeckChair", (0.75, 0.70, 0.62), rough=0.6)
     for nm, a, b in (("ChairSeat", (-3.35, 1.9, Z_DECK + 0.33), (-2.55, 2.7, Z_DECK + 0.45)),
                      ("ChairBack", (-3.5, 2.5, Z_DECK + 0.4), (-2.4, 2.75, Z_DECK + 1.15))):
         ob = sunny.box(nm, a, b, chair, bevel=0.02)
         ob.parent = body
-    put(franky((0, 0, 0), 0), (-6.2, -2.6, 0), SB - 15, "super", ground=Z_ROOF + 0.18)
+    # Franky auf dem Kastelldach: holt aus und reißt genau beim Vorbeiflug die SUPER-Pose hoch
+    put(franky((0, 0, 0), 0), (-6.2, -2.6, 0), SB - 15,
+        [(0.0, "hands_hips", 1, 0, 0), (12.95, "super_prep", 0.35, 0.0, 0.0), (13.3, "super", 0.4, 0.0, 0.15),
+         (16.2, "hands_hips", 0.7, 0.05, 0.08)],
+        ground=Z_ROOF + 0.18, seed=10, look=0.7, shake=(13.7, 15.6, 1.2))
     return crew

@@ -307,7 +307,8 @@ def build(args):
     # Schiff mit der Strohhutbande an Bord
     root, body, _ = sunny.build()
     sunny.animate(root, body, heading, tuple(start), SHIP_SPEED, FPS, frames)
-    crew.place_crew(body, frames, sunny)
+    sunny.flag_cloth(frames, os.environ.get("NIDO_CACHE", args.out.rstrip("/") + "_cache"), heading_deg=heading)
+    crew.place_crew(body, frames, sunny, cam_pos=pos)
     add_rim_light(root)
     if ATMO_DENSITY > 0:
         add_atmosphere(ATMO_DENSITY)

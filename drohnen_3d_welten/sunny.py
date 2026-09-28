@@ -878,6 +878,55 @@ def sail_mesh(name, width, height, bulge, mat, nx=34, ny=30, foot_arch=0.6, tape
     return ob, edge_pts
 
 
+def sail_wind(ob, belly, edge, gust_ob, flutter_ob, gust=0.5, flutter=0.07):
+    """Wind im Segel (prozedural, keine Cloth-Simulation): großräumige Böen verformen den Bauch
+    (Gewicht 'belly', 0 an allen Lieken), feines Flattern an den freien Kanten (Gewicht 'edge').
+    Die Rauschfelder hängen an animierten Empties (gust_ob/flutter_ob) und wandern durchs Segel."""
+    for nm, w in (("belly", belly), ("edge", edge)):
+        vg = ob.vertex_groups.new(name=nm)
+        for i, v in enumerate(w):
+            if v > 1e-4:
+                vg.add([i], float(v), "REPLACE")
+    sol = ob.modifiers.get("solid")
+    th = sol.thickness
+    ob.modifiers.remove(sol)
+    for nm, grp, co_ob, size, depth, st in (("gust", "belly", gust_ob, 5.0, 1, gust),
+                                             ("flutter", "edge", flutter_ob, 0.9, 2, flutter)):
+        tex = bpy.data.textures.new(f"{ob.name}_{nm}", "CLOUDS")
+        tex.noise_scale = size
+        tex.noise_depth = depth
+        tex.noise_type = "SOFT_NOISE"
+        m = ob.modifiers.new(nm, "DISPLACE")
+        m.texture = tex
+        m.strength = st
+        m.mid_level = 0.5
+        m.direction = "NORMAL"
+        m.vertex_group = grp
+        m.texture_coords = "OBJECT"
+        m.texture_coords_object = co_ob
+    sol = ob.modifiers.new("solid", "SOLIDIFY")
+    sol.thickness = th
+    # Böen sind langsam: keine Verformungs-Bewegungsunschärfe (kostete +25 % Renderzeit im Deck-Frame)
+    if hasattr(ob, "cycles"):
+        ob.cycles.use_deform_motion = False
+
+
+def _square_sail_weights(nx, ny):
+    j, i = np.mgrid[0:ny, 0:nx]
+    t = j / (ny - 1)
+    sx = 2 * i / (nx - 1) - 1
+    belly = (1 - sx ** 2) * np.sin(np.pi * t ** 0.85) ** 1.2
+    edge = np.maximum(np.abs(sx) ** 6 * np.sin(np.pi * t), t ** 6 * (1 - sx ** 2))
+    return belly.ravel(), edge.ravel()
+
+
+def _gaff_sail_weights(nx, ny):
+    j, i = np.mgrid[0:ny, 0:nx]
+    t = j / (ny - 1)
+    s = i / (nx - 1)
+    return (np.sin(np.pi * s) * np.sin(np.pi * t)).ravel(), (s ** 6 * np.sin(np.pi * t)).ravel()
+
+
 def gaff_sail_mesh(name, luff, gaff_len, boom_len, gaff_rise, mat, nx=24, ny=26, bulge=0.9):
     """Gaffelsegel (trapezförmig, achtern des Mastes). Lokal: -X nach achtern, Z hoch."""
     bm = bmesh.new()
@@ -1236,6 +1285,16 @@ def build(name="ThousandSunny"):
                           bulge=0.8)
     gaff.location = (MAIN_X - 0.5, 0, 12.25)
     P.append(gaff)
+    # Wind in den Segeln: zwei Rauschfelder, in animate() nach vorn bewegt (Böen 6 m/s, Flattern 14 m/s)
+    wind_obs = []
+    for nm in ("SailGust", "SailFlutter"):
+        e = bpy.data.objects.new(nm, None)
+        fpv.link(e)
+        e.parent = body
+        wind_obs.append(e)
+    for ob in (s_fore, s_main):
+        sail_wind(ob, *_square_sail_weights(34, 30), *wind_obs)
+    sail_wind(gaff, *_gaff_sail_weights(24, 26), *wind_obs, gust=0.35, flutter=0.06)
     P.append(cyl("Boom", (MAIN_X - 0.4, 0, 12.2), (MAIN_X - 6.3, 0, 12.2), 0.17, 0.12, mats["mast"], 12))
     P.append(cyl("Gaff", (MAIN_X - 0.4, 0, 18.4), (MAIN_X - 6.3, 0, 18.6), 0.15, 0.1, mats["mast"], 12))
 
@@ -1281,6 +1340,17 @@ def build(name="ThousandSunny"):
     return root, body, mats
 
 
+def _swell(t, comps):
+    """Summe von Sinus-Komponenten mit nicht-harmonischen Frequenzen (quasi-zufällige Dünung)."""
+    return sum(a * math.sin(2 * math.pi * f * t + p) for (a, f, p) in comps)
+
+
+# Dünung: Hauptwelle + zwei kürzere Seen + kleines Rauschen; Amplituden relativ zu heave/roll/pitch_amp
+HEAVE = ((1.0, 0.13, 0.4), (0.32, 0.29, 2.1), (0.16, 0.53, 0.7), (0.06, 1.13, 4.0))
+ROLL = ((1.0, 0.085, 1.1), (0.3, 0.21, 0.3), (0.12, 0.47, 2.5), (0.05, 0.97, 5.1))
+PITCH = ((1.0, 0.11, 0.0), (0.33, 0.26, 1.7), (0.12, 0.61, 0.9), (0.05, 1.21, 3.3))
+
+
 def animate(root, body, heading_deg, start, speed, fps, frames, pitch_amp=1.2, roll_amp=2.0, heave_amp=0.25):
     h = math.radians(heading_deg)
     d = Vector((math.cos(h), math.sin(h), 0))
@@ -1290,8 +1360,92 @@ def animate(root, body, heading_deg, start, speed, fps, frames, pitch_amp=1.2, r
         t = (f - 1) / fps
         root.location = Vector(start) + d * speed * t
         root.keyframe_insert("location", frame=f)
-        body.location = (0, 0, heave_amp * math.sin(2 * math.pi * 0.13 * t + 0.4) - 0.15)
-        body.rotation_euler = (math.radians(roll_amp) * math.sin(2 * math.pi * 0.085 * t + 1.1),
-                               math.radians(pitch_amp) * math.sin(2 * math.pi * 0.11 * t), 0)
+        body.location = (0, 0, heave_amp * _swell(t, HEAVE) - 0.15)
+        body.rotation_euler = (math.radians(roll_amp) * _swell(t, ROLL), math.radians(pitch_amp) * _swell(t, PITCH), 0)
         body.keyframe_insert("location", frame=f)
         body.keyframe_insert("rotation_euler", frame=f)
+    for nm, v in (("SailGust", (6.0, 0.0, 0.8)), ("SailFlutter", (14.0, 0.0, 2.0))):
+        e = bpy.data.objects.get(nm)
+        if e is None:
+            continue
+        for f in (0, frames + 1):
+            e.location = Vector(v) * ((f - 1) / fps)
+            e.keyframe_insert("location", frame=f)
+        ad = e.animation_data
+        for fc in _fcurves(ad.action):
+            for kp in fc.keyframe_points:
+                kp.interpolation = "LINEAR"
+
+
+def _fcurves(action):
+    if hasattr(action, "fcurves"):
+        return list(action.fcurves)
+    out = []
+    for layer in action.layers:
+        for strip in layer.strips:
+            for cb in strip.channelbags:
+                out += list(cb.fcurves)
+    return out
+
+
+def flag_cloth(frames, cache_dir, heading_deg=0.0, strength=40.0, noise=1.5, names=("ForeFlag", "MainFlag")):
+    """Flaggen als echte Cloth-Simulation (Blender Cloth + Wind-Kraftfeld) über den ganzen Clip, danach als
+    PC2-Punktcache über einen Mesh-Cache-Modifier eingespielt: jeder Frame ist einzeln renderbar, die Simulation
+    läuft nur beim Aufbau (vor Ozean/Felsen/Crew, damit die Schritte billig bleiben). Liek am Mast gepinnt."""
+    import os
+    import struct
+    os.makedirs(cache_dir, exist_ok=True)
+    sc = bpy.context.scene
+    n = frames + 2
+    flags = [bpy.data.objects[nm] for nm in names if nm in bpy.data.objects]
+    nx, ny = 24, 16
+    for fl in flags:
+        wv = fl.modifiers.get("wave")
+        if wv:
+            fl.modifiers.remove(wv)
+        vg = fl.vertex_groups.new(name="pin")
+        vg.add([j * nx for j in range(ny)], 1.0, "REPLACE")
+        cl = fl.modifiers.new("cloth", "CLOTH")
+        st = cl.settings
+        st.quality = 6
+        st.mass = 0.1
+        st.air_damping = 1.0
+        st.tension_stiffness = st.compression_stiffness = 15.0
+        st.shear_stiffness = 5.0
+        st.bending_stiffness = 0.05
+        st.vertex_group_mass = "pin"
+        cl.point_cache.frame_start = 0
+        cl.point_cache.frame_end = n - 1
+    bpy.ops.object.effector_add(type="WIND", location=(0, 0, 0))
+    wind = bpy.context.active_object
+    wind.field.strength = strength
+    wind.field.noise = noise
+    wind.field.flow = 0.0
+    wind.field.seed = 7
+    # Feld-Z zeigt in Windrichtung: achtern (Flaggen wehen nach hinten), 8° Seitenwind nach Steuerbord
+    wind.rotation_euler = (0.0, math.radians(-90.0), math.radians(heading_deg + 8.0))
+    data = {fl.name: np.zeros((n, nx * ny, 3), dtype=np.float32) for fl in flags}
+    for f in range(n):
+        sc.frame_set(f)
+        dg = bpy.context.evaluated_depsgraph_get()
+        for fl in flags:
+            ev = fl.evaluated_get(dg)
+            a = np.zeros(len(ev.data.vertices) * 3, dtype=np.float32)
+            ev.data.vertices.foreach_get("co", a)
+            data[fl.name][f] = a.reshape(-1, 3)
+    bpy.data.objects.remove(wind, do_unlink=True)
+    for fl in flags:
+        fl.modifiers.remove(fl.modifiers["cloth"])
+        path = os.path.join(cache_dir, fl.name + ".pc2")
+        with open(path, "wb") as fh:
+            fh.write(struct.pack("<12siiffi", b"POINTCACHE2\0", 1, nx * ny, 0.0, 1.0, n))
+            fh.write(data[fl.name].astype("<f4").tobytes())
+        mc = fl.modifiers.new("cloth_cache", "MESH_CACHE")
+        mc.cache_format = "PC2"
+        mc.filepath = path
+        mc.frame_start = 0.0
+        mc.frame_scale = 1.0
+        mc.play_mode = "SCENE"
+        mc.deform_mode = "OVERWRITE"
+    sc.frame_set(1)
+    return data

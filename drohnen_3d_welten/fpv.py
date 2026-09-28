@@ -537,6 +537,79 @@ def _smooth_noise(n, fps, freqs_amps, seed):
     return s
 
 
+def speed_profile(keys, fps, n):
+    """Tempo-Kurve (Speed-Ramp): keys = [(t, v in m/s)], weich (Smoothstep) zwischen den Stützstellen.
+    Frame-Index i entspricht t = (i - 1)/fps. Rückgabe: t[n], v[n], Strecke s[n] mit s(t=0) = 0."""
+    tk = np.array([k[0] for k in keys], dtype=float)
+    vk = np.array([k[1] for k in keys], dtype=float)
+
+    def v_of(tt):
+        tt = np.asarray(tt, dtype=float)
+        j = np.clip(np.searchsorted(tk, tt) - 1, 0, len(tk) - 2)
+        u = np.clip((tt - tk[j]) / (tk[j + 1] - tk[j]), 0, 1)
+        u = u * u * (3 - 2 * u)
+        return vk[j] + (vk[j + 1] - vk[j]) * u
+
+    t = (np.arange(n) - 1) / fps
+    fine = np.linspace(t[0], t[-1], (n - 1) * 16 + 1)
+    vf = v_of(fine)
+    sf = np.concatenate([[0], np.cumsum((vf[1:] + vf[:-1]) * 0.5 * np.diff(fine))])
+    sf -= np.interp(0.0, fine, sf)
+    return t, v_of(t), np.interp(t, fine, sf)
+
+
+def fpv_orient(pos, fps, look_pitch=-3.0, pitch_follow=0.5, bank_gain=1.0, max_bank=32.0, bank_smooth_s=0.35,
+               yaw_smooth_s=0.25, micro=1.0, seed=3, pitch_overrides=None, look=None, bank_look_damp=0.6):
+    """FPV-Ausrichtung für beliebige Positionen pro Frame (z. B. mit Speed-Ramp oder schiffsfester Bahn).
+    Blick entlang der Flugrichtung, koordinierte Schräglage aus der Querbeschleunigung, Piloten-/Mikrokorrekturen.
+    look = (w[n], yaw[n], pitch[n]) in Radiant: Blickziel, mit Gewicht w überblendet (Yaw stetig vorgeben).
+    Rückgabe: (positions[n,3] inkl. Mikro-Versatz, quats[n], info)."""
+    pos = np.array(pos, dtype=float)
+    n = len(pos)
+    t = (np.arange(n) - 1) / fps
+    vel = np.gradient(pos, axis=0) * fps
+    spd = np.linalg.norm(vel, axis=1)
+    fwd = vel / np.maximum(spd, 1e-6)[:, None]
+    yaw = np.unwrap(np.arctan2(fwd[:, 1], fwd[:, 0]))
+    pitch_path = np.arcsin(np.clip(fwd[:, 2], -1, 1))
+    spd_h = np.linalg.norm(vel[:, :2], axis=1)
+    lat = spd_h * np.gradient(yaw) * fps
+    bank = np.arctan2(lat, 9.81) * bank_gain
+    bank = _gauss_smooth(bank, bank_smooth_s * fps)
+    bank = np.clip(bank, -math.radians(max_bank), math.radians(max_bank))
+    yaw_s = _gauss_smooth(yaw, yaw_smooth_s * fps)
+    pitch = _gauss_smooth(pitch_path * pitch_follow + math.radians(look_pitch), 0.3 * fps)
+    if pitch_overrides:
+        for (t0, t1, dd) in pitch_overrides:
+            ramp_len = min(1.0, (t1 - t0) / 3)
+            w = np.minimum(np.clip((t - t0) / ramp_len, 0, 1), np.clip((t1 - t) / ramp_len, 0, 1))
+            pitch += math.radians(dd) * w * w * (3 - 2 * w)
+    if look is not None:
+        w, lyaw, lpitch = (np.asarray(a, dtype=float) for a in look)
+        yaw_s = yaw_s + 2 * np.pi * np.round((lyaw - yaw_s) / (2 * np.pi))   # gleicher Ast wie das Blickziel
+        yaw_s = yaw_s + w * (lyaw - yaw_s)
+        pitch = pitch + w * (lpitch - pitch)
+        bank = bank * (1 - bank_look_damp * w)
+    m = micro
+    roll_n = _smooth_noise(n, fps, [(0.35, 0.55 * m), (1.1, 0.25 * m), (6.5, 0.07 * m), (11.0, 0.035 * m)], seed)
+    pitch_n = _smooth_noise(n, fps, [(0.3, 0.6 * m), (1.3, 0.25 * m), (7.0, 0.08 * m), (13.0, 0.04 * m)], seed + 1)
+    yaw_n = _smooth_noise(n, fps, [(0.25, 0.7 * m), (1.2, 0.25 * m), (7.5, 0.07 * m)], seed + 2)
+    pos_n = np.stack([_smooth_noise(n, fps, [(0.4, 0.10 * m), (1.7, 0.03 * m), (9.0, 0.006 * m)], seed + 10 + k)
+                      for k in range(3)], axis=1)
+    roll = bank + np.radians(roll_n)
+    pitch = pitch + np.radians(pitch_n)
+    yaw_f = yaw_s + np.radians(yaw_n)
+    quats, prev = [], None
+    for i in range(n):
+        f = Vector((math.cos(pitch[i]) * math.cos(yaw_f[i]), math.cos(pitch[i]) * math.sin(yaw_f[i]), math.sin(pitch[i])))
+        q = Quaternion(f, -roll[i]) @ f.to_track_quat("-Z", "Y")
+        if prev is not None and prev.dot(q) < 0:
+            q.negate()
+        prev = q
+        quats.append(q)
+    return pos + pos_n, quats, dict(speed=spd, yaw=yaw_f, pitch=pitch, bank=bank, t=t)
+
+
 def fpv_path(points, speed, fps, frames, start_offset=0.0, look_pitch=-4.0, pitch_follow=0.55,
              bank_gain=1.0, max_bank=38.0, bank_smooth_s=0.35, yaw_smooth_s=0.25,
              micro=1.0, seed=3, pitch_overrides=None, yaw_lead_s=0.0, roll_bias=None):

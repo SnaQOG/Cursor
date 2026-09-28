@@ -29,49 +29,139 @@ import sunny  # noqa: E402
 
 FPS = 24
 SECONDS = 20
-SPEED = 15.0
 SUN_ELEV, SUN_AZIM = 32.0, 200.0
 
-ROUTE = [
-    (0, -8, 3.0), (0, 40, 3.1), (-1, 80, 3.4), (9, 118, 4.3), (13, 150, 5.4), (4, 184, 7.0),
-    (-18, 207, 8.7), (-45, 231, 9.1), (-75, 254, 9.3), (-108, 276, 9.0), (-140, 296, 8.5),
-]
-CAM = dict(look_pitch=-3.0, pitch_follow=0.5, bank_gain=1.0, max_bank=32, micro=1.0, seed=5,
-           pitch_overrides=[(14.0, 16.4, -9.0)])      # beim Anflug leicht auf das Deck hinunterblicken
-
+# ---- Schiff: fährt nach Osten (+X); Steuerbord zeigt nach Süden, zur anfliegenden Kamera
+SHIP_HEADING = 0.0
 SHIP_SPEED = 3.0
-T_CROSS = 16.0      # Zeitpunkt des Überflugs über die Mittellinie
-CROSS_X = -1.5      # Schiffs-X der Überflugstelle (zwischen Fockmast 2,9 und Achterkastell -5,2)
+SHIP_START = Vector((-19.0, 201.0, 0.0))   # schon im ersten Bild am Horizont, in der Lücke des Felsentors
+
+# ---- Kamera: feste 28-mm-Brennweite (Vollformat-Äquivalent, lange Bildseite 36 mm), Speed-Ramp,
+#      erster Teil weltfest durch die Felsen, zweiter Teil schiffsfest (langsamer Deck-Überflug, Rückblick)
+LENS_MM = 28.0
+SPEED_KEYS = [(0.0, 18.0), (2.0, 18.0), (2.8, 21.0), (8.8, 21.0), (10.8, 6.5), (11.4, 4.5), (14.8, 4.5),
+              (15.8, 7.0), (17.0, 11.0), (18.6, 11.0), (20.2, 8.0)]
+WORLD_ROUTE = [(0, -8, 3.0), (0, 35, 3.1), (-1, 78, 3.3), (18, 124, 3.9), (16, 150, 4.6), (14, 166, 5.6)]
+SHIP_ROUTE = [(1.0, -22.0, 7.8), (-1.5, -11.0, 9.2), (-1.5, -7.5, 9.2), (-1.45, 0.0, 9.0), (-1.5, 7.5, 9.8),
+              (-0.8, 12.5, 11.0), (3.5, 19.0, 13.2), (10.0, 25.5, 16.2), (17.5, 31.0, 19.0), (25.0, 35.5, 21.0),
+              (31.0, 39.0, 22.2), (38.0, 43.5, 23.6), (46.0, 48.5, 25.0), (54.0, 53.5, 26.4), (62.0, 58.5, 27.8)]
+BLEND_M = 8.0          # Übergang weltfest -> schiffsfest über ±8 m Bahnlänge
+LOOK = dict(mid=(-1.2, -3.2, 5.0), castle=(-6.2, -1.8, 10.8),
+            ship=(0.0, 0.0, 13.0))
+
+
+def ship_xform(t):
+    """Weltlage des Schiffsrumpfs (ohne Stampfen/Rollen) zur Zeit t: (Ort, Rotationsmatrix 3x3)."""
+    h = math.radians(SHIP_HEADING)
+    d = Vector((math.cos(h), math.sin(h), 0))
+    R = np.array([[math.cos(h), -math.sin(h), 0], [math.sin(h), math.cos(h), 0], [0, 0, 1]])
+    return np.array(SHIP_START + d * SHIP_SPEED * t), R
+
+
+def ship_course(pos=None):
+    return SHIP_HEADING, SHIP_START
+
+
+def _arc(points):
+    c = fpv._catmull_rom(points)
+    sa = np.concatenate([[0], np.cumsum(np.linalg.norm(np.diff(c, axis=0), axis=1))])
+    return c, sa
+
+
+def _eval(c, sa, s):
+    """Punkt bei Bogenlänge s; außerhalb linear entlang der End-Tangenten verlängert."""
+    s = float(s)
+    if s < 0:
+        d = (c[1] - c[0]) / np.linalg.norm(c[1] - c[0])
+        return c[0] + d * s
+    if s > sa[-1]:
+        d = (c[-1] - c[-2]) / np.linalg.norm(c[-1] - c[-2])
+        return c[-1] + d * (s - sa[-1])
+    return np.array([np.interp(s, sa, c[:, k]) for k in range(3)])
+
+
+def _dir(v):
+    return math.atan2(v[1], v[0]), math.atan2(v[2], math.hypot(v[0], v[1]))
+
+
+def _smooth(x0, x1, t):
+    u = np.clip((t - x0) / (x1 - x0), 0, 1)
+    return u * u * (3 - 2 * u)
 
 
 def camera_path(frames):
-    return fpv.fpv_path(ROUTE, SPEED, FPS, frames, **CAM)
+    """Kamerafahrt mit Speed-Ramp. Bis ~9 s weltfeste Route durch die Felsen, danach eine Bahn im Schiffssystem
+    (+X Bug, +Y Backbord): Anflug auf Steuerbord, Überflug quer übers Rasendeck mit 4,5 m/s relativ zum
+    Schiff, Rückblick-Schwenk und Rückzug, die Sunny steht am Ende vor der tiefen Sonne."""
+    n = frames + 2
+    t, v, s = fpv.speed_profile(SPEED_KEYS, FPS, n)
+    cw, sw = _arc(WORLD_ROUTE)
+    Lw = sw[-1]
+    t_join = float(np.interp(Lw, s, t))
+    loc0, R0 = ship_xform(t_join)
+    L0 = R0.T @ (np.array(WORLD_ROUTE[-1], dtype=float) - loc0)
+    cl, sl = _arc([tuple(L0)] + SHIP_ROUTE)
+    pos = np.zeros((n, 3))
+    local = np.zeros((n, 3))
+    for i in range(n):
+        loc, R = ship_xform(t[i])
+        pw = _eval(cw, sw, s[i])
+        pl = loc + R @ _eval(cl, sl, s[i] - Lw)
+        w = _smooth(Lw - BLEND_M, Lw + BLEND_M, s[i])
+        pos[i] = pw * (1 - w) + pl * w
+        local[i] = R.T @ (pos[i] - loc)
+    # ---- Blickziel-Kette im Schiffssystem (weich überblendet): Schiffsmitte -> Crew auf dem Rasen (voraus) ->
+    #      Achterkastell mit Franky -> ganzes Schiff. Stetiger Schwenk gegen den Uhrzeigersinn (das Fock-Segel
+    #      würde den Blick zum Bug versperren).
+    keys = [(9.0, "mid"), (11.0, "mid"), (11.6, "lawn"), (11.9, "lawn"), (13.5, "castle"), (14.7, "castle"),
+            (16.9, "ship"), (99.0, "ship")]
+    kt = [k[0] for k in keys]
+    look_yaw, look_pit = np.zeros(n), np.zeros(n)
+
+    def target(name, i):
+        if name == "lawn":        # mitwandernd ~7 m voraus auf dem Rasen (nie senkrecht nach unten)
+            return np.array([local[i, 0] + 1.0, local[i, 1] + 7.0, 4.6])
+        return np.array(LOOK[name])
+    for i in range(n):
+        j = int(np.clip(np.searchsorted(kt, t[i]) - 1, 0, len(keys) - 2))
+        u = float(_smooth(kt[j], kt[j + 1], t[i]))
+        tl = target(keys[j][1], i) * (1 - u) + target(keys[j + 1][1], i) * u
+        loc, R = ship_xform(t[i])
+        look_yaw[i], look_pit[i] = _dir(loc + R @ tl - pos[i])
+    look_yaw = np.unwrap(look_yaw)
+    w = 0.55 * _smooth(9.0, 10.4, t) + 0.45 * _smooth(10.4, 11.0, t)
+    pos_f, quats, info = fpv.fpv_orient(pos, FPS, look_pitch=-3.0, pitch_follow=0.5, bank_gain=1.0, max_bank=32,
+                                        micro=1.0, seed=5, look=(w, look_yaw, look_pit))
+    info.update(t_join=t_join, local=local, s=s, v=v, used=s[-1] - s[0], total=sl[-1] + Lw)
+    return pos_f, quats, info
 
 
-def ship_course(pos):
-    """Kurs und Startpunkt der Sunny aus der Kamerabahn: Die Kamera kreuzt bei T_CROSS die Mittellinie an
-    Schiffs-X = CROSS_X, und zwar relativ zum fahrenden Schiff genau quer (Kamerarichtung = Backbord um
-    asin(v_Schiff / v_Kamera) Richtung Bug gedreht)."""
-    i = int(round(T_CROSS * FPS)) + 1
-    h = Vector(pos[i + 6]) - Vector(pos[i - 6])
-    cam_heading = math.degrees(math.atan2(h.y, h.x))
-    heading = cam_heading - 90.0 + math.degrees(math.asin(SHIP_SPEED / SPEED))
-    d = Vector((math.cos(math.radians(heading)), math.sin(math.radians(heading)), 0))
-    c = Vector((pos[i][0], pos[i][1], 0))
-    p_cross = c - d * CROSS_X
-    return heading, p_cross - d * SHIP_SPEED * T_CROSS
+def sound_markers(info):
+    """Zeitmarken für das Sounddesign aus der tatsächlichen Bahn."""
+    t, local, pos = info["t"], info["local"], info["pos"]
+
+    def when(cond):
+        idx = np.where(cond)[0]
+        return float(t[idx[0]]) if len(idx) else None
+    gate = when(pos[:, 1] > 76.0)
+    rock = when(pos[:, 1] > 128.0)
+    rail_in = when((local[:, 1] > -7.5) & (t > 5))
+    rail_out = when((local[:, 1] > 7.5) & (t > 5))
+    m = [("AMBIENCE", 0.0), ("WHOOSH", gate), ("WHOOSH", rock), ("WHOOSH", rail_in), ("BEAT_DROP", rail_in),
+         ("WHOOSH", rail_out), ("AMBIENCE", 17.0)]
+    return [(name, tt) for name, tt in m if tt is not None]
 
 
 ROCKS = [
     # (x, y, radius, height, seed, taper)
-    (-17, 70, 9.0, 30, 11, 0.35),    # Tor links
+    (-19, 70, 9.0, 30, 11, 0.35),    # Tor links
     (15, 82, 7.0, 20, 12, 0.45),     # Tor rechts
-    (-20, 150, 20.0, 62, 13, 0.25),  # große Felsnadel (verdeckt das Schiff)
+    (-48, 158, 20.0, 62, 13, 0.25),  # große Felsnadel (seitlich, gibt den Blick aufs Schiff frei)
     (-38, 38, 4.0, 7, 14, 0.5),
     (27, 48, 3.0, 4, 15, 0.6),
     (30, 128, 5.5, 12, 16, 0.4),
     (-52, 118, 8.0, 26, 17, 0.35),
-    (40, 200, 6.0, 15, 18, 0.4),
+    (64, 178, 6.0, 15, 18, 0.4),
     (-5, 262, 3.5, 5, 19, 0.6),
     (-150, 205, 12.0, 38, 20, 0.3),
     (70, 110, 10.0, 34, 21, 0.3),
@@ -155,8 +245,10 @@ def build(args):
     fpv.add_sun(SUN_ELEV, SUN_AZIM, strength=5.2, color=(1.0, 0.9, 0.78))
 
     pos, quats, info = camera_path(frames)
-    heading, start = ship_course(pos)
-    print(f"Sunny: Kurs {heading:.1f} Grad, Start {tuple(round(v, 2) for v in start)}")
+    info["pos"] = pos
+    heading, start = ship_course()
+    print(f"Sunny: Kurs {heading:.1f} Grad, Start {tuple(round(v, 2) for v in start)}, "
+          f"Übergang schiffsfeste Bahn bei {info['t_join']:.2f} s")
 
     # Schiff mit der Strohhutbande an Bord
     root, body, _ = sunny.build()
@@ -254,8 +346,15 @@ def build(args):
     island("IslandFar", -300, 2600, 700, 420, 34, imat)
 
     # Kamera
-    fpv.make_camera(pos, quats, fov_deg=92.0)
-    print(f"route length {info['total']:.1f} m, used {info['used']:.1f} m")
+    cam = fpv.make_camera(pos, quats, fov_deg=92.0)
+    cam.data.sensor_fit = "VERTICAL"
+    cam.data.sensor_height = 36.0          # 9:16 hochkant: lange Seite = 36 mm (Vollformat-Äquivalent)
+    cam.data.lens_unit = "MILLIMETERS"
+    cam.data.lens = LENS_MM
+    for name, tt in sound_markers(info):
+        sc.timeline_markers.new(name, frame=int(round(tt * FPS)) + 1)
+    print(f"Bahnlänge {info['used']:.1f} m, Tempo {info['v'].min():.1f}–{info['v'].max():.1f} m/s, "
+          f"Marker {[(n, round(t, 2)) for n, t in sound_markers(info)]}")
     return sc
 
 

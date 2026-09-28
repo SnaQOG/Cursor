@@ -1351,6 +1351,13 @@ ROLL = ((1.0, 0.085, 1.1), (0.3, 0.21, 0.3), (0.12, 0.47, 2.5), (0.05, 0.97, 5.1
 PITCH = ((1.0, 0.11, 0.0), (0.33, 0.26, 1.7), (0.12, 0.61, 0.9), (0.05, 1.21, 3.3))
 
 
+def bow_down_speed(t, x=X_B, pitch_amp=1.2, heave_amp=0.25, dt=0.02):
+    """Abwärtsgeschwindigkeit des Bugs (m/s) aus Tauchen + Stampfen (für Gischtstöße)."""
+    def z(tt):
+        return heave_amp * _swell(tt, HEAVE) - x * math.sin(math.radians(pitch_amp * _swell(tt, PITCH)))
+    return -(z(t + dt) - z(t - dt)) / (2 * dt)
+
+
 def animate(root, body, heading_deg, start, speed, fps, frames, pitch_amp=1.2, roll_amp=2.0, heave_amp=0.25):
     h = math.radians(heading_deg)
     d = Vector((math.cos(h), math.sin(h), 0))

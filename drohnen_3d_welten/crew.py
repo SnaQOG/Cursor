@@ -389,11 +389,11 @@ def place_crew(body, frames, sunny):
     put(jinbe((0, 0, 0), 0), (6.75, 0.0, 0), BOW, "helm", ground=Z_FORE)
     put(brook((0, 0, 0), 0), (8.9, -1.5, 0), SB - 25, ground=Z_FORE, anim=["violin", "violin_b"], period=16)
     # Lysop und Chopper auf dem Rasen an der Steuerbord-Bordwand, genau wo die Drohne übers Deck fliegt
-    put(usopp((0, 0, 0), 0), (-2.1, -4.5, 0), SB, ground=Z_DECK, anim=["wave_up", "wave_up2"], period=12)
-    put(chopper((0, 0, 0), 0), (-0.8, -4.5, 0), SB + 10, ground=Z_DECK, anim=["wave_up", "wave_up2"], period=10)
-    put(nami((0, 0, 0), 0), (0.3, -2.7, 0), SB - 25, ground=Z_DECK, anim=["wave_R", "wave_R2"], period=16)
+    put(usopp((0, 0, 0), 0), (-2.0, -1.0, 0), SB, ground=Z_DECK, anim=["wave_up", "wave_up2"], period=12)
+    put(chopper((0, 0, 0), 0), (-0.7, -0.8, 0), SB + 10, ground=Z_DECK, anim=["wave_up", "wave_up2"], period=10)
+    put(nami((0, 0, 0), 0), (0.6, 0.6, 0), SB - 25, ground=Z_DECK, anim=["wave_R", "wave_R2"], period=16)
     put(zoro((0, 0, 0), 0), (2.95, -0.62, 0), SB, "nap", ground=Z_DECK)
-    put(sanji((0, 0, 0), 0), (-2.5, -1.3, 0), SB - 40, "pockets", ground=Z_DECK)
+    put(sanji((0, 0, 0), 0), (-3.2, 0.6, 0), SB - 40, "pockets", ground=Z_DECK)
     put(robin((0, 0, 0), 0), (-2.95, 2.3, 0), SB + 30, "read", seat=Z_DECK + 0.45)
     chair = fpv.simple_mat("DeckChair", (0.75, 0.70, 0.62), rough=0.6)
     for nm, a, b in (("ChairSeat", (-3.35, 1.9, Z_DECK + 0.33), (-2.55, 2.7, Z_DECK + 0.45)),

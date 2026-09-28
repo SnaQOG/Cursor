@@ -18,6 +18,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import bpy  # noqa: E402
+import bmesh  # noqa: E402,I100
 import numpy as np  # noqa: E402
 from mathutils import Vector  # noqa: E402
 
@@ -29,7 +30,14 @@ import sunny  # noqa: E402
 
 FPS = 24
 SECONDS = 20
-SUN_ELEV, SUN_AZIM = 32.0, 200.0
+SUN_ELEV, SUN_AZIM = 14.0, 195.0   # tiefe Abendsonne aus SSW: Deck frei von Kastell-Schatten, am Ende hinter dem Schiff
+SUN_KELVIN = 4300.0
+SUN_DISC_DEG = 0.4       # sichtbare Sonnenscheibe (Radius) für die Gegenlicht-Silhouette am Ende
+RIM = dict(elev=24.0, azim=25.0, strength=2.2, kelvin=7800.0, angle=3.0)   # kühles Randlicht, nur Schiff + Crew
+RIM_FADE = (15.5, 17.0)                                                      # Randlicht aus, bevor die Kamera zurückblickt
+# Homogenes Dunst-Volumen: getestet (0.0012/m: +33 % Renderzeit, aber bei 16 Samples extrem verrauscht) -> aus;
+# Tiefendunst kommt aus post.py (haze_sky). Mit GPU und 128+ Samples über NIDO_ATMO einschaltbar.
+ATMO_DENSITY = float(os.environ.get("NIDO_ATMO", "0.0"))
 
 # ---- Schiff: fährt nach Osten (+X); Steuerbord zeigt nach Süden, zur anfliegenden Kamera
 SHIP_HEADING = 0.0
@@ -43,10 +51,10 @@ SPEED_KEYS = [(0.0, 18.0), (2.0, 18.0), (2.8, 21.0), (8.8, 21.0), (10.8, 6.5), (
               (15.8, 7.0), (17.0, 11.0), (18.6, 11.0), (20.2, 8.0)]
 WORLD_ROUTE = [(0, -8, 3.0), (0, 35, 3.1), (-1, 78, 3.3), (18, 124, 3.9), (16, 150, 4.6), (14, 166, 5.6)]
 SHIP_ROUTE = [(1.0, -22.0, 7.8), (-1.5, -11.0, 9.2), (-1.5, -7.5, 9.2), (-1.45, 0.0, 9.0), (-1.5, 7.5, 9.8),
-              (-0.8, 12.5, 11.0), (3.5, 19.0, 13.2), (10.0, 25.5, 16.2), (17.5, 31.0, 19.0), (25.0, 35.5, 21.0),
-              (31.0, 39.0, 22.2), (38.0, 43.5, 23.6), (46.0, 48.5, 25.0), (54.0, 53.5, 26.4), (62.0, 58.5, 27.8)]
+              (-0.6, 12.5, 11.0), (1.5, 19.0, 13.2), (4.0, 26.0, 16.0), (6.5, 33.0, 18.8), (9.0, 40.0, 21.3),
+              (11.5, 47.0, 23.4), (14.0, 54.0, 25.4), (16.5, 61.0, 27.2), (19.0, 68.0, 29.0)]
 BLEND_M = 8.0          # Übergang weltfest -> schiffsfest über ±8 m Bahnlänge
-LOOK = dict(mid=(-1.2, -3.2, 5.0), castle=(-6.2, -1.8, 10.8),
+LOOK = dict(mid=(-1.0, -0.5, 5.0), castle=(-6.2, -1.8, 10.8),
             ship=(0.0, 0.0, 13.0))
 
 
@@ -172,6 +180,45 @@ ROCKS = [
 ]
 
 
+def add_rim_light(ship_root):
+    """Kühles Randlicht von schräg hinten (Norden), per Light Linking nur auf Schiff und Crew."""
+    coll = bpy.data.collections.new("RimReceivers")
+    bpy.context.scene.collection.children.link(coll)
+    stack = list(ship_root.children)
+    while stack:
+        o = stack.pop()
+        stack.extend(o.children)
+        if o.type in ("MESH", "CURVE"):
+            coll.objects.link(o)
+    coll.hide_render = False
+    rim = fpv.add_sun(RIM["elev"], RIM["azim"], strength=RIM["strength"], color=(1, 1, 1), angle_deg=RIM["angle"],
+                      name="RimLight")
+    rim.data.use_temperature, rim.data.temperature = True, RIM["kelvin"]
+    rim.light_linking.receiver_collection = coll
+    for f, e in ((1, RIM["strength"]), (int(RIM_FADE[0] * FPS) + 1, RIM["strength"]), (int(RIM_FADE[1] * FPS) + 1, 0.0)):
+        rim.data.energy = e
+        rim.data.keyframe_insert("energy", frame=f)
+    return rim
+
+
+def add_atmosphere(density, size=(1600.0, 1600.0, 300.0), center=(0.0, 250.0)):
+    """Homogenes Streuvolumen als Box um die Szene (endlich, damit der Himmel nicht zugenebelt wird):
+    Tiefendunst und Lichtschleier um die tiefe Sonne (Vorwärtsstreuung)."""
+    bm = bmesh.new()
+    bmesh.ops.create_cube(bm, size=1.0)
+    bmesh.ops.scale(bm, vec=size, verts=bm.verts)
+    bmesh.ops.translate(bm, vec=(center[0], center[1], size[2] / 2 + 0.3), verts=bm.verts)
+    mat, nb, out = fpv.new_material("Atmosphere")
+    vol = nb.node("ShaderNodeVolumePrincipled")
+    vol.inputs["Color"].default_value = (0.92, 0.95, 1.0, 1)
+    vol.inputs["Density"].default_value = density
+    vol.inputs["Anisotropy"].default_value = 0.65
+    nb.link(vol.outputs[0], out.inputs["Volume"])
+    ob = fpv.mesh_from_bmesh(bm, "Atmosphere", mat)
+    ob.visible_shadow = True
+    return ob
+
+
 def foam_builder(shore_img, shore_map, max_d=12.0):
     """Schaum aus GN-Attributen 'wake' + 'hull_foam' und Brandung aus dem Fels-Abstandsfeld."""
 
@@ -241,8 +288,11 @@ def build(args):
     fpv.setup_render(args.out, res=args.res, fps=FPS, seconds=SECONDS, samples=args.samples,
                      motion_blur=not args.no_mblur, mist_depth=6000.0)
     fpv.build_world(sun_elev=SUN_ELEV, sun_azim=SUN_AZIM, sky_strength=0.08, clouds=True, cloud_cover=0.42,
-                    cloud_ref=9.0, aerosol=0.5, ozone=2.0)
-    fpv.add_sun(SUN_ELEV, SUN_AZIM, strength=5.2, color=(1.0, 0.9, 0.78))
+                    cloud_ref=9.0, aerosol=0.5, ozone=2.0,
+                    extra_suns=[(SUN_ELEV, SUN_AZIM, SUN_DISC_DEG, 6000.0, (1.0, 0.86, 0.62))])
+    fpv.add_sun(SUN_ELEV, SUN_AZIM, strength=5.2, color=(1.0, 1.0, 1.0))
+    key = bpy.data.objects["Sun"].data
+    key.use_temperature, key.temperature = True, SUN_KELVIN
 
     pos, quats, info = camera_path(frames)
     info["pos"] = pos
@@ -254,6 +304,9 @@ def build(args):
     root, body, _ = sunny.build()
     sunny.animate(root, body, heading, tuple(start), SHIP_SPEED, FPS, frames)
     crew.place_crew(body, frames, sunny)
+    add_rim_light(root)
+    if ATMO_DENSITY > 0:
+        add_atmosphere(ATMO_DENSITY)
     hull = bpy.data.objects["Hull"]
     rng = np.random.default_rng(77)
 

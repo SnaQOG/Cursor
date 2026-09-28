@@ -79,11 +79,39 @@ def composite(path, P):
     L = P["haze_dist"]
     T = np.exp(-np.maximum(dist - P.get("haze_start", 0.0), 0) / L)
     haze = np.array(P["haze_color"], np.float32)
+    if P.get("haze_sky"):
+        haze = sky_haze(env, alpha, haze)[None, :, :]
     a3 = alpha[..., None]
     T3 = T[..., None]
     obj_h = obj * T3 + haze * (1 - T3) * a3
     img = obj_h + env
     return img.astype(np.float32)
+
+
+def sky_haze(env, alpha, fallback, band=0.035, blur=0.06):
+    """Dunstfarbe pro Bildspalte = Himmelsfarbe knapp über dem Horizont in dieser Spalte (Env-Pass):
+    ferne Objekte verschwinden im tatsächlichen Himmel dahinter – warm zur Sonne hin, kühl auf der Gegenseite."""
+    h, w = alpha.shape
+    sky = alpha < 0.05
+    has = sky.any(axis=0)
+    low = h - 1 - np.argmax(sky[::-1], axis=0)            # unterstes Himmelspixel je Spalte
+    k = max(2, int(band * h))
+    cols = np.tile(np.array(fallback, np.float32), (w, 1))
+    for x in np.where(has)[0]:
+        r0 = max(0, low[x] - k)
+        m = sky[r0:low[x] + 1, x]
+        if m.any():
+            cols[x] = env[r0:low[x] + 1, x][m].mean(axis=0)
+    if has.any() and not has.all():                           # Spalten ohne Himmel: von Nachbarn übernehmen
+        xs = np.where(has)[0]
+        for c in range(3):
+            cols[:, c] = np.interp(np.arange(w), xs, cols[xs, c])
+    sig = blur * w
+    r = int(3 * sig)
+    kern = np.exp(-0.5 * (np.arange(-r, r + 1) / sig) ** 2)
+    kern /= kern.sum()
+    pad = np.pad(cols, ((r, r), (0, 0)), mode="edge")
+    return np.stack([np.convolve(pad[:, c], kern, mode="valid") for c in range(3)], axis=1).astype(np.float32)
 
 
 def luminance(img):

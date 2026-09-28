@@ -62,3 +62,6 @@ Die Cloud-Renderings wurden aus Zeitgründen (4 CPU-Kerne, keine GPU) mit 720×1
 + KI-Entrauschen gerendert und im Post auf 1080×1920 skaliert. Mit GPU lohnt `--res 1080x1920 --samples 48`.
 `--frames 1,120,240` rendert nur einzelne Vorschaubilder; das Rendern ist fortsetzbar (fertige Frames
 werden übersprungen).
+One Piece simuliert beim Aufbau die Flaggen (Cloth) und berechnet die Bug-Gischt vor; beides landet als
+PC2-Punktcache in `<out>_cache` (oder `NIDO_CACHE`), damit jeder Frame einzeln renderbar bleibt. Die
+Sounddesign-Marker (WHOOSH, BEAT_DROP, AMBIENCE) stehen zusätzlich in `<out>/sound_markers.csv`.

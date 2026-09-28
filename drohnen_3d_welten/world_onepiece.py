@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bpy  # noqa: E402
 import bmesh  # noqa: E402,I100
 import numpy as np  # noqa: E402
-from mathutils import Vector  # noqa: E402
+from mathutils import Euler, Vector  # noqa: E402
 
 import crew  # noqa: E402
 import fpv  # noqa: E402
@@ -140,7 +140,19 @@ def camera_path(frames):
     w = 0.55 * _smooth(9.0, 10.4, t) + 0.45 * _smooth(10.4, 11.0, t)
     pos_f, quats, info = fpv.fpv_orient(pos, FPS, look_pitch=-3.0, pitch_follow=0.5, bank_gain=1.0, max_bank=32,
                                         micro=1.0, seed=5, look=(w, look_yaw, look_pit))
-    info.update(t_join=t_join, local=local, s=s, v=v, used=s[-1] - s[0], total=sl[-1] + Lw)
+    # Impact-Paket (BEAT_DROP beim Überfliegen der Reling): kurzer, abklingender Kamerastoß
+    idx = np.where((local[:, 1] > -7.5) & (t > 5))[0]
+    t_imp = float(t[idx[0]]) if len(idx) else None
+    if t_imp is not None:
+        for i in np.where((t >= t_imp) & (t < t_imp + IMPACT["dur"]))[0]:
+            dt = t[i] - t_imp
+            env = math.exp(-dt / IMPACT["decay"])
+            ph = 2 * math.pi * IMPACT["freq"] * dt
+            e = Euler((math.radians(IMPACT["pitch"]) * env * math.sin(ph + 0.6), 0.0,
+                       math.radians(IMPACT["roll"]) * env * math.sin(ph)))
+            quats[i] = quats[i] @ e.to_quaternion()
+            pos_f[i, 2] -= IMPACT["drop"] * env * abs(math.sin(ph * 0.5))
+    info.update(t_join=t_join, local=local, s=s, v=v, used=s[-1] - s[0], total=sl[-1] + Lw, t_impact=t_imp)
     return pos_f, quats, info
 
 
@@ -165,6 +177,11 @@ ROCK_GEO = dict(flute=0.035, ledges=0.04, bed=(1.6, 3.2))       # Karstrinnen ha
 ROCK_SHADE = dict(variation=0.3, bedding=0.6, bed_h=1.4, streak=0.35)
 WATER_VIEW_DARK = 0.45   # senkrecht ins Wasser 45 % dunkler, flach +11 %
 WATER_MICRO = 1.0        # feine Kräuselung mit Windflecken
+
+# FX (Schritt 3.5)
+CACHE_DIR = os.environ.get("NIDO_CACHE")   # PC2-Caches (Flaggen, Gischt); Standard: <out>_cache
+SPRAY = dict(base_rate=200.0, burst_rate=900.0, v_up=(2.2, 5.5), radius=(0.02, 0.16))   # Tropfen/s, m/s, m
+IMPACT = dict(roll=1.2, pitch=0.7, freq=11.0, decay=0.11, dur=0.45, drop=0.04)   # Grad, Hz, s, m
 
 ROCKS = [
     # (x, y, radius, height, seed, taper)
@@ -307,7 +324,7 @@ def build(args):
     # Schiff mit der Strohhutbande an Bord
     root, body, _ = sunny.build()
     sunny.animate(root, body, heading, tuple(start), SHIP_SPEED, FPS, frames)
-    sunny.flag_cloth(frames, os.environ.get("NIDO_CACHE", args.out.rstrip("/") + "_cache"), heading_deg=heading)
+    sunny.flag_cloth(frames, CACHE_DIR or args.out.rstrip("/") + "_cache", heading_deg=heading)
     crew.place_crew(body, frames, sunny, cam_pos=pos)
     add_rim_light(root)
     if ATMO_DENSITY > 0:
@@ -393,6 +410,9 @@ def build(args):
     oc = ocean.make_ocean(x0, y0, nx, ny, tile=tile, res=res, wind=9.5, wave_scale=0.9, chop=1.3, fps=FPS,
                           frames=frames, mat=wmat, direction_deg=-30, alignment=0.4, foam_coverage=0.25)
     ocean.ocean_fx_gn(oc, root, hull, bow_x=sunny.X_B, stern_x=sunny.X_S, hull_halfbeam=sunny.B2)
+    ocean.bow_spray(root, frames, FPS, CACHE_DIR or args.out.rstrip("/") + "_cache", bow_x=sunny.X_B,
+                    stern_x=sunny.X_S, halfbeam=sunny.B2, bow_motion=sunny.bow_down_speed, ship_speed=SHIP_SPEED,
+                    **SPRAY)
     far = ocean.water_material("FarSea", deep=(0.005, 0.06, 0.19), shallow=(0.015, 0.21, 0.33), far=True)
     ocean.far_plane(x0 - tile / 2 + 1, x0 - tile / 2 + tile * nx - 1, y0 - tile / 2 + 1, y0 - tile / 2 + tile * ny - 1,
                     mat=far, z=-0.05)
@@ -412,10 +432,17 @@ def build(args):
     cam.data.sensor_height = 36.0          # 9:16 hochkant: lange Seite = 36 mm (Vollformat-Äquivalent)
     cam.data.lens_unit = "MILLIMETERS"
     cam.data.lens = LENS_MM
-    for name, tt in sound_markers(info):
+    marks = sound_markers(info)
+    for name, tt in marks:
         sc.timeline_markers.new(name, frame=int(round(tt * FPS)) + 1)
+    # Sounddesign-Liste neben den Frames (Name, Sekunde, Frame)
+    os.makedirs(args.out, exist_ok=True)
+    with open(os.path.join(args.out, "sound_markers.csv"), "w") as fh:
+        fh.write("marker,seconds,frame\n")
+        for name, tt in marks:
+            fh.write(f"{name},{tt:.2f},{int(round(tt * FPS)) + 1}\n")
     print(f"Bahnlänge {info['used']:.1f} m, Tempo {info['v'].min():.1f}–{info['v'].max():.1f} m/s, "
-          f"Marker {[(n, round(t, 2)) for n, t in sound_markers(info)]}")
+          f"Marker {[(n, round(t, 2)) for n, t in marks]}, Impact {info['t_impact']:.2f} s")
     return sc
 
 

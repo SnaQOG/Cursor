@@ -338,3 +338,122 @@ def shore_distance_image(rocks, xmin, ymin, xmax, ymax, cell=0.5, max_d=12.0, na
     img = bpy.data.images.load(path, check_existing=False)
     img.colorspace_settings.name = "Non-Color"
     return img, (xmin, ymin, xmax - xmin, ymax - ymin)
+
+
+def bow_spray(ship_root, frames, fps, cache_dir, bow_x=10.0, stern_x=-11.2, halfbeam=6.0, bow_motion=None,
+              ship_speed=3.0, base_rate=140.0, burst_rate=900.0, seed=11, name="BowSpray", v_up=(1.6, 4.2),
+              radius=(0.015, 0.1)):
+    """Gischt am Bug als Punktwolke (Cycles-Punkte), deterministisch vorberechnet und als PC2-Cache eingespielt:
+    - Geburt an der Wasserlinie der vorderen 5 m des Rumpfs (beide Seiten), Rate = Grundrate + Stoßrate,
+      wenn der Bug durch Stampfen/Tauchen nach unten geht (bow_motion(t) -> Abwärtsgeschwindigkeit in m/s).
+    - Flugbahn im Schiffssystem: Anfangsgeschwindigkeit nach außen/oben, Schwerkraft, lineare Luftreibung
+      gegen den Fahrtwind (Luft bewegt sich relativ zum Schiff mit -ship_speed in X). Stirbt beim Eintauchen.
+    - Feste Punktzahl (Pool), tote Punkte liegen 20 m unter Wasser. Jeder Frame ist einzeln renderbar."""
+    import os
+    import struct
+    rng = np.random.default_rng(seed)
+    n = frames + 2
+    t_frames = (np.arange(n) - 1.0) / fps
+    # Geburten per inverser CDF der Rate über [-2 s, Ende]
+    tt = np.linspace(-2.0, t_frames[-1], 4000)
+    down = np.array([max(0.0, bow_motion(x)) for x in tt]) if bow_motion else np.zeros_like(tt)
+    rate = base_rate + burst_rate * np.clip(down / 0.4, 0.0, 2.5)
+    cdf = np.concatenate([[0.0], np.cumsum(0.5 * (rate[1:] + rate[:-1]) * np.diff(tt))])
+    m = int(cdf[-1])
+    births = np.interp(np.sort(rng.uniform(0, cdf[-1], m)), cdf, tt)
+    burst = np.interp(births, tt, np.clip(down / 0.4, 0.0, 2.5))
+    # Startpunkte an der Wasserlinien-Kontur (Superellipse wie der Rumpfschaum)
+    half_len = (bow_x - stern_x) / 2 + 0.3
+    xc0 = (bow_x + stern_x) / 2
+    x0 = bow_x - 5.0 * rng.random(m) ** 1.8
+    yb = halfbeam * np.sqrt(np.clip(1 - np.abs((x0 - xc0) / half_len) ** 2.6, 0.0, 1.0))
+    side = np.where(rng.random(m) < 0.5, -1.0, 1.0)
+    p0 = np.stack([x0, side * (yb + 0.08), np.full(m, 0.12)], axis=1)
+    fwd = np.clip((x0 - (bow_x - 5.0)) / 5.0, 0, 1)            # am Steven kräftiger
+    v0 = np.stack([rng.uniform(-0.4, 1.2, m),
+                   side * rng.uniform(1.2, 3.6, m) * (0.7 + 0.5 * fwd),
+                   rng.uniform(v_up[0], v_up[1], m) * (0.55 + 0.25 * fwd + 0.25 * burst)], axis=1)
+    k = 1.3
+    g = np.array([0.0, 0.0, -9.81])
+    v_air = np.array([-ship_speed, 0.0, 0.0])
+    v_inf = v_air + g / k
+
+    def traj(age):
+        e = np.exp(-k * age)[:, None]
+        return p0 + v_inf[None, :] * age[:, None] + (v0 - v_inf[None, :]) * (1 - e) / k
+
+    # Lebensdauer: bis z < -0.05 (numerisch) oder 2,2 s
+    ages = np.linspace(0, 2.2, 221)
+    life = np.full(m, 2.2)
+    alive = np.ones(m, bool)
+    for a in ages[1:]:
+        z = traj(np.full(m, a))[:, 2]
+        hit = alive & (z < -0.05)
+        life[hit] = a
+        alive &= ~hit
+    death = births + life
+    # Slots vergeben (Pool)
+    order = np.argsort(births)
+    slot_end = []
+    slot_of = np.zeros(m, int)
+    for i in order:
+        for s_i, e_t in enumerate(slot_end):
+            if e_t <= births[i]:
+                slot_of[i] = s_i
+                slot_end[s_i] = death[i]
+                break
+        else:
+            slot_of[i] = len(slot_end)
+            slot_end.append(death[i])
+    pool = len(slot_end)
+    P = np.zeros((n, pool, 3), np.float32)
+    P[:, :, 2] = -20.0
+    for f, t in enumerate(t_frames):
+        idx = np.where((births <= t) & (death > t))[0]
+        if len(idx):
+            e = np.exp(-k * (t - births[idx]))[:, None]
+            P[f, slot_of[idx]] = (p0[idx] + v_inf[None, :] * (t - births[idx])[:, None]
+                                  + (v0[idx] - v_inf[None, :]) * (1 - e) / k)
+    os.makedirs(cache_dir, exist_ok=True)
+    path = os.path.join(cache_dir, name + ".pc2")
+    with open(path, "wb") as fh:
+        fh.write(struct.pack("<12siiffi", b"POINTCACHE2\0", 1, pool, 0.0, 1.0, n))
+        fh.write(P.astype("<f4").tobytes())
+    me = bpy.data.meshes.new(name)
+    me.from_pydata(P[1].tolist(), [], [])
+    ob = bpy.data.objects.new(name, me)
+    fpv.link(ob)
+    ob.parent = ship_root
+    mc = ob.modifiers.new("spray_cache", "MESH_CACHE")
+    mc.cache_format = "PC2"
+    mc.filepath = path
+    mc.frame_start = 0.0
+    mc.play_mode = "SCENE"
+    # Punkte mit zufälligem Radius (Tröpfchen 1,5–6 cm, wenige Klumpen bis 10 cm)
+    ng = bpy.data.node_groups.new(name + "GN", "GeometryNodeTree")
+    ng.interface.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+    ng.interface.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+    nb = fpv.NB(ng)
+    gi = nb.node("NodeGroupInput")
+    go = nb.node("NodeGroupOutput")
+    rv = nb.node("FunctionNodeRandomValue")
+    rv.data_type = "FLOAT"
+    rv.inputs["Min"].default_value = 0.0
+    rv.inputs["Max"].default_value = 1.0
+    rv.inputs["Seed"].default_value = seed
+    r = nb.math("ADD", radius[0], nb.math("MULTIPLY", nb.math("POWER", rv.outputs["Value"], 3.0), radius[1] - radius[0]))
+    mtp = nb.node("GeometryNodeMeshToPoints")
+    nb.link(gi.outputs[0], mtp.inputs["Mesh"])
+    nb.link(r, mtp.inputs["Radius"])
+    mat, snb, out = fpv.new_material("Spray")
+    pr = fpv.principled(snb, Base_Color=(0.82, 0.86, 0.88), Roughness=0.5)   # matt-weiß statt Glasperlen
+    pr.inputs["Transmission Weight"].default_value = 0.15
+    snb.link(pr.outputs[0], out.inputs[0])
+    sm = nb.node("GeometryNodeSetMaterial")
+    sm.inputs["Material"].default_value = mat
+    nb.link(mtp.outputs[0], sm.inputs["Geometry"])
+    nb.link(sm.outputs[0], go.inputs[0])
+    mod = ob.modifiers.new("spray_points", "NODES")
+    mod.node_group = ng
+    print(f"Gischt: {m} Tropfen, Pool {pool}, Cache {path}")
+    return ob

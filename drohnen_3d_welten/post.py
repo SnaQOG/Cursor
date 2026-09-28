@@ -174,51 +174,95 @@ def _blur(img, sigma):
     return out
 
 
-def bloom(img, thr=2.5, strength=0.35, f=8):
+def bloom(img, thr=2.5, strength=0.35, f=8, fog=0.0, clamp=None):
     """Leuchten heller Quellen (Energieattacken, Blitze, Sonnenglanz): Hochpass über thr, verkleinert
-    weichgezeichnet (zwei Radien), bilinear zurück."""
+    weichgezeichnet (zwei Radien), bilinear zurück. fog > 0: zusätzlicher sehr weiter Schleier
+    (entspricht dem Glare-Knoten „Fog Glow“ im Blender-Compositor)."""
     h, w, _ = img.shape
     hh, ww = h // f, w // f
-    b = np.maximum(img - thr, 0)[:hh * f, :ww * f].reshape(hh, f, ww, f, 3).mean((1, 3))
+    src = np.maximum(img - thr, 0)
+    if clamp:                      # Sonne/Glitzern nicht unbegrenzt ins Glühen (sonst Schleier übers ganze Bild)
+        src = src * (clamp / np.maximum(src.max(-1, keepdims=True), clamp))
+    b = src[:hh * f, :ww * f].reshape(hh, f, ww, f, 3).mean((1, 3))
     if b.max() <= 0:
         return img
     bb = 0.55 * _blur(b, 1.5) + 0.45 * _blur(b, 6.0)
+    if fog:
+        bb = bb + fog * _blur(b, 18.0)
     up = np.stack([np.asarray(Image.fromarray(bb[..., c].astype(np.float32), mode="F").resize((w, h), Image.BILINEAR))
                    for c in range(3)], -1)
     return img + strength * up
 
 
-def _stage2(args):
-    i, path, P, ev, outdir = args
-    img = composite(path, P)
-    img *= 2.0 ** ev
-    # dezente Farbkorrektur vor Tonemapping (linear)
-    wb = np.array(P.get("wb", (1, 1, 1)), np.float32)
-    img *= wb
+def pulse(P, t):
+    """Impact-Pulse (P['pulses'] = [(t0, ev, dispersion, abklingzeit)]): Belichtungs- und Dispersionsspitze,
+    1 Frame Anstieg, dann exponentiell abklingend."""
+    ev = disp = 0.0
+    if t is None:
+        return ev, disp
+    for (t0, e, d, tau) in P.get("pulses", ()):
+        dt = t - t0
+        if dt >= -1 / 24:
+            env = min(1.0, (dt + 1 / 24) * 24) * math.exp(-max(dt, 0) / tau)
+            ev += e * env
+            disp += d * env
+    return ev, disp
+
+
+def dispersion(img, d):
+    """Laterale chromatische Aberration: Rot um (1+d), Grün um (1+d/2) radial skaliert, Blau bleibt."""
+    if d <= 0:
+        return img
+    h, w, _ = img.shape
+    out = img.copy()
+    for c, s in ((0, 1 + d), (1, 1 + d / 2)):
+        W, H = int(round(w * s)), int(round(h * s))
+        big = np.asarray(Image.fromarray(img[..., c].astype(np.float32), mode="F").resize((W, H), Image.BICUBIC))
+        x0, y0 = (W - w) // 2, (H - h) // 2
+        out[..., c] = big[y0:y0 + h, x0:x0 + w]
+    return out
+
+
+def frame_time(path, fps=24):
+    import re
+    m = re.search(r"(\d{4})Image\.exr$", os.path.basename(path))
+    return (int(m.group(1)) - 1) / fps if m else None
+
+
+def grade(img, P, ev, t=None, seed=0):
+    """Lineares HDR-Bild -> fertiges sRGB (0..1): Belichtung (+Impact-Puls), Weißabgleich, Sättigung,
+    Fog-Glow/Bloom, Dispersion, AgX-Look, Vignette, Filmkorn."""
+    pev, pdisp = pulse(P, t)
+    img = img * 2.0 ** (ev + pev)
+    img = img * np.array(P.get("wb", (1, 1, 1)), np.float32)
     Y = luminance(img)[..., None]
-    sat = P.get("sat", 1.0)
-    img = Y + (img - Y) * sat
-    img = np.maximum(img, 0)
+    img = np.maximum(Y + (img - Y) * P.get("sat", 1.0), 0)
     if P.get("bloom"):
-        img = bloom(img, thr=P.get("bloom_thr", 2.5), strength=P["bloom"])
-    out = tonemap(img, P.get("look"))
-    out = np.clip(out, 0, 1)
+        img = bloom(img, thr=P.get("bloom_thr", 2.5), strength=P["bloom"], fog=P.get("fog_glow", 0.0),
+                    clamp=P.get("bloom_clamp"))
+    img = dispersion(img, P.get("dispersion", 0.0) + pdisp)
+    out = np.clip(tonemap(img, P.get("look")), 0, 1)
     h, w = out.shape[:2]
     # Vignette
     yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
     r2 = ((xx - w / 2) / (w / 2)) ** 2 * 0.8 + ((yy - h / 2) / (h / 2)) ** 2 * 0.6
     vig = 1 - P.get("vignette", 0.18) * np.clip(r2, 0, 1.6) ** 1.5 / 1.9
     out *= vig[..., None]
-    # Sensorrauschen (luminanzabhängig, fein)
-    rng = np.random.default_rng(1000 + i)
+    # Filmkorn (luminanzabhängig, fein; grain = Standardabweichung relativ zum Vollausschlag)
+    rng = np.random.default_rng(1000 + seed)
     g = P.get("grain", 0.012)
     if g:
         lum = out.mean(-1, keepdims=True)
         n = rng.normal(0, 1, out.shape[:2] + (1,)).astype(np.float32)
         nc = rng.normal(0, 1, out.shape).astype(np.float32) * 0.35
         out += (n + nc) * g * (0.5 + 0.8 * np.sqrt(np.clip(lum, 0, 1))) * (1.1 - lum)
-    out = np.clip(out, 0, 1)
-    # Frames liegen unten-links bei EXR? OpenEXR liefert oben-links -> direkt speichern
+    return np.clip(out, 0, 1)
+
+
+def _stage2(args):
+    i, path, P, ev, outdir = args
+    out = grade(composite(path, P), P, ev, t=frame_time(path), seed=i)
+    # OpenEXR liefert oben-links -> direkt speichern
     im = Image.fromarray((out * 255 + 0.5).astype(np.uint8))
     im.save(os.path.join(outdir, f"p_{i:04d}.png"), compress_level=1)
     return i
@@ -247,16 +291,28 @@ def process(exr_dir, out_mp4, P, fps=24, size=(1080, 1920), workers=4, crf=17):
         os.remove(f)
     with ProcessPoolExecutor(workers) as ex:
         list(ex.map(_stage2, [(i, f, P, float(evs[i]), pngdir) for i, f in enumerate(files)], chunksize=2))
+    encode(pngdir, out_mp4, fps=fps, size=size, crf=crf, bitrate=P.get("bitrate"))
+    print("wrote", out_mp4, "EV range", evs.min(), evs.max())
+
+
+def encode(pngdir, out_mp4, fps=24, size=(1080, 1920), crf=17, bitrate=None):
+    """H.264 High. bitrate (z. B. '18M'): Zwei-Pass mit Zielbitrate (max. +12 %), sonst CRF 17 (max. 24 Mbit/s)."""
     ff = ffmpeg_bin()
     vf = (f"scale={size[0]}:{size[1]}:flags=lanczos,"
           "unsharp=5:5:0.35:5:5:0.0,format=yuv420p")
-    cmd = [ff, "-y", "-framerate", str(fps), "-i", os.path.join(pngdir, "p_%04d.png"),
-           "-vf", vf, "-c:v", "libx264", "-profile:v", "high", "-preset", "slow", "-crf", str(crf),
-           "-maxrate", "24M", "-bufsize", "48M",
-           "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-colorspace", "bt709",
-           "-color_primaries", "bt709", "-color_trc", "bt709", out_mp4]
-    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    print("wrote", out_mp4, "EV range", evs.min(), evs.max())
+    base = [ff, "-y", "-framerate", str(fps), "-i", os.path.join(pngdir, "p_%04d.png"),
+            "-vf", vf, "-c:v", "libx264", "-profile:v", "high", "-preset", "slow"]
+    tail = ["-pix_fmt", "yuv420p", "-movflags", "+faststart", "-colorspace", "bt709",
+            "-color_primaries", "bt709", "-color_trc", "bt709"]
+    q = dict(stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+    if bitrate:
+        mbit = float(bitrate.rstrip("M"))
+        rate = ["-b:v", bitrate, "-maxrate", f"{mbit * 1.12:.1f}M", "-bufsize", f"{mbit * 2:.0f}M"]
+        log = os.path.join(pngdir, "x264pass")
+        subprocess.run(base + rate + ["-pass", "1", "-passlogfile", log, "-an", "-f", "mp4", os.devnull], **q)
+        subprocess.run(base + rate + ["-pass", "2", "-passlogfile", log] + tail + [out_mp4], **q)
+    else:
+        subprocess.run(base + ["-crf", str(crf), "-maxrate", "24M", "-bufsize", "48M"] + tail + [out_mp4], **q)
 
 
 def ffmpeg_bin():
@@ -267,12 +323,20 @@ def ffmpeg_bin():
         return "ffmpeg"
 
 
-def still(exr_path, png_path, P, ev=0.0):
-    img = composite(exr_path, P) * 2.0 ** ev
-    img = np.maximum(img * np.array(P.get("wb", (1, 1, 1)), np.float32), 0)
-    Y = luminance(img)[..., None]
-    img = Y + (img - Y) * P.get("sat", 1.0)
-    out = np.clip(tonemap(np.maximum(img, 0), P.get("look")), 0, 1)
+def still(exr_path, png_path, P, ev=0.0, full=None):
+    """Vorschau-Standbild. full=True (oder P['still_full']): kompletter Grade wie im Video
+    (Fog Glow, Dispersion, Vignette, Korn, Impact-Puls), sonst nur Belichtung/Farbe/AgX."""
+    img = composite(exr_path, P)
+    if full if full is not None else P.get("still_full", False):
+        if "ae_ref" in P:       # Auto-Belichtung wie im Video (ohne zeitliche Glättung)
+            ev = ev - P.get("ae_strength", 0.55) * (_stage1((exr_path, P)) - P["ae_ref"]) / math.log(2)
+        out = grade(img, P, ev, t=frame_time(exr_path))
+    else:
+        img = img * 2.0 ** ev
+        img = np.maximum(img * np.array(P.get("wb", (1, 1, 1)), np.float32), 0)
+        Y = luminance(img)[..., None]
+        img = Y + (img - Y) * P.get("sat", 1.0)
+        out = np.clip(tonemap(np.maximum(img, 0), P.get("look")), 0, 1)
     Image.fromarray((out * 255 + 0.5).astype(np.uint8)).save(png_path)
 
 

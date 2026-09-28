@@ -543,10 +543,6 @@ def break_fx(mats, deck_z):
     deck_bits = vfx.voronoi_fracture("DeckBit", sb, seeds, mats["roofdeck"])
     sb.free()
     f_blast = F(T_CLASH) + 4
-    for ob in deck_bits:
-        for f, h in ((1, True), (f_blast - 1, True), (f_blast, False)):
-            ob.hide_render = h
-            ob.keyframe_insert("hide_render", frame=f)
     colliders = [bpy.data.objects[n] for n in ("ResRoofDeck", "ResParapet", "ResCap")]
     hit = roof(14.6, -6.0, 1.9)          # Naruto trifft das Horn von innen -> Stücke fliegen nach außen
     f_horn = F(13.15) + 3
@@ -554,6 +550,10 @@ def break_fx(mats, deck_z):
     vfx.rigid_sim(horn_bits, colliders, f_horn, F(17.5), [(hit, 40000.0, f_horn, f_horn + 1)], mass_density=500.0)
     vfx.rigid_sim(deck_bits, colliders, f_blast, F(19.0), [(Pc - Vector((0, 0, 0.5)), 34000.0, f_blast, f_blast + 1)],
                   mass_density=450.0)
+    for ob in deck_bits:        # erst nach der Simulation (rigid_sim ersetzt die Animationsdaten)
+        for f, h in ((1, True), (f_blast - 1, True), (f_blast, False)):
+            ob.hide_render = h
+            ob.keyframe_insert("hide_render", frame=f)
     import crew
     hi = max(max(fc.evaluate(f) for f in range(f_blast, f_blast + 30)) for ob in deck_bits
              for fc in crew._fcurves_of(ob) if fc.data_path == "location" and fc.array_index == 2)

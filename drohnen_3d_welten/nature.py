@@ -13,11 +13,21 @@ import fpv
 def rock_material(name="Rock", c1=(0.085, 0.078, 0.07), c2=(0.30, 0.27, 0.23), c3=(0.18, 0.16, 0.13),
                   wet_line=1.6, algae=(0.035, 0.05, 0.022), strata_scale=1.3, bump=0.9, moss=None,
                   moss_amount=0.0, scale=1.0, wet=True, lichen=0.15, crack_w=0.12, cavity=0.0, moss_tex=None,
-                  moss_tex_scale=5.0):
+                  moss_tex_scale=5.0, variation=0.0, bedding=0.0, bed_h=1.4, streak=0.55):
+    """variation: Streuung pro Objekt (Object Info Random) für Helligkeit, Warm/Kalt-Tönung, Rauschversatz und
+    Höhe der Nässelinie; bedding: Stärke dunkler, waagerechter Schichtfugen (Welt-Z, Abstand ~bed_h m);
+    streak: Deckkraft der senkrechten Regen-/Sinterstreifen."""
     mat, nb, out = fpv.new_material(name)
     co = nb.coords("Object")
     wpos = nb.out(nb.node("ShaderNodeNewGeometry"), "Position")
     z = nb.sep(wpos)[2]
+    rnd = rnd2 = None
+    if variation:
+        rnd = nb.out(nb.node("ShaderNodeObjectInfo"), "Random")
+        rnd2 = nb.math("FRACT", nb.math("MULTIPLY", rnd, 7.31))
+        co = nb.vmath("ADD", co, nb.comb(nb.math("MULTIPLY", rnd, 37.0), nb.math("MULTIPLY", rnd, 53.0),
+                                         nb.math("MULTIPLY", rnd2, 11.0)))
+        z = nb.math("ADD", z, nb.math("MULTIPLY", nb.math("SUBTRACT", rnd2, 0.5), 0.6))
     n_big = nb.noise(co, scale=0.035 / scale, detail=3, rough=0.6)
     n_mid = nb.noise(co, scale=0.35 / scale, detail=4, rough=0.65)
     n_fine = nb.noise(co, scale=4.0 / scale, detail=3, rough=0.7)
@@ -43,7 +53,20 @@ def rock_material(name="Rock", c1=(0.085, 0.078, 0.07), c2=(0.30, 0.27, 0.23), c
     nb.link(nb.out(stv, "Fac"), stm.inputs["Value"])
     stm.inputs["From Min"].default_value = 0.5
     stm.inputs["From Max"].default_value = 0.72
-    col = nb.mix(nb.math("MULTIPLY", stm.outputs[0], 0.55), col, [c * 0.45 for c in c1])
+    col = nb.mix(nb.math("MULTIPLY", stm.outputs[0], streak), col, [c * 0.45 for c in c1])
+    if bedding:
+        # Schichtfugen: dünne dunkle Linien in Welt-Z, Dicke/Lage mit großem Rauschen verzogen
+        bz = nb.math("DIVIDE", nb.math("ADD", z, nb.math("MULTIPLY", nb.out(n_big, "Fac"), bed_h * 1.4)), bed_h)
+        bf = nb.math("FRACT", bz)
+        seam = nb.node("ShaderNodeMapRange", clamp=True)
+        nb.link(nb.math("MINIMUM", bf, nb.math("SUBTRACT", 1.0, bf)), seam.inputs["Value"])
+        seam.inputs["From Min"].default_value = 0.07
+        seam.inputs["From Max"].default_value = 0.0
+        gap = nb.math("MULTIPLY", seam.outputs[0], nb.math("MULTIPLY_ADD", nb.out(n_mid, "Fac"), 0.8, 0.4))
+        col = nb.mix(nb.math("MULTIPLY", gap, bedding), col, [c * 0.35 for c in c1])
+        # jede zweite Bank minimal heller/wärmer
+        alt = nb.math("MULTIPLY", nb.math("FLOOR", nb.math("MULTIPLY", nb.math("FRACT", nb.math("MULTIPLY", bz, 0.5)), 2.0)), 0.18)
+        col = nb.mix(nb.math("MULTIPLY", alt, bedding), col, [min(1.0, c * 1.25) for c in c3])
     if lichen:
         lic = nb.noise(co, scale=1.6 / scale, detail=2, rough=0.6)
         lm = nb.node("ShaderNodeMapRange", clamp=True)
@@ -51,6 +74,13 @@ def rock_material(name="Rock", c1=(0.085, 0.078, 0.07), c2=(0.30, 0.27, 0.23), c
         lm.inputs["From Min"].default_value = 0.62
         lm.inputs["From Max"].default_value = 0.7
         col = nb.mix(nb.math("MULTIPLY", lm.outputs[0], lichen * 3), col, (0.42, 0.40, 0.33))
+    if variation:
+        v = variation
+        val = nb.math("MULTIPLY_ADD", nb.math("SUBTRACT", rnd, 0.5), v, 1.0)
+        warm = nb.math("MULTIPLY", nb.math("SUBTRACT", rnd2, 0.5), v)
+        tint = nb.comb(nb.math("MULTIPLY", val, nb.math("MULTIPLY_ADD", warm, 0.5, 1.0)), val,
+                       nb.math("MULTIPLY", val, nb.math("MULTIPLY_ADD", warm, -0.7, 1.0)))
+        col = nb.vmath("MULTIPLY", col, tint)
     rough = nb.math("MULTIPLY_ADD", nb.out(n_fine, "Fac"), 0.2, 0.78)
     moss_mask = None
     if cavity:

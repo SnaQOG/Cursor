@@ -165,12 +165,19 @@ def wood_material(name, tint=None, scale=0.5, rough=0.55, dark=1.0, board=0.22, 
     col = nb.vmath("SCALE", col, scale=dark)
     seam = nb.math("LESS_THAN", bt, 0.05)
     col = nb.mix(nb.math("MULTIPLY", seam, 0.8), col, (0.02, 0.015, 0.01))
+    col = _objvar(nb, col, 0.16)
     col = _wear(nb, col, edge_col=(0.55, 0.42, 0.3), cav_col=(0.03, 0.02, 0.015))
     p = fpv.principled(nb, Base_Color=col, Roughness=nb.math("MULTIPLY_ADD", g, 0.2, rough - 0.1))
     h = nb.math("SUBTRACT", nb.math("MULTIPLY", g, 0.3), nb.math("MULTIPLY", seam, 0.5))
     nb.link(nb.bump(h, strength=0.4, distance=0.01), p.inputs["Normal"])
     nb.link(p.outputs[0], out.inputs[0])
     return mat
+
+
+def _objvar(nb, col, amt):
+    """Streuung pro Objekt (Object Info Random): Helligkeit ±amt/2, damit gleiche Teile nicht identisch wirken."""
+    rnd = nb.out(nb.node("ShaderNodeObjectInfo"), "Random")
+    return nb.vmath("SCALE", col, scale=nb.math("MULTIPLY_ADD", rnd, amt, 1.0 - amt / 2))
 
 
 def _wear(nb, col, edge_col, cav_col, edge=0.35, cav=0.5):
@@ -197,6 +204,7 @@ def paint_material(name, color, rough=0.42, wear=True, coat=0.2, under=(0.35, 0.
     col = nb.mix(nb.math("MULTIPLY", nb.out(big, "Fac"), 0.25), color, [c * 1.12 for c in color])
     fine = nb.noise(co, scale=4.0, detail=3)
     col = nb.mix(nb.math("MULTIPLY", nb.out(fine, "Fac"), 0.2), col, [c * 0.75 for c in color])
+    col = _objvar(nb, col, 0.1)
     if wear:
         col = _wear(nb, col, edge_col=under, cav_col=[c * 0.35 for c in color], edge=0.55, cav=0.45)
     p = fpv.principled(nb, Base_Color=col, Roughness=rough)

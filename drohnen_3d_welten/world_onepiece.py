@@ -160,6 +160,12 @@ def sound_markers(info):
     return [(name, tt) for name, tt in m if tt is not None]
 
 
+# Materialien (Schritt 3.3)
+ROCK_GEO = dict(flute=0.035, ledges=0.04, bed=(1.6, 3.2))       # Karstrinnen halbiert, Bankung als Stufen
+ROCK_SHADE = dict(variation=0.3, bedding=0.6, bed_h=1.4, streak=0.35)
+WATER_VIEW_DARK = 0.45   # senkrecht ins Wasser 45 % dunkler, flach +11 %
+WATER_MICRO = 1.0        # feine Kräuselung mit Windflecken
+
 ROCKS = [
     # (x, y, radius, height, seed, taper)
     (-19, 70, 9.0, 30, 11, 0.35),    # Tor links
@@ -220,22 +226,20 @@ def add_atmosphere(density, size=(1600.0, 1600.0, 300.0), center=(0.0, 250.0)):
 
 
 def foam_builder(shore_img, shore_map, max_d=12.0):
-    """Schaum aus GN-Attributen 'wake' + 'hull_foam' und Brandung aus dem Fels-Abstandsfeld."""
+    """Schaum aus GN-Attributen 'wake' + 'hull_foam' und Brandungsring aus dem Fels-Abstandsfeld,
+    als Netz (ocean.lacy_foam) statt geschlossener Flächen."""
 
     def fn(nb, wp_t):
         wake = nb.out(nb.node("ShaderNodeAttribute", attribute_name="wake"), "Fac")
         hf = nb.out(nb.node("ShaderNodeAttribute", attribute_name="hull_foam"), "Fac")
-        shore = shore_factor(nb, shore_img, shore_map, 0.0, 4.5, max_d)
-        m = nb.math("MAXIMUM", nb.math("MAXIMUM", nb.math("MULTIPLY", wake, 0.95), hf), nb.math("MULTIPLY", shore, 0.9))
+        shore = shore_factor(nb, shore_img, shore_map, 0.0, 6.0, max_d)
+        # Ring: direkt am Fels dicht (~1,5 m), nach außen bis 6 m in Fäden auslaufend
+        ring = nb.math("MINIMUM", nb.math("MULTIPLY", nb.math("POWER", shore, 1.2), 1.15), 1.0)
+        m = nb.math("MAXIMUM", nb.math("MAXIMUM", nb.math("MULTIPLY", wake, 0.95), hf), ring)
         n = nb.noise(wp_t, scale=0.55, detail=4, rough=0.65)
         n2 = nb.noise(wp_t, scale=2.6, detail=2, rough=0.6)
-        nn = nb.math("ADD", nb.out(n, "Fac"), nb.math("MULTIPLY", nb.out(n2, "Fac"), 0.35))
-        th = nb.math("SUBTRACT", 1.02, m)
-        mr = nb.node("ShaderNodeMapRange", clamp=True)
-        nb.link(nb.math("SUBTRACT", nn, th), mr.inputs["Value"])
-        mr.inputs["From Min"].default_value = -0.15
-        mr.inputs["From Max"].default_value = 0.12
-        return nb.math("MULTIPLY", mr.outputs[0], nb.math("MINIMUM", nb.math("MULTIPLY", m, 1.6), 0.9))
+        nn = nb.math("ADD", nb.math("MULTIPLY", nb.out(n, "Fac"), 0.75), nb.math("MULTIPLY", nb.out(n2, "Fac"), 0.25))
+        return ocean.lacy_foam(nb, m, nn, ocean.foam_lace(nb, wp_t, scale=1.1), cap=0.92)
 
     return fn
 
@@ -313,11 +317,11 @@ def build(args):
     # Felsen (Kalk-Karst): Kavität, Regenfahnen, Ocker-Eisenflecken, Nässe-/Algenband
     rmat = nature.rock_material("SeaRock", c1=(0.095, 0.088, 0.078), c2=(0.34, 0.32, 0.28), c3=(0.27, 0.22, 0.16),
                                 wet_line=1.8, moss=(0.06, 0.10, 0.03), moss_amount=0.28, lichen=0.22, cavity=0.55,
-                                crack_w=0.1)
+                                crack_w=0.1, **ROCK_SHADE)
     rocks = []
     for (x, y, r, h, seed, taper) in ROCKS:
         ob = fpv.rock_mesh(f"Rock{seed}", radius=r, height=h + 4, seed=seed, detail=5, taper=taper, mat=rmat,
-                           base_z=-4.0, lumpy=0.22, strata=1.0)
+                           base_z=-4.0, lumpy=0.22, strata=1.0, **ROCK_GEO)
         ob.location = (x, y, 0)
         ob.rotation_euler = (0, 0, seed * 1.7)
         rocks.append((ob, r, h))
@@ -381,7 +385,9 @@ def build(args):
 
     # Ozean + Geometry-Nodes-Kielspur
     wmat = ocean.water_material("Sea", deep=(0.005, 0.06, 0.19), shallow=(0.015, 0.21, 0.33),
-                                wake_fn=foam_builder(shore_img, shore_map), color_fn=shallow_tint(shore_img, shore_map, color=(0.01, 0.24, 0.30)))
+                                wake_fn=foam_builder(shore_img, shore_map),
+                                color_fn=shallow_tint(shore_img, shore_map, color=(0.01, 0.24, 0.30)),
+                                lace=True, view_dark=WATER_VIEW_DARK, micro=WATER_MICRO)
     ocean.animate_time_value(wmat, FPS, frames)
     oc = ocean.make_ocean(x0, y0, nx, ny, tile=tile, res=res, wind=9.5, wave_scale=0.9, chop=1.3, fps=FPS,
                           frames=frames, mat=wmat, direction_deg=-30, alignment=0.4, foam_coverage=0.25)
@@ -392,7 +398,8 @@ def build(args):
 
     # Inseln am Horizont
     imat = nature.rock_material("IslandRock", c1=(0.08, 0.075, 0.065), c2=(0.22, 0.2, 0.17), c3=(0.15, 0.13, 0.11),
-                                wet=False, moss=(0.05, 0.09, 0.025), moss_amount=0.55, scale=8.0, bump=0.4)
+                                wet=False, moss=(0.05, 0.09, 0.025), moss_amount=0.55, scale=8.0, bump=0.4,
+                                variation=0.25)
     island("IslandNW", -900, 1150, 420, 260, 31, imat)
     island("IslandNE", 700, 1600, 520, 330, 32, imat)
     island("IslandW", -1700, 420, 380, 180, 33, imat)

@@ -8,9 +8,40 @@ import fpv
 import textures
 
 
+def foam_lace(nb, wp_t, scale=1.3, width=0.12, stretch=1.0):
+    """Schaumnetz: verzerrte Voronoi-Kanten, 1 auf den Kanten, 0 in den Zellen.
+    stretch < 1 zieht das Netz entlang X zu Windstreifen."""
+    if stretch != 1.0:
+        wp_t = nb.mapping(wp_t, scale=(stretch, 1.0, 1.0))
+    warp = nb.vmath("ADD", wp_t, nb.vmath("SCALE", nb.out(nb.noise(wp_t, scale=0.35, detail=2, rough=0.5), "Color"),
+                                          scale=1.6))
+    vor = nb.voronoi(warp, scale=scale, feature="DISTANCE_TO_EDGE")
+    mr = nb.node("ShaderNodeMapRange", clamp=True)
+    nb.link(nb.out(vor, "Distance"), mr.inputs["Value"])
+    mr.inputs["From Min"].default_value = width
+    mr.inputs["From Max"].default_value = 0.0
+    return mr.outputs[0]
+
+
+def lacy_foam(nb, density, noise_fac, lace, cap=0.95, soft=(0.05, 0.12)):
+    """Dichte 0..1 -> Schaum mit Struktur statt Aufkleber-Fleck: dicht = geschlossen mit Löchern,
+    mittel = Netz, dünn = einzelne Fäden. Schwelle wandert mit der Dichte über Rauschen + Netz."""
+    f = nb.math("ADD", nb.math("MULTIPLY", noise_fac, 0.6), nb.math("MULTIPLY", lace, 0.4))
+    t = nb.math("SUBTRACT", 1.0, nb.math("MULTIPLY", density, 0.9))
+    mr = nb.node("ShaderNodeMapRange", clamp=True)
+    mr.interpolation_type = "SMOOTHSTEP"
+    nb.link(f, mr.inputs["Value"])
+    nb.link(nb.math("SUBTRACT", t, soft[0]), mr.inputs["From Min"])
+    nb.link(nb.math("ADD", t, soft[1]), mr.inputs["From Max"])
+    return nb.math("MULTIPLY", mr.outputs[0], nb.math("MINIMUM", nb.math("MULTIPLY", density, 1.6), cap))
+
+
 def water_material(name="Water", deep=(0.004, 0.028, 0.040), shallow=(0.02, 0.09, 0.10), rough=0.035,
-                   foam_attr="foam", wake_fn=None, far=False, foam_amount=1.0, color_fn=None):
-    """Wasser-Shader. Performance: nur 3D-Rauschen mit animiertem Versatz, wenige Oktaven."""
+                   foam_attr="foam", wake_fn=None, far=False, foam_amount=1.0, color_fn=None, lace=False,
+                   view_dark=0.0, micro=0.0):
+    """Wasser-Shader. Performance: nur 3D-Rauschen mit animiertem Versatz, wenige Oktaven.
+    lace: Ozean-Schaum als Netz (foam_lace/lacy_foam) statt weicher Flecken; view_dark: Blickwinkel-Verlauf
+    (senkrecht in die Tiefe dunkler, flach heller); micro: feine Kräuselung mit Windflecken (Stärke)."""
     mat, nb, out = fpv.new_material(name)
     p = fpv.principled(nb, Roughness=rough, IOR=1.333)
     p.inputs["Specular IOR Level"].default_value = 0.5
@@ -34,15 +65,30 @@ def water_material(name="Water", deep=(0.004, 0.028, 0.040), shallow=(0.02, 0.09
         col = nb.mix(crest.outputs[0], deep, shallow)
     if color_fn is not None:
         col = color_fn(nb, col)
+    if view_dark:
+        lw = nb.node("ShaderNodeLayerWeight")
+        lw.inputs["Blend"].default_value = 0.35
+        face = nb.math("POWER", nb.out(lw, "Facing"), 1.5)
+        col = nb.mix(face, nb.vmath("SCALE", col, scale=1.0 - view_dark), nb.vmath("SCALE", col, scale=1.0 + 0.25 * view_dark))
     foam = None
     if not far:
         at = nb.node("ShaderNodeAttribute", attribute_name=foam_attr)
         fnoise = nb.noise(wpos, scale=0.9, detail=3, rough=0.6)
-        fm = nb.node("ShaderNodeMapRange", clamp=True)
-        nb.link(nb.math("MULTIPLY", nb.out(at, "Fac"), nb.math("ADD", nb.out(fnoise, "Fac"), 0.2)), fm.inputs["Value"])
-        fm.inputs["From Min"].default_value = 0.45
-        fm.inputs["From Max"].default_value = 0.95
-        foam = nb.math("MULTIPLY", fm.outputs[0], foam_amount)
+        if lace:
+            dens = nb.node("ShaderNodeMapRange", clamp=True)
+            nb.link(nb.out(at, "Fac"), dens.inputs["Value"])
+            dens.inputs["From Min"].default_value = 0.35
+            dens.inputs["From Max"].default_value = 1.0
+            # offene See: weiche, windgestreckte Schaumfäden, nie geschlossene Flecken
+            foam = lacy_foam(nb, nb.math("MULTIPLY", dens.outputs[0], foam_amount), nb.out(fnoise, "Fac"),
+                             foam_lace(nb, wp_t, scale=2.8, width=0.08, stretch=0.35), cap=0.5, soft=(0.12, 0.3))
+        else:
+            fm = nb.node("ShaderNodeMapRange", clamp=True)
+            nb.link(nb.math("MULTIPLY", nb.out(at, "Fac"), nb.math("ADD", nb.out(fnoise, "Fac"), 0.2)),
+                    fm.inputs["Value"])
+            fm.inputs["From Min"].default_value = 0.45
+            fm.inputs["From Max"].default_value = 0.95
+            foam = nb.math("MULTIPLY", fm.outputs[0], foam_amount)
     if wake_fn is not None:
         wk = wake_fn(nb, wp_t)
         foam = wk if foam is None else nb.math("MAXIMUM", foam, wk)
@@ -61,6 +107,16 @@ def water_material(name="Water", deep=(0.004, 0.028, 0.040), shallow=(0.02, 0.09
         bump = nb.bump(h, strength=0.35, distance=0.3)
     else:
         bump = nb.bump(nb.out(ripple, "Fac"), strength=0.12, distance=0.3)
+        if micro:
+            # feine Kräuselung (~20 cm), in Windflecken (Katzenpfoten) stärker
+            fine = nb.noise(nb.vmath("ADD", wp_t, nb.vmath("SCALE", drift, scale=1.5)), scale=5.0, detail=2, rough=0.55)
+            paw = nb.node("ShaderNodeMapRange", clamp=True)
+            nb.link(nb.out(nb.noise(wpos, scale=0.025, detail=2, rough=0.5), "Fac"), paw.inputs["Value"])
+            paw.inputs["From Min"].default_value = 0.38
+            paw.inputs["From Max"].default_value = 0.62
+            paw.inputs["To Min"].default_value = 0.35
+            bump = nb.bump(nb.math("MULTIPLY", nb.out(fine, "Fac"), paw.outputs[0]), strength=0.1 * micro,
+                           distance=0.06, normal=bump)
     nb.link(bump, p.inputs["Normal"])
     nb.link(p.outputs[0], out.inputs[0])
     return mat

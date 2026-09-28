@@ -850,8 +850,10 @@ def apply_modifiers(ob):
 
 
 def rock_mesh(name, radius=10.0, height=30.0, seed=1, detail=5, stretch=(1, 1, 1), strata=0.0,
-              taper=0.3, mat=None, base_z=-4.0, lumpy=0.25):
-    """Felsnadel/Seestack aus verformtem Zylinder mit Rauschen (numpy)."""
+              taper=0.3, mat=None, base_z=-4.0, lumpy=0.25, flute=0.07, ledges=0.0, bed=(1.6, 3.2)):
+    """Felsnadel/Seestack aus verformtem Zylinder mit Rauschen (numpy).
+    flute: Tiefe der senkrechten Karstrinnen; ledges: Tiefe der waagerechten Schichtstufen (Anteil am Radius),
+    bed: Bereich der Bankdicke in Metern (pro Fels zufällig), Schichten leicht geneigt und verrauscht."""
     rng = np.random.default_rng(seed)
     nr = 96 * (detail - 2)
     nz = int(max(24, height / (radius * 2 * math.pi / nr)))
@@ -872,7 +874,20 @@ def rock_mesh(name, radius=10.0, height=30.0, seed=1, detail=5, stretch=(1, 1, 1
     flutes = fbm2(X0 * a_f + ph[1] + zw * 0.025, Y0 * a_f + zw * 0.01, octaves=4, seed=seed + 5)
     mid = fbm2(X0 * radius / 4.0 + ph[2], Y0 * radius / 4.0 + zw / 4.0, octaves=5, seed=seed + 7)
     fine = fbm2(X0 * radius / 1.2 + ph[3], Y0 * radius / 1.2 + zw / 1.2, octaves=3, seed=seed + 8)
-    r = radius * prof * (1 + lumpy * n_big + 0.07 * flutes + 0.07 * mid + 0.02 * fine)
+    r = radius * prof * (1 + lumpy * n_big + flute * flutes + 0.07 * mid + 0.02 * fine)
+    if ledges:
+        # Bankung: sägezahnförmige Stufen (Bank springt oben vor, unten zurück), leicht geneigt
+        bed_h = rng.uniform(*bed)
+        dip_a = rng.uniform(0, 2 * math.pi)
+        # Bankdicke variiert über die Höhe (1D-Rauschen), Stufentiefe pro Bank zufällig 45–135 %
+        u = (zw + 1.3 * bed_h * fbm2(zw * 0.07 + ph[3], zw * 0.0 + 3.7, 2, seed + 13)
+             + 0.12 * radius * (X0 * math.cos(dip_a) + Y0 * math.sin(dip_a))
+             + 0.9 * fbm2(X0 * 1.5 + ph[0], Y0 * 1.5 + zw * 0.02, 3, seed + 11)) / bed_h
+        k = np.floor(u)
+        fu = u - k
+        hk = np.sin(k * 12.9898 + seed * 78.233) * 43758.5453
+        amp = 0.45 + 0.9 * (hk - np.floor(hk))
+        r *= 1 + ledges * amp * (fu ** 3 - 0.25)
     if strata:
         r *= 1 + strata * 0.012 * np.sin(zw * 0.8 + 3 * fbm2(X0 * 2, Y0 * 2 + zw * 0.05, 2, seed + 9))
     # Brandungskehle an der Wasserlinie (Welt-z ~ 0.3 .. 2)

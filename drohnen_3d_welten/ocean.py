@@ -438,10 +438,10 @@ def bow_spray(ship_root, frames, fps, cache_dir, bow_x=10.0, stern_x=-11.2, half
     go = nb.node("NodeGroupOutput")
     rv = nb.node("FunctionNodeRandomValue")
     rv.data_type = "FLOAT"
-    rv.inputs["Min"].default_value = 0.0
-    rv.inputs["Max"].default_value = 1.0
+    rv.inputs[2].default_value = 0.0          # Float-Min/Max (in Blender 5 heißen alle Varianten gleich)
+    rv.inputs[3].default_value = 1.0
     rv.inputs["Seed"].default_value = seed
-    r = nb.math("ADD", radius[0], nb.math("MULTIPLY", nb.math("POWER", rv.outputs["Value"], 3.0), radius[1] - radius[0]))
+    r = nb.math("ADD", radius[0], nb.math("MULTIPLY", nb.math("POWER", rv.outputs[1], 3.0), radius[1] - radius[0]))
     mtp = nb.node("GeometryNodeMeshToPoints")
     nb.link(gi.outputs[0], mtp.inputs["Mesh"])
     nb.link(r, mtp.inputs["Radius"])

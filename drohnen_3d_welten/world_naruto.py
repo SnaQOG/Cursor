@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bpy  # noqa: E402
 import bmesh  # noqa: E402,I100
 import numpy as np  # noqa: E402
-from mathutils import Matrix, Vector  # noqa: E402
+from mathutils import Euler, Matrix, Vector  # noqa: E402
 
 import fpv  # noqa: E402
 import konoha  # noqa: E402
@@ -463,6 +463,171 @@ def stage_fight(N_keys, S_keys, n=None, cam_pos=None):
     return nar, sas
 
 
+# ------------------------------------------------------------------------------------------------ Schritt 3.5 – FX
+# Kamera: Stöße (Zeit, Stärke in Grad, Frames) und Halte-Frames nur auf dem Dach (Kamera dort langsam)
+SHAKES = [(1.15, 0.8, 6), (4.1, 0.9, 6), (5.65, 0.9, 6), (6.85, 1.0, 6), (12.6, 1.2, 7), (13.15, 1.6, 8),
+          (T_CLASH, 3.2, 10)]
+CAM_HOLDS = [(12.6, 2), (13.15, 2), (T_CLASH, 4)]
+BLUE = (0.12, 0.42, 1.0)
+
+
+def F(t):
+    return int(round(t * FPS)) + 1
+
+
+def warp(t, holds):
+    tau = np.array(t, dtype=float)
+    for h, nf in holds:
+        H = nf / FPS
+        a = (t >= h) & (t < h + H)
+        b = (t >= h + H) & (t < h + 2 * H)
+        tau[a] = h
+        tau[b] = h + 2 * (t[b] - h - H)
+    return tau
+
+
+def impact_small(name, loc, t, color=(1.0, 0.75, 0.4), light_w=4000.0, ring=2.5, sparks=90, seed=1):
+    """Kleines Impact-Paket (Kunai/Schlag): Funken, Lichtspitze 0 -> hoch -> 0 über 8 Frames, kleine Druckwelle.
+    Halte-Frames, Kamerastoß und Blitz-Frame kommen aus Figuren-Warp, Kamera und Post."""
+    f0 = F(t)
+    vfx.sparks_gn(name + "Sparks", loc, t, n=sparks, speed=(5, 12), life=(0.15, 0.45), color=color, seed=seed)
+    lt = vfx.point_light(name + "Light", color, 0.0, 0.15)
+    lt.location = loc
+    vfx.key_energy(lt, [(f0 - 1, 0.0), (f0, light_w), (f0 + 2, light_w * 0.5), (f0 + 8, 0.0)])
+    vfx.shockwave(name + "Wave", loc, f0 + 1, r_max=ring, dur=8, color=(0.9, 0.85, 0.75), thick=0.1, glow=1.5)
+
+
+def break_fx(mats, deck_z):
+    """Echte Bruchstücke: (1) das Horn im Südosten bricht beim Konter-Treffer (13,15 s) oberhalb 1,6 m in 9 Stücke,
+    (2) beim Zusammenprall (15,0 s) werden Dachplanken um den Klimaxpunkt in 14 Stücke gesprengt. Voronoi-Bruch +
+    Bullet-Rigid-Body gegen Dachbelag und Brüstung, gebacken als Keyframes."""
+    rng = np.random.default_rng(31)
+    dg = bpy.context.evaluated_depsgraph_get()
+    horn = bpy.data.objects["Horn7"]
+    me = bpy.data.meshes.new_from_object(horn.evaluated_get(dg))
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.transform(horn.matrix_world)
+    z_break = deck_z + 1.6
+    lower, upper = bm.copy(), bm.copy()
+    bm.free()
+    for part, keep_up in ((lower, False), (upper, True)):
+        res = bmesh.ops.bisect_plane(part, geom=part.verts[:] + part.edges[:] + part.faces[:],
+                                     plane_co=(0, 0, z_break), plane_no=(0, 0, -1 if keep_up else 1), clear_outer=True)
+        cut = [e for e in res["geom_cut"] if isinstance(e, bmesh.types.BMEdge)]
+        if cut:
+            bmesh.ops.holes_fill(part, edges=cut, sides=0)
+    sme = bpy.data.meshes.new("HornStump")
+    lower.to_mesh(sme)
+    lower.free()
+    sme.materials.append(mats["horn"])
+    fpv.link(bpy.data.objects.new("HornStump", sme))
+    ctr = [v.co.copy() for v in upper.verts]
+    zs = np.array([c.z for c in ctr])
+    seeds = []
+    for zz in np.linspace(zs.min() + 0.3, zs.max() - 0.2, 9):
+        near = [c for c in ctr if abs(c.z - zz) < 0.3]
+        c = sum(near, Vector()) / max(len(near), 1)
+        seeds.append(c + Vector(rng.uniform(-0.15, 0.15, 3)))
+    horn_bits = vfx.voronoi_fracture("HornBit", upper, seeds, mats["horn"])
+    upper.free()
+    bpy.data.objects.remove(horn, do_unlink=True)
+    # Dachplanken um den Klimaxpunkt (erst im Blitz sichtbar)
+    Pc = roof(P_CLASH[0], P_CLASH[1], 0.0)
+    sb = bmesh.new()
+    bmesh.ops.create_cube(sb, size=1.0)
+    bmesh.ops.scale(sb, vec=(2.6, 2.6, 0.12), verts=sb.verts)
+    bmesh.ops.translate(sb, vec=(Pc.x, Pc.y, deck_z + 0.062), verts=sb.verts)     # auf dem Belag (bis zum Blitz unsichtbar)
+    seeds = [Pc + Vector((rng.uniform(-1.2, 1.2), rng.uniform(-1.2, 1.2), 0.062))
+             for _ in range(14)]
+    deck_bits = vfx.voronoi_fracture("DeckBit", sb, seeds, mats["roofdeck"])
+    sb.free()
+    f_blast = F(T_CLASH) + 4
+    for ob in deck_bits:
+        for f, h in ((1, True), (f_blast - 1, True), (f_blast, False)):
+            ob.hide_render = h
+            ob.keyframe_insert("hide_render", frame=f)
+    colliders = [bpy.data.objects[n] for n in ("ResRoofDeck", "ResParapet", "ResCap")]
+    hit = roof(14.6, -6.0, 1.9)          # Naruto trifft das Horn von innen -> Stücke fliegen nach außen
+    f_horn = F(13.15) + 3
+    # Kraftfeld-Stärken kalibriert (Test: 40 000 -> 1,4 m, 150 000 -> 10 m Steighöhe der Dachplatten)
+    vfx.rigid_sim(horn_bits, colliders, f_horn, F(17.5), [(hit, 40000.0, f_horn, f_horn + 1)], mass_density=500.0)
+    vfx.rigid_sim(deck_bits, colliders, f_blast, F(19.0), [(Pc - Vector((0, 0, 0.5)), 34000.0, f_blast, f_blast + 1)],
+                  mass_density=450.0)
+    import crew
+    hi = max(max(fc.evaluate(f) for f in range(f_blast, f_blast + 30)) for ob in deck_bits
+             for fc in crew._fcurves_of(ob) if fc.data_path == "location" and fc.array_index == 2)
+    print(f"Trümmer: Horn {len(horn_bits)} Stücke, Dach {len(deck_bits)} Stücke, max. Höhe Dachstücke {hi - deck_z:.1f} m")
+    # Brandfleck im Dach nach der Explosion
+    bm = bmesh.new()
+    bmesh.ops.create_circle(bm, cap_ends=True, segments=40, radius=1.6)
+    for v in bm.verts:
+        v.co.x *= 1.0 + 0.25 * math.sin(3 * math.atan2(v.co.y, v.co.x))
+    sm, snb, sout = fpv.new_material("Scorch")
+    n = snb.noise(snb.coords("Object"), scale=2.0, detail=4)
+    r = snb.vmath("LENGTH", snb.coords("Object"))
+    col = snb.mix(snb.math("MULTIPLY", snb.out(n, "Fac"), 0.6), (0.02, 0.016, 0.012), (0.10, 0.07, 0.05))
+    pr = fpv.principled(snb, Base_Color=col, Roughness=0.9)
+    tr = snb.node("ShaderNodeBsdfTransparent")
+    mx = snb.node("ShaderNodeMixShader")
+    rm = snb.node("ShaderNodeMapRange", clamp=True)
+    snb.link(snb.math("ADD", r, snb.math("MULTIPLY", snb.out(n, "Fac"), 0.6)), rm.inputs["Value"])
+    rm.inputs["From Min"].default_value = 1.5
+    rm.inputs["From Max"].default_value = 1.0
+    snb.link(rm.outputs[0], mx.inputs[0])
+    snb.link(tr.outputs[0], mx.inputs[1])
+    snb.link(pr.outputs[0], mx.inputs[2])
+    snb.link(mx.outputs[0], sout.inputs[0])
+    scorch = fpv.mesh_from_bmesh(bm, "Scorch", sm)
+    scorch.location = (Pc.x, Pc.y, deck_z + 0.006)
+    for f, h in ((1, True), (f_blast - 1, True), (f_blast, False)):
+        scorch.hide_render = h
+        scorch.keyframe_insert("hide_render", frame=f)
+
+
+def fight_fx(nar, sas):
+    """Rasengan/Chidori, Impact-Pakete an allen Treffern, volles Paket beim Zusammenprall."""
+    vfx.energy_ball("Rasengan", nar.J["wrist.R"], (0, 0.03, -0.21), BLUE, 0.34, F(13.62), F(14.25), F(15.05),
+                    light_w=160.0)
+    vfx.lightning("Chidori", sas.J["wrist.L"], (0, 0.0, -0.12), (0.35, 0.6, 1.0), F(13.55), F(15.05), radius=0.85,
+                  n_bolts=10, seed=4, light_w=260.0)
+    V = Vector
+    impact_small("HitGate", V((0.0, -0.2, BEAM2_TOP + 1.4)), 1.15, light_w=3000.0, ring=2.0)
+    impact_small("HitTree", V((TREE_POS[0], 108.5, 8.6)), 6.85, light_w=4000.0, ring=2.5, seed=3)
+    impact_small("HitStrike", roof(4.0, 1.8, 1.9), 12.6, color=(0.85, 0.9, 1.0), light_w=5000.0, ring=3.0, seed=4)
+    impact_small("HitHorn", roof(15.4, -6.2, 1.9), 13.15, color=(1.0, 0.8, 0.5), light_w=8000.0, ring=3.5, sparks=140,
+                 seed=5)
+    vfx.dust_gn("HornDust", roof(15.8, -6.4, 0.05), 13.15 + 3 / FPS, n=260, r_max=3.0, rise=1.2, life=1.2,
+                color=(0.62, 0.58, 0.52), size=(0.012, 0.04), seed=5)
+    # --- Klimax: Rasengan gegen Chidori
+    P = roof(*P_CLASH) + Vector((0, 0, 1.1))
+    f0 = F(T_CLASH)
+    hold = bpy.data.objects.new("ClashHold", None)
+    fpv.link(hold)
+    hold.location = P
+    vfx.energy_ball("ClashSphere", hold, (0, 0, 0), (0.3, 0.55, 1.0), 0.45, f0 - 1, f0, f0 + 5, light_w=600.0)
+    lt = vfx.point_light("ClashFlash", (0.75, 0.85, 1.0), 0.0, 0.4)
+    lt.location = P
+    vfx.key_energy(lt, [(f0 - 1, 0.0), (f0, 8000.0), (f0 + 1, 14000.0), (f0 + 3, 4000.0), (f0 + 7, 0.0)])
+    vfx.shockwave("ClashWave", roof(P_CLASH[0], P_CLASH[1], 0.4), f0 + 4, r_max=15.0, dur=12, color=(0.55, 0.75, 1.0),
+                  thick=0.2, glow=2.5)
+    vfx.sparks_gn("ClashSparks", P, T_CLASH + 4 / FPS, n=260, speed=(8, 20), life=(0.25, 0.7),
+                  color=(0.7, 0.85, 1.0), strength=60.0, seed=11)
+    vfx.lightning("ClashArcs", hold, (0, 0, 0), (0.45, 0.7, 1.0), f0, f0 + 10, radius=1.9, n_bolts=10, seed=9,
+                  light_w=0.0)
+    vfx.dust_gn("ClashDust", roof(P_CLASH[0], P_CLASH[1], 0.05), T_CLASH + 4 / FPS, n=1600, r_max=8.0, rise=1.8,
+                life=1.6, color=(0.40, 0.33, 0.27), size=(0.015, 0.05), seed=12)
+
+
+def street_hits(N_keys, S_keys):
+    """Impact-Pakete an den Schlagabtauschen auf der Straße (Ort aus dem Blocking)."""
+    for k, t in enumerate((4.1, 5.65)):
+        a = track(N_keys, np.array([t]))[0]
+        b = track(S_keys, np.array([t]))[0]
+        impact_small(f"HitStreet{k}", Vector(tuple((a + b) / 2 + np.array([0, 0, 1.3]))), t, light_w=3500.0,
+                     ring=2.2, seed=6 + k)
+
+
 def track(keys, t):
     """Ort einer Figur laut Blocking zu Zeiten t (linear zwischen den Schlüsseln), (n, 3)."""
     ks = sorted(keys, key=lambda k: k[0])
@@ -476,7 +641,9 @@ def camera_path(frames, N_keys, S_keys):
     in Flugrichtung (Tor-Durchflug), am Ende auf Naruto mit den Gesichtern dahinter."""
     t, pos, v = camera_positions(frames)
     n = len(t)
-    a, b = track(N_keys, t), track(S_keys, t)
+    tw = warp(t, CAM_HOLDS)
+    pos = np.stack([np.interp(tw, t, pos[:, k]) for k in range(3)], axis=1)
+    a, b = track(N_keys, hit_warp(t)), track(S_keys, hit_warp(t))
     pair = (a + b) / 2 + np.array([0, 0, 1.0])
     nar = a + np.array([0, 0, 1.2])
     nar_end = a + np.array([0, 0, 1.3])      # Schlussbild: Blick 8° nach oben, Gesichter über Naruto
@@ -498,6 +665,15 @@ def camera_path(frames, N_keys, S_keys):
     look_pit = np.arctan2(d[:, 2], np.hypot(d[:, 0], d[:, 1]))
     pos_f, quats, info = fpv.fpv_orient(pos, FPS, look_pitch=-2.0, pitch_follow=0.45, bank_gain=1.0, max_bank=30,
                                         micro=1.0, seed=9, look=(w, look_yaw, look_pit))
+    # Kamerastöße: kurzes, stark verrauschtes, abklingendes Rütteln (Rollen/Nicken/Gieren + 3 cm Versatz)
+    rng = np.random.default_rng(77)
+    for (h, amp, nf) in SHAKES:
+        idx = np.where((t >= h) & (t < h + nf / FPS))[0]
+        for k, i in enumerate(idx):
+            env = (1 - k / len(idx)) ** 1.5
+            r = rng.uniform(-1, 1, 3) * math.radians(amp) * env
+            quats[i] = quats[i] @ Euler((r[0], r[1] * 0.5, r[2]), "XYZ").to_quaternion()
+            pos_f[i] = pos_f[i] + rng.uniform(-1, 1, 3) * 0.03 * amp * env
     info.update(v=v, t=t, look_w=w, tgt=tgt, N=a, S=b)
     return pos_f, quats, info
 
@@ -722,6 +898,7 @@ def build(args):
     print("buildings", idx)
 
     _, res_top = konoha.residence(mats, RES_POS[0], RES_POS[1], r=21.0)
+    break_fx(mats, DECK_Z)
     for (x, y, rr, tiers, rm) in ((-44, 150, 5.5, 3, 3), (40, 128, 5.0, 2, 5)):   # Stufentürme an der Straße
         konoha.tiered_tower(f"StreetTower{x}", x, y, rr, tiers, mats, mats["tower_roofs"][rm], rng)
         foot.append((x, y, rr + 3))
@@ -902,6 +1079,8 @@ def build(args):
     nar, sas = stage_fight(N_keys, S_keys, n=frames + 2, cam_pos=cam_p)
     fpv.rim_light([nar.base, sas.base], RIM["elev"], RIM["azim"], strength=RIM["strength"], kelvin=RIM["kelvin"],
                   angle=RIM["angle"])
+    fight_fx(nar, sas)
+    street_hits(N_keys, S_keys)
     pos, quats, info = camera_path(frames, N_keys, S_keys)
     info["pos"] = pos
     cam = fpv.make_camera(pos, quats, fov_deg=60.0)

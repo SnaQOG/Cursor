@@ -524,3 +524,326 @@ def aura(name, parent, color, f_on, f_off, height=1.9, width=0.75, light_w=600.0
         lt.data.energy = light_w * rng.uniform(0.7, 1.1) if f_on <= f < f_off else 0.0
         lt.data.keyframe_insert("energy", frame=f)
     return m1
+
+
+# --------------------------------------------------------------------------
+# Impact-Paket (Naruto Schritt 3.5): Funken, Druckwelle, Bruch + Rigid Body
+# --------------------------------------------------------------------------
+
+def sparks_gn(name, origin, t0, n=140, speed=(6.0, 15.0), life=(0.2, 0.55), color=(1.0, 0.72, 0.32),
+              strength=40.0, radius=(0.01, 0.025), gravity=-9.81, up=0.35, spread_dir=None, seed=3):
+    """Funkenregen als Geometry Nodes mit der Szenenzeit: n Punkte starten bei t0 am Ursprung, fliegen ballistisch
+    (Zufallsrichtung, nach oben verschoben), leuchten heiß und verschwinden nach ihrer Lebensdauer. Deterministisch,
+    jeder Frame einzeln renderbar; Bewegungsunschärfe zieht sie zu Streifen."""
+    me = bpy.data.meshes.new(name)
+    ob = bpy.data.objects.new(name, me)
+    fpv.link(ob)
+    ob.location = origin
+    ng = bpy.data.node_groups.new(name + "GN", "GeometryNodeTree")
+    ng.interface.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+    ng.interface.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+    g = fpv.NB(ng)
+    go = g.node("NodeGroupOutput")
+    ts = g.node("GeometryNodeInputSceneTime").outputs["Seconds"]
+    age = g.math("SUBTRACT", ts, t0)
+
+    def rnd(dtype, lo, hi, sd):
+        r = g.node("FunctionNodeRandomValue")
+        r.data_type = dtype
+        if dtype == "FLOAT_VECTOR":
+            r.inputs["Min"].default_value = lo
+            r.inputs["Max"].default_value = hi
+        else:
+            r.inputs[2].default_value = lo
+            r.inputs[3].default_value = hi
+        r.inputs["Seed"].default_value = sd
+        return r.outputs[0] if dtype == "FLOAT_VECTOR" else r.outputs[1]
+    d = g.vmath("NORMALIZE", g.vmath("ADD", rnd("FLOAT_VECTOR", (-1, -1, -1), (1, 1, 1), seed), (0, 0, up)))
+    if spread_dir is not None:
+        d = g.vmath("NORMALIZE", g.vmath("ADD", d, tuple(spread_dir)))
+    v = g.vmath("SCALE", d, scale=rnd("FLOAT", speed[0], speed[1], seed + 1))
+    lf = rnd("FLOAT", life[0], life[1], seed + 2)
+    a = g.math("MAXIMUM", age, 0.0)
+    p = g.vmath("ADD", g.vmath("SCALE", v, scale=a), g.comb(0.0, 0.0, g.math("MULTIPLY", 0.5 * gravity, g.math("MULTIPLY", a, a))))
+    pts = g.node("GeometryNodePoints")
+    pts.inputs["Count"].default_value = n
+    g.link(p, pts.inputs["Position"])
+    # Radius schrumpft mit dem Alter (abkühlen)
+    rad = g.math("MULTIPLY", rnd("FLOAT", radius[0], radius[1], seed + 3),
+                 g.math("SUBTRACT", 1.0, g.math("MINIMUM", g.math("DIVIDE", a, lf), 1.0)))
+    g.link(rad, pts.inputs["Radius"])
+    dead = g.math("MAXIMUM", g.math("LESS_THAN", age, 0.0), g.math("GREATER_THAN", age, lf))
+    dg = g.node("GeometryNodeDeleteGeometry")
+    g.link(pts.outputs[0], dg.inputs["Geometry"])
+    g.link(dead, dg.inputs["Selection"])
+    mat, nb, out = fpv.new_material(name + "Mat")
+    em = nb.node("ShaderNodeEmission")
+    em.inputs["Color"].default_value = (*color, 1)
+    em.inputs["Strength"].default_value = strength
+    nb.link(em.outputs[0], out.inputs[0])
+    mat.cycles.emission_sampling = "NONE"
+    sm = g.node("GeometryNodeSetMaterial")
+    sm.inputs["Material"].default_value = mat
+    g.link(dg.outputs[0], sm.inputs["Geometry"])
+    g.link(sm.outputs[0], go.inputs[0])
+    mod = ob.modifiers.new("Sparks", "NODES")
+    mod.node_group = ng
+    ob.visible_shadow = False
+    return ob
+
+
+def shockwave(name, loc, f0, r_max=12.0, dur=12, color=(0.55, 0.75, 1.0), thick=0.35, glow=6.0, ior=1.04, fps=24):
+    """Druckwelle als flacher Ring (Geometry Nodes, Szenenzeit): der Radius wächst schnell und bremst ab
+    (1 - e^-kt), der Querschnitt bleibt dünn und wird flacher; Material: leichte Brechung (Hitzeflimmern) plus
+    leuchtende Kante, blendet mit dem Alter aus. Vor f0 und nach dur Frames ist keine Geometrie da."""
+    t0 = (f0 - 1) / fps
+    life = dur / fps
+    me = bpy.data.meshes.new(name)
+    ob = bpy.data.objects.new(name, me)
+    fpv.link(ob)
+    ob.location = loc
+    ng = bpy.data.node_groups.new(name + "GN", "GeometryNodeTree")
+    ng.interface.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+    ng.interface.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+    g = fpv.NB(ng)
+    go = g.node("NodeGroupOutput")
+    ts = g.node("GeometryNodeInputSceneTime").outputs["Seconds"]
+    age = g.math("SUBTRACT", ts, t0)
+    an = g.math("MINIMUM", g.math("MAXIMUM", g.math("DIVIDE", age, life), 0.0), 1.0)
+    rad = g.math("MAXIMUM", g.math("MULTIPLY", r_max, g.math("SUBTRACT", 1.0, g.math("EXPONENT", g.math("MULTIPLY", an, -3.5)))), 0.05)
+    cc = g.node("GeometryNodeCurvePrimitiveCircle")
+    cc.inputs["Resolution"].default_value = 96
+    g.link(rad, cc.inputs["Radius"])
+    pc = g.node("GeometryNodeCurvePrimitiveCircle")
+    pc.inputs["Resolution"].default_value = 10
+    g.link(g.math("MULTIPLY", thick, g.math("SUBTRACT", 1.0, g.math("MULTIPLY", an, 0.6))), pc.inputs["Radius"])
+    c2m = g.node("GeometryNodeCurveToMesh")
+    g.link(cc.outputs[0], c2m.inputs["Curve"])
+    g.link(pc.outputs[0], c2m.inputs["Profile Curve"])
+    tf = g.node("GeometryNodeTransform")
+    g.link(c2m.outputs[0], tf.inputs["Geometry"])
+    tf.inputs["Scale"].default_value = (1.0, 1.0, 0.45)
+    st = g.node("GeometryNodeStoreNamedAttribute")
+    st.data_type = "FLOAT"
+    st.domain = "POINT"
+    st.inputs["Name"].default_value = "wave_age"
+    g.link(tf.outputs[0], st.inputs["Geometry"])
+    g.link(an, st.inputs["Value"])
+    dead = g.math("MAXIMUM", g.math("LESS_THAN", age, 0.0), g.math("GREATER_THAN", age, life))
+    dg = g.node("GeometryNodeDeleteGeometry")
+    g.link(st.outputs[0], dg.inputs["Geometry"])
+    g.link(dead, dg.inputs["Selection"])
+    mat, nb, out = fpv.new_material(name + "Mat")
+    at = nb.node("ShaderNodeAttribute", attribute_name="wave_age")
+    fade = nb.math("SUBTRACT", 1.0, nb.math("POWER", nb.out(at, "Fac"), 0.7))
+    glass = nb.node("ShaderNodeBsdfRefraction")
+    glass.inputs["IOR"].default_value = ior
+    glass.inputs["Roughness"].default_value = 0.08
+    lw = nb.node("ShaderNodeLayerWeight")
+    lw.inputs["Blend"].default_value = 0.25
+    em = nb.node("ShaderNodeEmission")
+    em.inputs["Color"].default_value = (*color, 1)
+    nb.link(nb.math("MULTIPLY", nb.math("MULTIPLY", nb.out(lw, "Facing"), glow), fade), em.inputs["Strength"])
+    add = nb.node("ShaderNodeAddShader")
+    nb.link(glass.outputs[0], add.inputs[0])
+    nb.link(em.outputs[0], add.inputs[1])
+    tr = nb.node("ShaderNodeBsdfTransparent")
+    mix = nb.node("ShaderNodeMixShader")
+    nb.link(nb.math("MULTIPLY", fade, 0.6), mix.inputs[0])
+    nb.link(tr.outputs[0], mix.inputs[1])
+    nb.link(add.outputs[0], mix.inputs[2])
+    nb.link(mix.outputs[0], out.inputs[0])
+    mat.cycles.emission_sampling = "NONE"
+    sm = g.node("GeometryNodeSetMaterial")
+    sm.inputs["Material"].default_value = mat
+    g.link(dg.outputs[0], sm.inputs["Geometry"])
+    g.link(sm.outputs[0], go.inputs[0])
+    mod = ob.modifiers.new("Wave", "NODES")
+    mod.node_group = ng
+    ob.visible_shadow = False
+    return ob
+
+
+def voronoi_fracture(name, src_bm, seeds, mat, min_verts=4):
+    """Voronoi-Bruch eines geschlossenen Meshes (bmesh in Weltkoordinaten): pro Saatpunkt eine konvexe Zelle durch
+    Halbraum-Schnitte (bisect + Deckel füllen) -> scharfkantige Bruchstücke, Ursprung im Schwerpunkt."""
+    out = []
+    S = [Vector(s) for s in seeds]
+    for i, si in enumerate(S):
+        bm = src_bm.copy()
+        for j, sj in enumerate(S):
+            if i == j or not bm.verts:
+                continue
+            mid = (si + sj) / 2
+            nrm = (sj - si).normalized()
+            res = bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=mid,
+                                         plane_no=nrm, clear_outer=True)
+            cut = [e for e in res["geom_cut"] if isinstance(e, bmesh.types.BMEdge)]
+            if cut:
+                bmesh.ops.holes_fill(bm, edges=cut, sides=0)
+        if len(bm.verts) < min_verts:
+            bm.free()
+            continue
+        c = sum((v.co for v in bm.verts), Vector()) / len(bm.verts)
+        for v in bm.verts:
+            v.co -= c
+        me = bpy.data.meshes.new(f"{name}{i}")
+        bm.to_mesh(me)
+        bm.free()
+        for p in me.polygons:
+            p.use_smooth = False
+        me.materials.append(mat)
+        ob = bpy.data.objects.new(f"{name}{i}", me)
+        ob.location = c
+        fpv.link(ob)
+        out.append(ob)
+    return out
+
+
+def rigid_sim(pieces, colliders, f_release, f_end, impulses, fps=24, mass_density=600.0, friction=0.6,
+              restitution=0.25):
+    """Echte Rigid-Body-Simulation (Blender Bullet) für Bruchstücke: bis f_release kinematisch (stehen an Ort und
+    Stelle), danach dynamisch; Impulse über kurz eingeschaltete Kraftfelder (impulses = [(ort, stärke, f0, f1)]).
+    Die Simulation wird Frame für Frame durchlaufen und als Keyframes gebacken, danach wird die Physik entfernt
+    (jeder Frame ist einzeln renderbar)."""
+    sc = bpy.context.scene
+    if sc.rigidbody_world is None:
+        bpy.ops.rigidbody.world_add()
+    rbw = sc.rigidbody_world
+    rbw.point_cache.frame_start = f_release - 2
+    rbw.point_cache.frame_end = f_end
+    rbw.substeps_per_frame = 10
+    rbw.solver_iterations = 20
+    coll = rbw.collection
+    if coll is None:
+        coll = bpy.data.collections.new("RigidBodyWorld")
+        rbw.collection = coll
+
+    def add_rb(ob, kind):
+        with bpy.context.temp_override(object=ob, active_object=ob, selected_objects=[ob], selected_editable_objects=[ob]):
+            bpy.ops.rigidbody.object_add(type=kind)
+    for ob in colliders:
+        add_rb(ob, "PASSIVE")
+        ob.rigid_body.collision_shape = "MESH"
+        ob.rigid_body.friction = 0.8
+    for ob in pieces:
+        add_rb(ob, "ACTIVE")
+        rb = ob.rigid_body
+        rb.collision_shape = "CONVEX_HULL"
+        dims = ob.dimensions
+        rb.mass = max(0.2, mass_density * dims.x * dims.y * dims.z * 0.5)
+        rb.friction = friction
+        rb.restitution = restitution
+        rb.collision_margin = 0.01
+        rb.kinematic = True
+        rb.keyframe_insert("kinematic", frame=f_release - 1)
+        rb.kinematic = False
+        rb.keyframe_insert("kinematic", frame=f_release)
+    fields = []
+    for (loc, strength, f0, f1) in impulses:
+        bpy.ops.object.effector_add(type="FORCE", location=tuple(loc))
+        fo = bpy.context.active_object
+        fo.field.falloff_type = "SPHERE"
+        fo.field.use_max_distance = True
+        fo.field.distance_max = 6.0
+        for f, s in ((f0 - 1, 0.0), (f0, strength), (f1, strength), (f1 + 1, 0.0)):
+            fo.field.strength = s
+            fo.field.keyframe_insert("strength", frame=f)
+        fields.append(fo)
+    mats = {ob.name: [] for ob in pieces}
+    for f in range(f_release - 2, f_end + 1):
+        sc.frame_set(f)
+        for ob in pieces:
+            mats[ob.name].append(ob.matrix_world.copy())
+    # Physik entfernen, Bahn als Keyframes
+    for ob in pieces + colliders:
+        with bpy.context.temp_override(object=ob, active_object=ob, selected_objects=[ob]):
+            bpy.ops.rigidbody.object_remove()
+    for fo in fields:
+        bpy.data.objects.remove(fo, do_unlink=True)
+    bpy.ops.rigidbody.world_remove()
+    for ob in pieces:
+        ob.animation_data_clear()
+        ob.rotation_mode = "QUATERNION"
+        prev = None
+        for k, M in enumerate(mats[ob.name]):
+            f = f_release - 2 + k
+            loc, q, _ = M.decompose()
+            if prev is not None and prev.dot(q) < 0:
+                q = -q
+            prev = q
+            ob.location = loc
+            ob.rotation_quaternion = q
+            ob.keyframe_insert("location", frame=f)
+            ob.keyframe_insert("rotation_quaternion", frame=f)
+    sc.frame_set(1)
+    return pieces
+
+
+def dust_gn(name, loc, t0, n=700, r_max=7.0, rise=1.6, life=1.5, color=(0.46, 0.40, 0.33), size=(0.06, 0.28),
+            k_drag=3.0, alpha=1.0, seed=5):
+    """Staub als Partikel statt Kugel-Wolken: Punkte schießen radial flach über den Boden (Luftwiderstand), steigen
+    leicht, werden größer und blassen aus (Alter als Attribut -> Transparenz im Shader). Deterministisch über die
+    Szenenzeit; nach der Lebensdauer ist nichts mehr übrig."""
+    me = bpy.data.meshes.new(name)
+    ob = bpy.data.objects.new(name, me)
+    fpv.link(ob)
+    ob.location = loc
+    ng = bpy.data.node_groups.new(name + "GN", "GeometryNodeTree")
+    ng.interface.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+    ng.interface.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+    g = fpv.NB(ng)
+    go = g.node("NodeGroupOutput")
+    ts = g.node("GeometryNodeInputSceneTime").outputs["Seconds"]
+    age = g.math("SUBTRACT", ts, t0)
+
+    def rnd(lo, hi, sd):
+        r = g.node("FunctionNodeRandomValue")
+        r.data_type = "FLOAT"
+        r.inputs[2].default_value = lo
+        r.inputs[3].default_value = hi
+        r.inputs["Seed"].default_value = sd
+        return r.outputs[1]
+    ang = rnd(0.0, 6.2832, seed)
+    reach = rnd(0.3, 1.0, seed + 1)
+    lf = rnd(life * 0.6, life, seed + 2)
+    a = g.math("MAXIMUM", age, 0.0)
+    an = g.math("MINIMUM", g.math("DIVIDE", a, lf), 1.0)
+    rr = g.math("MULTIPLY", g.math("MULTIPLY", reach, r_max),
+                g.math("SUBTRACT", 1.0, g.math("EXPONENT", g.math("MULTIPLY", a, -k_drag))))
+    z = g.math("MULTIPLY", g.math("MULTIPLY", rnd(0.2, 1.0, seed + 3), rise), g.math("POWER", an, 0.7))
+    p = g.comb(g.math("MULTIPLY", rr, g.math("COSINE", ang)), g.math("MULTIPLY", rr, g.math("SINE", ang)), z)
+    pts = g.node("GeometryNodePoints")
+    pts.inputs["Count"].default_value = n
+    g.link(p, pts.inputs["Position"])
+    # Körnchen schrumpfen mit dem Alter (statt transparenter Kugeln: kein Transparenz-Rauschen)
+    g.link(g.math("MULTIPLY", rnd(size[0], size[1], seed + 4), g.math("SUBTRACT", 1.05, g.math("POWER", an, 1.5))),
+           pts.inputs["Radius"])
+    st = g.node("GeometryNodeStoreNamedAttribute")
+    st.data_type = "FLOAT"
+    st.domain = "POINT"
+    st.inputs["Name"].default_value = "dust_age"
+    g.link(pts.outputs[0], st.inputs["Geometry"])
+    g.link(an, st.inputs["Value"])
+    dead = g.math("MAXIMUM", g.math("LESS_THAN", age, 0.0), g.math("GREATER_THAN", age, lf))
+    dg = g.node("GeometryNodeDeleteGeometry")
+    g.link(st.outputs[0], dg.inputs["Geometry"])
+    g.link(dead, dg.inputs["Selection"])
+    mat, nb, out = fpv.new_material(name + "Mat")
+    at = nb.node("ShaderNodeAttribute", attribute_name="dust_age")
+    fa = nb.math("MULTIPLY", nb.math("SUBTRACT", 1.0, nb.math("POWER", nb.out(at, "Fac"), 3.0)), alpha)
+    diff = fpv.principled(nb, Base_Color=color, Roughness=1.0)
+    tr = nb.node("ShaderNodeBsdfTransparent")
+    mx = nb.node("ShaderNodeMixShader")
+    nb.link(fa, mx.inputs[0])
+    nb.link(tr.outputs[0], mx.inputs[1])
+    nb.link(diff.outputs[0], mx.inputs[2])
+    nb.link(mx.outputs[0], out.inputs[0])
+    sm = g.node("GeometryNodeSetMaterial")
+    sm.inputs["Material"].default_value = mat
+    g.link(dg.outputs[0], sm.inputs["Geometry"])
+    g.link(sm.outputs[0], go.inputs[0])
+    mod = ob.modifiers.new("Dust", "NODES")
+    mod.node_group = ng
+    ob.visible_shadow = False
+    return ob

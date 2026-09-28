@@ -419,7 +419,8 @@ def leaves_gn(name, box, count=600, wind=(1.2, 3.0, -0.35), seed=4):
     rv = g.node("FunctionNodeRandomValue")
     rv.data_type = "FLOAT"
     g.link(idx, rv.inputs["ID"])
-    ph = g.math("MULTIPLY", rv.outputs["Value"], 6.283)
+    rval = rv.outputs[1]                       # Float-Ausgang (in Blender 5 heißen alle Varianten „Value“)
+    ph = g.math("MULTIPLY", rval, 6.283)
     px, py, pz = g.sep(pos)
     # Drift + Flattern, periodisch in der Box gehalten (Modulo)
     fx = g.math("ADD", g.math("MULTIPLY", ts, wind[0]), g.math("MULTIPLY", g.math("SINE", g.math("ADD", g.math("MULTIPLY", ts, 1.7), ph)), 0.6))
@@ -442,7 +443,7 @@ def leaves_gn(name, box, count=600, wind=(1.2, 3.0, -0.35), seed=4):
     rot = g.comb(g.math("ADD", g.math("MULTIPLY", ts, 5.0), ph), g.math("ADD", g.math("MULTIPLY", ts, 3.1), g.math("MULTIPLY", ph, 2.0)),
                  g.math("MULTIPLY", ph, 3.0))
     g.link(rot, iop.inputs["Rotation"])
-    g.link(g.math("ADD", 0.8, g.math("MULTIPLY", rv.outputs["Value"], 0.8)), iop.inputs["Scale"])
+    g.link(g.math("ADD", 0.8, g.math("MULTIPLY", rval, 0.8)), iop.inputs["Scale"])
     g.link(iop.outputs[0], go.inputs[0])
     mod = ob.modifiers.new("Leaves", "NODES")
     mod.node_group = ng

@@ -374,6 +374,47 @@ def add_sun(elev_deg, azim_deg, strength=4.0, color=(1.0, 0.95, 0.88), angle_deg
     return ob
 
 
+def add_atmosphere(density, size=(1600.0, 1600.0, 300.0), center=(0.0, 250.0), color=(0.92, 0.95, 1.0),
+                   anisotropy=0.65, name="Atmosphere"):
+    """Homogenes Streuvolumen als Box um die Szene (endlich, damit der Himmel nicht zugenebelt wird):
+    Tiefendunst und Lichtschleier um die tiefe Sonne (Vorwärtsstreuung)."""
+    import bmesh
+    bm = bmesh.new()
+    bmesh.ops.create_cube(bm, size=1.0)
+    bmesh.ops.scale(bm, vec=size, verts=bm.verts)
+    bmesh.ops.translate(bm, vec=(center[0], center[1], size[2] / 2 + 0.3), verts=bm.verts)
+    mat, nb, out = new_material(name)
+    vol = nb.node("ShaderNodeVolumePrincipled")
+    vol.inputs["Color"].default_value = (*color, 1)
+    vol.inputs["Density"].default_value = density
+    vol.inputs["Anisotropy"].default_value = anisotropy
+    nb.link(vol.outputs[0], out.inputs["Volume"])
+    ob = mesh_from_bmesh(bm, name, mat)
+    ob.visible_shadow = True
+    return ob
+
+
+def rim_light(receivers, elev, azim, strength=2.2, kelvin=7800.0, angle=3.0, name="RimLight", fade=None, fps=24):
+    """Kühles Randlicht (Sonnenlampe) per Light Linking nur auf die Objekte unter `receivers` (Wurzelobjekte,
+    alle Mesh/Kurven-Nachfahren). fade = (t0, t1): Energie blendet zwischen t0 und t1 s auf 0."""
+    coll = bpy.data.collections.new(name + "Receivers")
+    bpy.context.scene.collection.children.link(coll)
+    stack = list(receivers)
+    while stack:
+        o = stack.pop()
+        stack.extend(o.children)
+        if o.type in ("MESH", "CURVE") and o.name not in coll.objects:
+            coll.objects.link(o)
+    rim = add_sun(elev, azim, strength=strength, color=(1, 1, 1), angle_deg=angle, name=name)
+    rim.data.use_temperature, rim.data.temperature = True, kelvin
+    rim.light_linking.receiver_collection = coll
+    if fade:
+        for f, e in ((1, strength), (int(fade[0] * fps) + 1, strength), (int(fade[1] * fps) + 1, 0.0)):
+            rim.data.energy = e
+            rim.data.keyframe_insert("energy", frame=f)
+    return rim
+
+
 def build_world(sun_elev=15, sun_azim=200, sky_strength=1.0, clouds=True, cloud_cover=0.45,
                 cloud_scale=1.0, cloud_height=2000.0, cloud_color=(1.0, 0.97, 0.93),
                 air=1.0, aerosol=1.2, ozone=1.0, altitude=50.0, tint=None, custom_sky=None,

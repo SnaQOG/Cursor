@@ -34,7 +34,13 @@ import textures  # noqa: E402
 FPS = 24
 SECONDS = 20
 SPEED = 19.0
-SUN_ELEV, SUN_AZIM = 40.0, 222.0  # heller Tag (Referenzen), Sonne links hinten: Gesichter modelliert
+# Licht (Schritt 3.2): tiefe, warme Nachmittagssonne aus Westsüdwest – Streiflicht auf den Gesichtern, lange
+# Schatten quer über die Straße; kühles Randlicht aus Nordost nur auf Naruto und Sasuke
+SUN_ELEV, SUN_AZIM = 18.0, 250.0
+SUN_KELVIN = 4300.0
+SUN_STRENGTH = 5.0
+RIM = dict(elev=22.0, azim=60.0, strength=2.5, kelvin=7800.0, angle=3.0)
+ATMO_DENSITY = float(os.environ.get("NIDO_ATMO", "0.0"))
 
 WALL_C, WALL_R = (0.0, 190.0), 190.0
 STREET_HW = 12.0
@@ -401,7 +407,10 @@ def build(args):
                      motion_blur=not args.no_mblur, mist_depth=6000.0)
     fpv.build_world(sun_elev=SUN_ELEV, sun_azim=SUN_AZIM, sky_strength=0.1, clouds=True, cloud_cover=0.4,
                     cloud_ref=9.0, aerosol=0.9, ozone=1.6, cloud_color=(1.0, 0.98, 0.95))
-    fpv.add_sun(SUN_ELEV, SUN_AZIM, strength=5.2, color=(1.0, 0.95, 0.87), angle_deg=0.5)
+    key = fpv.add_sun(SUN_ELEV, SUN_AZIM, strength=SUN_STRENGTH, color=(1.0, 1.0, 1.0), angle_deg=0.5)
+    key.data.use_temperature, key.data.temperature = True, SUN_KELVIN
+    if ATMO_DENSITY > 0:
+        fpv.add_atmosphere(ATMO_DENSITY, size=(700.0, 700.0, 160.0), center=(0.0, 180.0), color=(1.0, 0.97, 0.93))
     rng = np.random.default_rng(12)
 
     mats = {
@@ -739,7 +748,9 @@ def build(args):
     # Kamera + Kämpfer (Schritt 3.1)
     cam_t, cam_p, _ = camera_positions(frames)
     N_keys, S_keys, _ = fight_plan(cam_t, cam_p)
-    stage_fight(N_keys, S_keys)
+    nar, sas = stage_fight(N_keys, S_keys)
+    fpv.rim_light([nar.base, sas.base], RIM["elev"], RIM["azim"], strength=RIM["strength"], kelvin=RIM["kelvin"],
+                  angle=RIM["angle"])
     pos, quats, info = camera_path(frames, N_keys, S_keys)
     info["pos"] = pos
     cam = fpv.make_camera(pos, quats, fov_deg=60.0)

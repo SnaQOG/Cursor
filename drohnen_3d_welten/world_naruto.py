@@ -192,9 +192,10 @@ def chase_over_roofs(N, S, street_roofs, C, deck, key, F, lead=13.0):
 
 
 def roof_fight(deck, street_roofs):
-    """Choreografie auf dem Residenzdach, getaktet auf den Kameraflug (Drohne bei ~15,8 s über der Dachmitte):
-    Sprint + Schlagabtausch, Luftsprung mit Zusammenprall, Rasengan/Chidori aufladen, Ansturm,
-    Zusammenprall mit Lichtexplosion und Druckwelle, beide werden zurückgeschleudert."""
+    """Choreografie auf dem Residenzdach, getaktet auf den Kameraflug (Drohne ab ~13,6 s über der Dachkante,
+    bei ~15,75 s über der Dachmitte): Landung, Rasengan und Chidori aufladen (sichtbar, sobald die Drohne
+    über die Kante steigt), Ansturm, Zusammenprall ~14 m vor der Drohne mit Energiekugel, Blitzbögen und
+    Druckwelle über das Dach, beide werden zurückgeschleudert; die Drohne fliegt über sie hinweg."""
     C = Vector((RES_POS[0], RES_POS[1] - 1.0, deck))
     nar = ninja.naruto(tuple(C), 0.0)
     sas = ninja.sasuke(tuple(C), 0.0)
@@ -211,34 +212,39 @@ def roof_fight(deck, street_roofs):
         fig.pose(F(t), POSES[pose], loc=(pos.x, pos.y, pos.z), yaw=yaw, ground=None if air else pos.z)
 
     N, S = nar, sas
-    Y = 7.0   # Kampflinie 6 m nördlich der Dachmitte (Flugbahn läuft über die Mitte)
+    Y0, YC = 3.0, 9.0   # Auflade-Linie knapp nördlich der Dachmitte, Zusammenprall 9 m nördlich (Drohne darüber)
     chase_over_roofs(N, S, street_roofs, C, deck, key, F)
     # (Zeit, Pose N, Position N, Pose S, Position S, in der Luft?)
     plan = [
-        (12.15, "land", at(-9.0, Y), "land", at(9.0, Y), False),
-        (12.45, "crouch_charge_R", at(-9.0, Y), "crouch_charge_L", at(9.0, Y), False),
-        (13.55, "crouch_charge_R", at(-8.9, Y), "crouch_charge_L", at(8.9, Y), False),
-        (13.75, "run_a", at(-6.6, Y), "run_b", at(6.6, Y), False),
-        (13.95, "run_b", at(-4.3, Y), "run_a", at(4.3, Y), False),
-        (14.15, "dash_thrust_R", at(-2.2, Y, 0.35), "dash_thrust_L", at(2.2, Y, 0.35), True),
-        (14.4, "dash_thrust_R", at(-0.62, Y, 0.55), "dash_thrust_L", at(0.62, Y, 0.55), True),
-        (14.7, "recoil", at(-4.2, Y - 0.5, 1.8), "recoil", at(4.2, Y - 0.5, 1.8), True),
-        (15.15, "land", at(-8.4, Y - 1.0), "land", at(8.4, Y - 1.0), False),
-        (16.4, "land", at(-8.7, Y - 1.0), "land", at(8.7, Y - 1.0), False),
-        (17.2, "guard", at(-8.7, Y - 1.0), "guard", at(8.7, Y - 1.0), False),
+        (12.15, "land", at(-7.0, Y0), "land", at(7.0, Y0), False),
+        (12.45, "crouch_charge_R", at(-7.0, Y0), "crouch_charge_L", at(7.0, Y0), False),
+        (14.9, "crouch_charge_R", at(-6.9, Y0), "crouch_charge_L", at(6.9, Y0), False),
+        (15.1, "run_a", at(-4.8, Y0 + 2.5), "run_b", at(4.8, Y0 + 2.5), False),
+        (15.25, "dash_thrust_R", at(-2.4, YC - 1.2, 0.6), "dash_thrust_L", at(2.4, YC - 1.2, 0.6), True),
+        (15.45, "dash_thrust_R", at(-0.62, YC, 1.0), "dash_thrust_L", at(0.62, YC, 1.0), True),
+        (15.75, "recoil", at(-4.5, YC - 0.5, 2.3), "recoil", at(4.5, YC - 0.5, 2.3), True),
+        (16.2, "land", at(-8.4, YC - 1.0), "land", at(8.4, YC - 1.0), False),
+        (17.0, "land", at(-8.7, YC - 1.0), "land", at(8.7, YC - 1.0), False),
+        (17.8, "guard", at(-8.7, YC - 1.0), "guard", at(8.7, YC - 1.0), False),
     ]
     for (t, pn, xn, ps, xs, air) in plan:
         key(N, t, pn, xn, xs, air)
         key(S, t, ps, xs, xn, air)
     blue = (0.12, 0.42, 1.0)
-    # Rasengan (rechte Hand Naruto) und Chidori (linke Hand Sasuke)
-    vfx.energy_ball("Rasengan", N.J["wrist.R"], (0, 0.03, -0.19), blue, 0.28, F(12.35), F(13.1), F(14.45),
-                    light_w=260.0)
-    vfx.lightning("Chidori", S.J["wrist.L"], (0, 0.0, -0.12), (0.35, 0.6, 1.0), F(12.4), F(14.45), radius=0.7,
-                  n_bolts=9, seed=4, light_w=450.0)
-    # Zusammenprall: Lichtblitz, Glühkugel, Druckwellenring flach über das Dach, Blitzbögen
-    vfx.burst("Clash", at(0, Y, 1.9), F(14.42), (0.25, 0.55, 1.0), r_max=4.2, dur=26, light_w=16000.0, seed=8,
-              ring_dz=-1.7)
+    # Rasengan (rechte Hand Naruto) und Chidori (linke Hand Sasuke), während des Anlaufs voll geladen
+    vfx.energy_ball("Rasengan", N.J["wrist.R"], (0, 0.03, -0.21), blue, 0.34, F(12.35), F(13.1), F(15.47),
+                    light_w=140.0)
+    vfx.lightning("Chidori", S.J["wrist.L"], (0, 0.0, -0.12), (0.35, 0.6, 1.0), F(12.4), F(15.47), radius=0.85,
+                  n_bolts=10, seed=4, light_w=220.0)
+    # Zusammenprall: kurz gehaltene Energiekugel, Lichtblitz, Glühkugel, Druckwelle flach über das Dach, Blitzbögen
+    P = at(0, YC, 2.2)
+    hold = bpy.data.objects.new("ClashHold", None)
+    fpv.link(hold)
+    hold.location = P
+    vfx.energy_ball("ClashSphere", hold, (0, 0, 0), (0.3, 0.55, 1.0), 1.0, F(15.43), F(15.5), F(15.85),
+                    light_w=700.0)
+    vfx.burst("Clash", P, F(15.47), (0.2, 0.45, 1.0), r_max=3.0, dur=24, light_w=2500.0, seed=8,
+              ring_dz=-2.1, core_s=14.0, glow_s=3.5, glow_alpha=0.22, ring_s=2.5, core_color=(0.8, 0.9, 1.0))
 
 
 def build(args):

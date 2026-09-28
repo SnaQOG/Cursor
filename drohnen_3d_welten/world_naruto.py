@@ -24,6 +24,7 @@ from mathutils import Matrix, Vector  # noqa: E402
 
 import fpv  # noqa: E402
 import konoha  # noqa: E402
+import konoha_life  # noqa: E402
 import nature  # noqa: E402
 import ninja  # noqa: E402
 import vfx  # noqa: E402
@@ -460,6 +461,21 @@ def build(args):
         "cloth": [fpv.simple_mat("ClothR", (0.40, 0.05, 0.03), rough=0.8), fpv.simple_mat("ClothW", (0.62, 0.58, 0.50), rough=0.8),
                   fpv.simple_mat("ClothB", (0.06, 0.12, 0.26), rough=0.8)],
     }
+    # Schritt 3.3: Ziegeldächer (Reihen, Farbstreuung, Moos, Patina, Regenstreifen), Fensterglas mit Innenraum,
+    # Verwitterung (Schmutz von unten, Kantenabrieb, Laufspuren, Farbton pro Objekt), Dachbelag der Residenz
+    roof_cols = [(0.42, 0.08, 0.04), (0.55, 0.20, 0.06), (0.10, 0.28, 0.13), (0.07, 0.19, 0.46), (0.25, 0.11, 0.36),
+                 (0.05, 0.28, 0.29)]
+    mats["roofs"] = [konoha.tile_roof_material(f"TileRoof{i}", c) for i, c in enumerate(roof_cols)]
+    mats["tower_roofs"] = [konoha.tile_roof_material(f"TowerRoof{i}", c, cylindrical=True)
+                           for i, c in enumerate(roof_cols)]
+    mats["glass"] = konoha.window_glass_material("WindowGlass", per_cell=0.9)
+    for key, kw in (("plaster", dict(edge=0.35, streak=0.25)), ("parapet", dict(edge=0.3, streak=0.3, dirt=0.0)),
+                    ("plaster_street", dict(edge=0.4, streak=0.25, dirt=0.5)),
+                    ("red", dict(dirt_h=2.5, dirt=0.35, streak=0.35)), ("red_dark", dict(dirt=0.0, streak=0.3)),
+                    ("gate", dict(dirt=0.4, edge=0.3, streak=0.3)), ("stone", dict(dirt=0.3, var=0.03)),
+                    ("horn", dict(dirt=0.0, streak=0.35, var=0.0)), ("shutter", dict(dirt=0.0, edge=0.4))):
+        konoha.weather(mats[key], **kw)
+    konoha.deck_wear(mats["roofdeck"], C_ROOF)
     sign_mats = []
     for ch in ("一楽", "忍具", "団子", "花", "書"):
         sp = os.path.join(textures.OUT, f"sign_{abs(hash(ch)) % 10000}.png")
@@ -501,7 +517,8 @@ def build(args):
     road = fpv.grid_mesh("Road", 12, 300, 2, 2, None, konoha.dirt_road_material(), origin=(0, -148))
     road.location.z = 0.04
     fpv.grid_mesh("VillageGround", 420, 420, 2, 2, None, gmat, origin=(0, 190))
-    st = fpv.grid_mesh("MainStreet", 2 * STREET_HW + 2, 178, 2, 2, None, konoha.sand_street_material(), origin=(0, 88))
+    st = fpv.grid_mesh("MainStreet", 2 * STREET_HW + 2, 178, 2, 2, None, konoha.street_ground_material(half_w=STREET_HW),
+                       origin=(0, 88))
     st.location.z = 0.02
     pz = fpv.grid_mesh("Plaza", 140, 100, 2, 2, None, cobble, origin=(0, 226))
     pz.location.z = 0.02
@@ -579,7 +596,7 @@ def build(args):
             foot.append((x, y, max(w, d) / 2 + 2.5))
             if rng.random() < 0.06:   # runde Stufentürme (Referenz)
                 konoha.tiered_tower(f"Tower{idx}", x, y, min(w, d) / 2, int(rng.integers(2, 4)), mats,
-                                    mats["roofs"][int(rng.choice([3, 5, 2]))], rng)
+                                    mats["tower_roofs"][int(rng.choice([3, 5, 2]))], rng)
             else:
                 konoha.building(rng, mats, tanks, x, y, w, d, floors, math.radians(rng.uniform(-6, 6)), idx)
             idx += 1
@@ -594,7 +611,7 @@ def build(args):
 
     _, res_top = konoha.residence(mats, RES_POS[0], RES_POS[1], r=21.0)
     for (x, y, rr, tiers, rm) in ((-44, 150, 5.5, 3, 3), (40, 128, 5.0, 2, 5)):   # Stufentürme an der Straße
-        konoha.tiered_tower(f"StreetTower{x}", x, y, rr, tiers, mats, mats["roofs"][rm], rng)
+        konoha.tiered_tower(f"StreetTower{x}", x, y, rr, tiers, mats, mats["tower_roofs"][rm], rng)
         foot.append((x, y, rr + 3))
 
     # Strommasten + Leitungen entlang der Straße
@@ -613,20 +630,21 @@ def build(args):
                     konoha.curve_tube("Wire", pts, 0.018, mats["wire"], res=0)
             prev = (x, y)
 
-    # Laternenketten quer über die Straße + Marktstände
-    for y in np.arange(33, 170, 38.0):
-        a = Vector((-(STREET_HW - 0.8), y, 6.9))
-        b = Vector((STREET_HW - 0.8, y, 6.9))
-        pts_w = [tuple(a.lerp(b, t) - Vector((0, 0, 1.3 * 4 * t * (1 - t)))) for t in np.linspace(0, 1, 16)]
-        konoha.curve_tube("LWire", pts_w, 0.02, mats["wire"], res=0)
-        for t in np.linspace(0.1, 0.9, 9):
-            p = a.lerp(b, t) - Vector((0, 0, 1.3 * 4 * t * (1 - t) + 0.5))
-            bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=8, radius=0.28, location=p)
-            lo = bpy.context.object
-            lo.scale = (1, 1, 1.35)
-            for dz in (0.36, -0.36):
-                konoha.cylinder("LCap", p.x, p.y, p.z + dz - 0.05, 0.16, 0.1, mats["wire"], seg=10)
-            lo.data.materials.append(mats["lantern"])
+    # Laternen an sichtbaren Seilen quer über die Straße (pendeln), Wäscheleinen, Marktstände mit Waren,
+    # Passanten, aufgeschreckte Vögel, treibende Blätter (Schritt 3.3)
+    konoha_life.lantern_lines([33.0, 71.0, 109.0, 147.0], x_end=STREET_HW + 1.4, z_end=7.2, sag=1.1)
+
+    def facade_h(side, y):
+        hs = [h for (sd, yc, h, _) in street_roofs if sd == side and abs(yc - y) < 6.0]
+        return min(hs) if hs else 0.0
+    wl = []
+    for y in (52.0, 90.0, 128.0, 160.0):
+        z = min(facade_h(-1, y), facade_h(1, y)) - 1.2
+        if z > 7.3 and abs(y - TREE_POS[1]) > 14:
+            wl.append((y, min(z, 10.5)))
+    for y, z in wl:
+        konoha_life.laundry_lines([y], x_end=STREET_HW + 1.4, z_end=z, sag=0.7, seed=int(y))
+    print("laundry lines", wl)
     for k in range(14):
         side = -1 if k % 2 else 1
         y = 30 + k * 10.5 + rng.uniform(-2, 2)
@@ -637,9 +655,30 @@ def build(args):
                 konoha.cylinder("StallPost", x + dx, y + dy, 0, 0.06, 2.4, mats["rail"], seg=6)
         konoha.box("StallRoof", x, y, 2.4, 2.8, 3.4, 0.12, cm, rot=math.radians(rng.uniform(-4, 4)), bevel=0)
         konoha.box("StallTable", x, y, 0.8, 2.2, 2.8, 0.12, mats["rail"], bevel=0)
-        for q in range(3):
-            konoha.box("Crate", x + rng.uniform(-0.8, 0.8), y + rng.uniform(-1, 1), 0.92, 0.5, 0.4, 0.35,
+        konoha_life.stall_goods(f"Goods{k}", x, y, rng)
+        for q in range(2):
+            konoha.box("Crate", x + side * 1.6, y + rng.uniform(-1, 1), 0.0, 0.5, 0.4, 0.35,
                        mats["rail"], rot=rng.uniform(0, 3), bevel=0.02)
+
+
+    vtemps = konoha_life.villager_templates()
+    spots = []
+    y = 24.0
+    while y < 172.0:
+        for side in (-1, 1):
+            if rng.random() < 0.55:
+                x = side * (rng.uniform(5.0, 7.6) if rng.random() < 0.6 else rng.uniform(11.0, 12.2))
+                if abs(y - TREE_POS[1]) < 7 and -2 < x < 10:
+                    continue
+                yaw = (90.0 if side > 0 else -90.0) + rng.uniform(-45, 45)
+                spots.append((x, y + rng.uniform(-1.5, 1.5), yaw))
+        y += rng.uniform(3.5, 6.0)
+    konoha_life.place_villagers(vtemps, spots, seed=11)
+    print("villagers", len(spots))
+    konoha_life.birds(14, ((-20, -14), (64, 80), (9, 13)), (30, 14, 9), 3.3, 5.6, seed=21)
+    konoha_life.birds(12, ((14, 20), (70, 84), (9, 13)), (-28, 18, 10), 3.45, 5.7, seed=22)
+    konoha_life.leaves_gn("StreetLeaves", ((-12, 12), (18, 176), (0.3, 12)), count=700, wind=(1.0, 2.2, -0.3), seed=4)
+    konoha_life.leaves_gn("TreeLeaves", ((-6, 14), (104, 134), (0.5, 13)), count=260, wind=(0.8, 1.6, -0.5), seed=6)
 
     # Hokage-Felsen
     # ockerfarbener Sandstein mit dunklen Laufspuren (Referenzen)
@@ -675,7 +714,7 @@ def build(args):
     variants += [nature.tree_variant(f"KSugi{i}", conleaf, bark, height=h, crown_r=cr, n_clusters=nc, leaves_per=110,
                                      seed=80 + i, shape="conical", leaf_size=0.3)
                  for i, (h, cr, nc) in enumerate(((22, 4.0, 34), (16, 3.2, 28)))]
-    _, subs = nature.make_tree_collection("KTrees", variants)
+    tree_coll, subs = nature.make_tree_collection("KTrees", variants)
     # großer alter Baum auf der Straße (Manöverpunkt)
     big = nature.tree_variant("BigTree", leaf, bark, height=21, crown_r=7.0, n_clusters=44, leaves_per=140, seed=99,
                               leaf_size=0.45)
@@ -742,7 +781,7 @@ def build(args):
             continue
         pts.append((x, y, 0))
         scl.append(rng.uniform(0.6, 1.1))
-    nature.scatter_instances("KForest", subs, pts, scales=scl, seed=5)
+    nature.scatter_gn("KForest", tree_coll, len(subs), pts, scales=scl, seed=5)   # Geometry Nodes, Drehung/Größe zufällig
     print("trees", len(pts))
 
     # Kamera + Kämpfer (Schritt 3.1)

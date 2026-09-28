@@ -66,6 +66,13 @@ def plaster_material(name="Plaster", window=True):
         fr_z = nb.math("MULTIPLY", nb.math("GREATER_THAN", fz, 0.28), nb.math("LESS_THAN", fz, 0.82))
         frame = nb.math("MULTIPLY", nb.math("MULTIPLY", fr_u, fr_z), nb.math("MULTIPLY", above, nb.math("MULTIPLY", vert, keep)))
         glass = nb.mix(nb.out(wr, "Value"), (0.02, 0.025, 0.03), (0.08, 0.07, 0.05))
+        # ~25 % der Fenster warm erleuchtet (Zimmerlicht), ~25 % mit hellem Vorhang
+        lit = nb.math("MULTIPLY", win, nb.math("GREATER_THAN", nb.out(wr, "Value"), 0.8))
+        cur = nb.math("MULTIPLY", win, nb.math("MULTIPLY", nb.math("GREATER_THAN", nb.out(wr, "Value"), 0.62),
+                                                nb.math("LESS_THAN", nb.out(wr, "Value"), 0.8)))
+        glass = nb.mix(cur, glass, (0.55, 0.50, 0.40))
+        glass = nb.mix(lit, glass, (0.30, 0.21, 0.13))
+        emis = nb.math("MULTIPLY", lit, 1.1)
         col = nb.mix(frame, col, (0.22, 0.13, 0.08))
         col = nb.mix(win, col, glass)
         # Erdgeschoss: Ladenfronten/Türen (dunkle Öffnungen mit Holzrahmen)
@@ -85,6 +92,10 @@ def plaster_material(name="Plaster", window=True):
         col = nb.mix(nb.math("MULTIPLY", foot.outputs[0], 0.5), col, (0.12, 0.1, 0.08))
         rough = nb.mix(win, 0.85, 0.08, dtype="FLOAT")
     p = fpv.principled(nb, Base_Color=col, Roughness=rough)
+    if window:
+        p.inputs["Emission Color"].default_value = (1.0, 0.62, 0.32, 1)
+        nb.link(emis, p.inputs["Emission Strength"])
+        mat.cycles.emission_sampling = "NONE"     # sichtbar leuchtend, aber keine Lichtquelle (sonst +15 % Renderzeit)
     nb.link(tnrm, p.inputs["Normal"])
     nb.link(p.outputs[0], out.inputs[0])
     return mat
@@ -1036,3 +1047,271 @@ def add_cracks(Y, X, Z, rng, n=8, x_range=(-400, 400), z_top=150, panel=None, de
             groove = np.where(inside, groove * 0.15, groove)
         Y = Y + groove
     return Y
+
+
+# --------------------------------------------------------------------------
+# Schritt 3.3 – Verwitterung, Straßenboden, Ziegel, Glas, Dachbelag
+# --------------------------------------------------------------------------
+
+def weather(mat, dirt_h=2.2, dirt=0.45, ground_z=0.0, edge=0.0, edge_col=(0.78, 0.74, 0.66), bevel_r=0.07,
+            streak=0.0, var=0.05, streak_scale=1.2):
+    """Verwitterung an ein bestehendes Material hängen (Basisfarbe des Principled BSDF wird umgeleitet):
+    - Farbe pro Objekt (Object Info → Random): Farbton ±var/2, Helligkeit ±var
+    - Schmutz von unten (Welt-z über ground_z bis dirt_h, mit Rauschen ausgefranst)
+    - Kantenabrieb über den Bevel-Knoten (Abweichung der gerundeten von der echten Normale), aufgehellt
+    - senkrechte Regen-/Laufspuren (gestrecktes Rauschen)."""
+    nt = mat.node_tree
+    nb = fpv.NB(nt)
+    p = next(n for n in nt.nodes if n.bl_idname == "ShaderNodeBsdfPrincipled")
+    bc = p.inputs["Base Color"]
+    col = bc.links[0].from_socket if bc.is_linked else tuple(bc.default_value)[:3]
+    for lk in list(bc.links):
+        nt.links.remove(lk)
+    geo = nb.node("ShaderNodeNewGeometry")
+    wpos = nb.out(geo, "Position")
+    x, y, z = nb.sep(wpos)
+    if var:
+        rnd = nb.out(nb.node("ShaderNodeObjectInfo"), "Random")
+        hsv = nb.node("ShaderNodeHueSaturation")
+        nb.link(col, hsv.inputs["Color"])
+        nb.link(nb.math("ADD", 0.5, nb.math("MULTIPLY", nb.math("SUBTRACT", nb.math("FRACT", nb.math("MULTIPLY", rnd, 7.3)), 0.5),
+                                              0.4 * var)), hsv.inputs["Hue"])
+        nb.link(nb.math("ADD", 1.0, nb.math("MULTIPLY", nb.math("SUBTRACT", rnd, 0.5), 2 * var)), hsv.inputs["Value"])
+        col = hsv.outputs[0]
+    if streak:
+        sn = nb.noise(nb.comb(nb.math("ADD", x, y), nb.math("MULTIPLY", z, 0.07), 0.0), scale=streak_scale, detail=2)
+        sm = nb.node("ShaderNodeMapRange", clamp=True)
+        nb.link(nb.out(sn, "Fac"), sm.inputs["Value"])
+        sm.inputs["From Min"].default_value = 0.55
+        sm.inputs["From Max"].default_value = 0.75
+        col = nb.mix(nb.math("MULTIPLY", sm.outputs[0], streak), col, nb.vmath("MULTIPLY", col, (0.55, 0.52, 0.48)))
+    if edge:
+        bev = nb.node("ShaderNodeBevel")
+        bev.samples = 4
+        bev.inputs["Radius"].default_value = bevel_r
+        d = nb.vmath("DOT_PRODUCT", nb.out(bev, "Normal"), nb.out(geo, "Normal"))
+        em = nb.node("ShaderNodeMapRange", clamp=True)
+        nb.link(nb.math("ADD", d, nb.math("MULTIPLY", nb.out(nb.noise(wpos, scale=3.0, detail=3), "Fac"), 0.06)),
+                em.inputs["Value"])
+        em.inputs["From Min"].default_value = 1.02
+        em.inputs["From Max"].default_value = 0.96
+        col = nb.mix(nb.math("MULTIPLY", em.outputs[0], edge), col, edge_col)
+    if dirt:
+        dn = nb.noise(wpos, scale=0.9, detail=3, rough=0.6)
+        h = nb.math("ADD", nb.math("SUBTRACT", z, ground_z), nb.math("MULTIPLY", nb.math("SUBTRACT", nb.out(dn, "Fac"), 0.5), 0.9))
+        dm = nb.node("ShaderNodeMapRange", clamp=True)
+        nb.link(h, dm.inputs["Value"])
+        dm.inputs["From Min"].default_value = dirt_h
+        dm.inputs["From Max"].default_value = 0.0
+        f = nb.math("MULTIPLY", nb.math("POWER", dm.outputs[0], 1.6), dirt)
+        col = nb.mix(f, col, nb.vmath("MULTIPLY", col, (0.42, 0.37, 0.31)))
+    nb.link(col, bc)
+    return mat
+
+
+def street_ground_material(name="StreetGround", half_w=12.0):
+    """Hauptstraße: festgetretener Sand mit Steinplatten-Weg in der Mitte (Brick-Muster, Fugen, Risse,
+    Farbstreuung pro Platte), Fahrrinnen, rissigen Lehmflächen, Pfützen (glatt, spiegelnd) und dunkleren,
+    bewachsenen Rändern an den Hauswänden."""
+    mat, nb, out = fpv.new_material(name)
+    wpos = nb.out(nb.node("ShaderNodeNewGeometry"), "Position")
+    x, y, _ = nb.sep(wpos)
+    ax = nb.math("ABSOLUTE", x)
+    c = nb.image(os.path.join(fpv.ASSETS, "bab", "textures_dirt.jpg"), nb.mapping(wpos, scale=(0.22, 0.22, 0.22)))
+    lum = nb.vmath("DOT_PRODUCT", nb.out(c, "Color"), (0.33, 0.33, 0.33))
+    n1 = nb.noise(wpos, scale=0.05, detail=3)
+    n2 = nb.noise(wpos, scale=0.9, detail=3)
+    sand = nb.mix(nb.out(n1, "Fac"), (0.44, 0.35, 0.21), (0.66, 0.55, 0.36))
+    sand = nb.vmath("SCALE", sand, scale=nb.math("MULTIPLY_ADD", lum, 0.9, 0.55))
+    # Fahrrinnen bei |x| ≈ 5,5 m
+    rut = nb.node("ShaderNodeMapRange", clamp=True)
+    nb.link(nb.math("ABSOLUTE", nb.math("SUBTRACT", ax, 5.5)), rut.inputs["Value"])
+    rut.inputs["From Min"].default_value = 0.9
+    rut.inputs["From Max"].default_value = 0.2
+    sand = nb.mix(nb.math("MULTIPLY", rut.outputs[0], nb.math("MULTIPLY_ADD", nb.out(n2, "Fac"), 0.5, 0.2)), sand,
+                  (0.30, 0.23, 0.14))
+    # rissige Lehmflächen
+    mud = nb.node("ShaderNodeMapRange", clamp=True)
+    nb.link(nb.out(nb.noise(wpos, scale=0.11, detail=2), "Fac"), mud.inputs["Value"])
+    mud.inputs["From Min"].default_value = 0.56
+    mud.inputs["From Max"].default_value = 0.62
+    vc = nb.voronoi(wpos, scale=2.2, feature="DISTANCE_TO_EDGE")
+    crk = nb.node("ShaderNodeMapRange", clamp=True)
+    nb.link(nb.out(vc, "Distance"), crk.inputs["Value"])
+    crk.inputs["From Min"].default_value = 0.045
+    crk.inputs["From Max"].default_value = 0.0
+    cracks = nb.math("MULTIPLY", crk.outputs[0], mud.outputs[0])
+    sand = nb.mix(nb.math("MULTIPLY", cracks, 0.8), sand, (0.12, 0.09, 0.06))
+    # Steinplatten in der Mitte (Ränder ausgefranst)
+    fl = nb.voronoi(wpos, scale=1.05, feature="F1", rand=0.85)
+    fe = nb.voronoi(wpos, scale=1.05, feature="DISTANCE_TO_EDGE", rand=0.85)
+    jm = nb.node("ShaderNodeMapRange", clamp=True)                  # Fuge: 1 in der Fuge
+    nb.link(nb.out(fe, "Distance"), jm.inputs["Value"])
+    jm.inputs["From Min"].default_value = 0.05
+    jm.inputs["From Max"].default_value = 0.025
+    stone = nb.mix(nb.math("MULTIPLY", nb.sep(nb.out(fl, "Color"))[0], 1.0), (0.34, 0.32, 0.29), (0.50, 0.47, 0.41))
+    path = nb.node("ShaderNodeMapRange", clamp=True)
+    nb.link(nb.math("ADD", ax, nb.math("MULTIPLY", nb.out(nb.noise(wpos, scale=0.35, detail=2), "Fac"), 1.4)),
+            path.inputs["Value"])
+    path.inputs["From Min"].default_value = 3.6
+    path.inputs["From Max"].default_value = 3.3
+    slab = nb.mix(jm.outputs[0], stone, (0.13, 0.11, 0.09))
+    sc_ = nb.voronoi(wpos, scale=1.6, feature="DISTANCE_TO_EDGE")
+    sc_m = nb.node("ShaderNodeMapRange", clamp=True)
+    nb.link(nb.out(sc_, "Distance"), sc_m.inputs["Value"])
+    sc_m.inputs["From Min"].default_value = 0.02
+    sc_m.inputs["From Max"].default_value = 0.0
+    slab = nb.mix(nb.math("MULTIPLY", sc_m.outputs[0], nb.math("GREATER_THAN", nb.out(n2, "Fac"), 0.55)), slab,
+                  (0.14, 0.12, 0.10))
+    slab = nb.vmath("SCALE", slab, scale=nb.math("MULTIPLY_ADD", lum, 0.5, 0.75))
+    col = nb.mix(path.outputs[0], sand, slab)
+    mortar = nb.math("MULTIPLY", jm.outputs[0], path.outputs[0])
+    # dunklere, bewachsene Ränder an den Hauswänden
+    edge = nb.node("ShaderNodeMapRange", clamp=True)
+    nb.link(nb.math("ADD", ax, nb.math("MULTIPLY", nb.out(n2, "Fac"), 1.2)), edge.inputs["Value"])
+    edge.inputs["From Min"].default_value = half_w - 3.5
+    edge.inputs["From Max"].default_value = half_w + 0.6
+    col = nb.mix(nb.math("MULTIPLY", edge.outputs[0], 0.6), col, nb.vmath("MULTIPLY", col, (0.5, 0.47, 0.42)))
+    weed = nb.math("MULTIPLY", nb.math("POWER", edge.outputs[0], 3.0),
+                   nb.math("GREATER_THAN", nb.out(nb.noise(wpos, scale=1.7, detail=3), "Fac"), 0.55))
+    col = nb.mix(weed, col, (0.07, 0.11, 0.03))
+    # Pfützen: dunkel, glatt, Rand nass
+    pn = nb.noise(wpos, scale=0.075, detail=3, rough=0.55)
+    pud = nb.node("ShaderNodeMapRange", clamp=True)
+    nb.link(nb.math("ADD", nb.out(pn, "Fac"), nb.math("MULTIPLY", nb.out(n2, "Fac"), 0.06)), pud.inputs["Value"])
+    pud.inputs["From Min"].default_value = 0.672
+    pud.inputs["From Max"].default_value = 0.69
+    wet = nb.node("ShaderNodeMapRange", clamp=True)
+    nb.link(nb.out(pn, "Fac"), wet.inputs["Value"])
+    wet.inputs["From Min"].default_value = 0.64
+    wet.inputs["From Max"].default_value = 0.675
+    col = nb.mix(nb.math("MULTIPLY", wet.outputs[0], 0.6), col, nb.vmath("MULTIPLY", col, (0.55, 0.52, 0.5)))
+    col = nb.mix(pud.outputs[0], col, (0.10, 0.10, 0.10))
+    rough = nb.mix(wet.outputs[0], 0.93, 0.45, dtype="FLOAT")
+    rough = nb.mix(pud.outputs[0], rough, 0.03, dtype="FLOAT")
+    p = fpv.principled(nb, Base_Color=col, Roughness=rough)
+    h = nb.math("ADD", lum, nb.math("MULTIPLY", nb.out(n2, "Fac"), 0.4))
+    h = nb.math("SUBTRACT", h, nb.math("MULTIPLY", nb.math("ADD", mortar, cracks), 0.8))
+    h = nb.math("MULTIPLY", h, nb.math("SUBTRACT", 1.0, pud.outputs[0]))       # Pfützen spiegelglatt
+    nb.link(nb.bump(h, strength=0.4, distance=0.04), p.inputs["Normal"])
+    nb.link(p.outputs[0], out.inputs[0])
+    return mat
+
+
+def tile_roof_material(name, color, cylindrical=False, tile_w=0.32, tile_h=0.26, var=0.18):
+    """Ziegeldach: versetzte Ziegelreihen (Brick-Muster) mit Farbstreuung pro Ziegel, dunkle Fugen/Schattenkanten
+    als Relief, Moos/Schmutz in den Fugen, Patina-Flecken und Regenstreifen. cylindrical=True: Reihen rund um
+    Kegel/Zylinder (Objektkoordinaten, Winkel × Umfang), für die runden Turm- und Stufendächer."""
+    mat, nb, out = fpv.new_material(name)
+    co = nb.coords("Object")
+    ox, oy, oz = nb.sep(co)
+    wpos = nb.out(nb.node("ShaderNodeNewGeometry"), "Position")
+    if cylindrical:
+        ang = nb.math("ARCTAN2", oy, ox)
+        u = nb.math("MULTIPLY", ang, 1.6)       # ~10 Ziegel pro Radiant (feste Zahl rund um den Kegel)
+        v = oz
+    else:
+        u, v = nb.math("ADD", ox, oy), oz      # Reihen parallel zur Traufe (gleiche Höhe) für Walm-/Tonnendächer
+    br = nb.node("ShaderNodeTexBrick")
+    br.offset = 0.5
+    nb.link(nb.comb(u, v, 0.0), br.inputs["Vector"])
+    br.inputs["Scale"].default_value = 1.0
+    br.inputs["Mortar Size"].default_value = 0.018
+    br.inputs["Mortar Smooth"].default_value = 0.6
+    br.inputs["Brick Width"].default_value = tile_w if not cylindrical else 0.16
+    br.inputs["Row Height"].default_value = tile_h
+    br.inputs["Color1"].default_value = (*color, 1)
+    br.inputs["Color2"].default_value = (*[c * (1 - var) for c in color], 1)
+    br.inputs["Mortar"].default_value = (*[c * 0.35 for c in color], 1)
+    rnd = nb.out(nb.node("ShaderNodeObjectInfo"), "Random")
+    col = nb.out(br, "Color")
+    col = nb.vmath("SCALE", col, scale=nb.math("ADD", 0.93, nb.math("MULTIPLY", rnd, 0.14)))
+    # Patina (grau-grünlich) und Schmutz
+    pat = nb.node("ShaderNodeMapRange", clamp=True)
+    nb.link(nb.out(nb.noise(wpos, scale=0.45, detail=4, rough=0.6), "Fac"), pat.inputs["Value"])
+    pat.inputs["From Min"].default_value = 0.5
+    pat.inputs["From Max"].default_value = 0.75
+    col = nb.mix(nb.math("MULTIPLY", pat.outputs[0], 0.45), col, (0.34, 0.36, 0.30))
+    moss = nb.math("MULTIPLY", nb.out(br, "Fac"), nb.math("GREATER_THAN", nb.out(nb.noise(wpos, scale=1.3), "Fac"), 0.5))
+    col = nb.mix(nb.math("MULTIPLY", moss, 0.7), col, (0.06, 0.09, 0.03))
+    x, y, z = nb.sep(wpos)
+    sn = nb.noise(nb.comb(nb.math("ADD", x, y), nb.math("MULTIPLY", z, 0.1), 0.0), scale=1.4, detail=2)
+    sm = nb.node("ShaderNodeMapRange", clamp=True)
+    nb.link(nb.out(sn, "Fac"), sm.inputs["Value"])
+    sm.inputs["From Min"].default_value = 0.56
+    sm.inputs["From Max"].default_value = 0.74
+    col = nb.mix(nb.math("MULTIPLY", sm.outputs[0], 0.4), col, nb.vmath("MULTIPLY", col, (0.5, 0.48, 0.45)))
+    p = fpv.principled(nb, Base_Color=col, Roughness=nb.mix(nb.out(br, "Fac"), 0.5, 0.85, dtype="FLOAT"))
+    # Relief: Ziegel wölben sich, Unterkante wirft Schattenkante (Sägezahn über die Reihe)
+    row = nb.math("FRACT", nb.math("DIVIDE", v, tile_h))
+    h = nb.math("SUBTRACT", nb.math("MULTIPLY", row, 0.6), nb.math("MULTIPLY", nb.out(br, "Fac"), 0.8))
+    nb.link(nb.bump(h, strength=0.55, distance=0.03), p.inputs["Normal"])
+    nb.link(p.outputs[0], out.inputs[0])
+    return mat
+
+
+def window_glass_material(name="WindowGlass", lit=0.22, curtain=0.3, per_cell=None):
+    """Fensterglas: spiegelnd (Fresnel), dahinter angedeuteter Raum: ein Teil der Fenster warm erleuchtet,
+    ein Teil mit hellem Vorhang, der Rest dunkles Zimmer. Zufall pro Objekt (Instanzen) oder – für ein einziges
+    Mesh mit vielen Fenstern – pro Weltzelle (per_cell = Zellgröße in m)."""
+    mat, nb, out = fpv.new_material(name)
+    wpos = nb.out(nb.node("ShaderNodeNewGeometry"), "Position")
+    if per_cell:
+        wn = nb.node("ShaderNodeTexWhiteNoise")
+        wn.noise_dimensions = "3D"
+        nb.link(nb.vmath("SCALE", wpos, scale=1.0 / per_cell), wn.inputs["Vector"])
+        fl = nb.node("ShaderNodeVectorMath", operation="FLOOR")
+        nb.link(nb.vmath("SCALE", wpos, scale=1.0 / per_cell), fl.inputs[0])
+        nb.link(fl.outputs[0], wn.inputs["Vector"])
+        rnd = nb.out(wn, "Value")
+    else:
+        rnd = nb.out(nb.node("ShaderNodeObjectInfo"), "Random")
+    is_lit = nb.math("LESS_THAN", rnd, lit)
+    is_cur = nb.math("MULTIPLY", nb.math("GREATER_THAN", rnd, lit), nb.math("LESS_THAN", rnd, lit + curtain))
+    _, _, z = nb.sep(wpos)
+    fold = nb.out(nb.noise(nb.comb(nb.math("MULTIPLY", nb.sep(wpos)[0], 9.0), nb.sep(wpos)[1], 0.0), scale=1.0), "Fac")
+    room = nb.mix(nb.math("FRACT", nb.math("MULTIPLY", rnd, 13.0)), (0.025, 0.022, 0.02), (0.05, 0.04, 0.03))
+    col = nb.mix(is_cur, room, nb.mix(fold, (0.55, 0.50, 0.40), (0.72, 0.66, 0.52)))
+    col = nb.mix(is_lit, col, (0.30, 0.22, 0.14))
+    p = fpv.principled(nb, Base_Color=col, Roughness=0.04, IOR=1.52)
+    p.inputs["Emission Color"].default_value = (1.0, 0.62, 0.32, 1)
+    nb.link(nb.math("MULTIPLY", is_lit, nb.math("MULTIPLY_ADD", fold, 0.8, 0.9)), p.inputs["Emission Strength"])
+    mat.cycles.emission_sampling = "NONE"
+    nb.link(p.outputs[0], out.inputs[0])
+    return mat
+
+
+def deck_wear(mat, center, r_edge=19.3):
+    """Dachbelag der Residenz verwittern: dunkler, feuchter Ring an der Brüstung, Wasserflecken, helle
+    Laufspuren zur Mitte, Moos in den Fugen am Rand."""
+    nt = mat.node_tree
+    nb = fpv.NB(nt)
+    p = next(n for n in nt.nodes if n.bl_idname == "ShaderNodeBsdfPrincipled")
+    bc = p.inputs["Base Color"]
+    col = bc.links[0].from_socket
+    nt.links.remove(bc.links[0])
+    wpos = nb.out(nb.node("ShaderNodeNewGeometry"), "Position")
+    x, y, _ = nb.sep(wpos)
+    r = nb.math("SQRT", nb.math("ADD", nb.math("POWER", nb.math("SUBTRACT", x, center[0]), 2.0),
+                                nb.math("POWER", nb.math("SUBTRACT", y, center[1]), 2.0)))
+    n = nb.noise(wpos, scale=0.35, detail=4, rough=0.6)
+    ring = nb.node("ShaderNodeMapRange", clamp=True)
+    nb.link(nb.math("ADD", r, nb.math("MULTIPLY", nb.out(n, "Fac"), 3.0)), ring.inputs["Value"])
+    ring.inputs["From Min"].default_value = r_edge - 3.5
+    ring.inputs["From Max"].default_value = r_edge + 1.0
+    col = nb.mix(nb.math("MULTIPLY", ring.outputs[0], 0.75), col, nb.vmath("MULTIPLY", col, (0.45, 0.43, 0.38)))
+    moss = nb.math("MULTIPLY", nb.math("POWER", ring.outputs[0], 2.0),
+                   nb.math("GREATER_THAN", nb.out(nb.noise(wpos, scale=2.2), "Fac"), 0.58))
+    col = nb.mix(nb.math("MULTIPLY", moss, 0.8), col, (0.07, 0.10, 0.035))
+    st = nb.node("ShaderNodeMapRange", clamp=True)
+    nb.link(nb.out(nb.noise(wpos, scale=0.16, detail=3), "Fac"), st.inputs["Value"])
+    st.inputs["From Min"].default_value = 0.6
+    st.inputs["From Max"].default_value = 0.68
+    col = nb.mix(nb.math("MULTIPLY", st.outputs[0], 0.35), col, nb.vmath("MULTIPLY", col, (0.62, 0.6, 0.56)))
+    walk = nb.node("ShaderNodeMapRange", clamp=True)
+    nb.link(nb.math("ADD", r, nb.math("MULTIPLY", nb.out(n, "Fac"), 4.0)), walk.inputs["Value"])
+    walk.inputs["From Min"].default_value = 11.0
+    walk.inputs["From Max"].default_value = 4.0
+    col = nb.mix(nb.math("MULTIPLY", walk.outputs[0], 0.25), col, nb.vmath("MULTIPLY", col, (1.35, 1.3, 1.22)))
+    nb.link(col, bc)
+    return mat

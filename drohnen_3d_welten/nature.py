@@ -502,3 +502,54 @@ def vines_mesh(name, starts, rng, leaf_mat, stem_mat, len_range=(3, 9)):
     fpv.link(so)
     fpv.link(lo)
     return so, lo
+
+
+def scatter_gn(name, coll, n_variants, points, scales=None, seed=0):
+    """Streuung per Geometry Nodes: ein Punkt-Mesh (Attribute 'variant', 'scale', 'rot_z'), 'Instance on Points'
+    wählt die Variante aus den Unter-Collections von `coll` (Collection Info, Kinder getrennt),
+    zufällige Drehung um Z und Größe pro Punkt."""
+    rng = np.random.default_rng(seed)
+    P = np.asarray(points, dtype=np.float32).reshape(-1, 3)
+    n = len(P)
+    me = bpy.data.meshes.new(name + "Pts")
+    me.vertices.add(n)
+    me.vertices.foreach_set("co", P.ravel())
+    var = me.attributes.new("variant", "INT", "POINT")
+    var.data.foreach_set("value", rng.integers(0, n_variants, n).astype(np.int32))
+    sc = me.attributes.new("scale", "FLOAT", "POINT")
+    s = np.asarray(scales, np.float32) if scales is not None else rng.uniform(0.8, 1.25, n).astype(np.float32)
+    sc.data.foreach_set("value", s)
+    rz = me.attributes.new("rot_z", "FLOAT", "POINT")
+    rz.data.foreach_set("value", rng.uniform(0, 2 * np.pi, n).astype(np.float32))
+    ob = bpy.data.objects.new(name, me)
+    fpv.link(ob)
+    ng = bpy.data.node_groups.new(name + "GN", "GeometryNodeTree")
+    ng.interface.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+    ng.interface.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+    g = fpv.NB(ng)
+    gi, go = g.node("NodeGroupInput"), g.node("NodeGroupOutput")
+    mtp = g.node("GeometryNodeMeshToPoints")
+    g.link(gi.outputs[0], mtp.inputs["Mesh"])
+    ci = g.node("GeometryNodeCollectionInfo")
+    ci.transform_space = "ORIGINAL"
+    ci.inputs["Collection"].default_value = coll
+    ci.inputs["Separate Children"].default_value = True
+    ci.inputs["Reset Children"].default_value = True
+    iop = g.node("GeometryNodeInstanceOnPoints")
+    g.link(mtp.outputs[0], iop.inputs["Points"])
+    g.link(ci.outputs[0], iop.inputs["Instance"])
+    iop.inputs["Pick Instance"].default_value = True
+
+    def attr(nm, dtype):
+        a = g.node("GeometryNodeInputNamedAttribute")
+        a.data_type = dtype
+        a.inputs["Name"].default_value = nm
+        return a.outputs["Attribute"]
+    g.link(attr("variant", "INT"), iop.inputs["Instance Index"])
+    g.link(g.comb(0.0, 0.0, attr("rot_z", "FLOAT")), iop.inputs["Rotation"])
+    s_ = attr("scale", "FLOAT")
+    g.link(g.comb(s_, s_, s_), iop.inputs["Scale"])
+    g.link(iop.outputs[0], go.inputs[0])
+    mod = ob.modifiers.new("Scatter", "NODES")
+    mod.node_group = ng
+    return ob

@@ -97,16 +97,27 @@ def hazard_rim_material(name="FriezaRim", stripes=48):
 
 
 def grass_blade_material(name="NamekBlade"):
+    """Blaues Namek-Gras: dunkle Basis, hellere Spitzen; Variation je Halm (Attribut 'blade_rnd': Helligkeit,
+    Tönung Richtung Türkis/Violett) und je Büschel ('clump': satter/blasser, trockene hellere Spitzen)."""
     mat, nb, out = fpv.new_material(name)
     uv = nb.coords("UV")
     v = nb.sep(uv)[1]
-    wn = nb.node("ShaderNodeTexWhiteNoise")
-    wn.noise_dimensions = "3D"
-    nb.link(nb.coords("Object"), wn.inputs["Vector"])
-    root = nb.mix(nb.out(wn, "Value"), (0.008, 0.04, 0.15), (0.015, 0.06, 0.21))
-    tip = nb.mix(nb.out(wn, "Value"), (0.04, 0.19, 0.50), (0.08, 0.29, 0.62))
+
+    def attr(nm):
+        n = nb.node("ShaderNodeAttribute")
+        n.attribute_name = nm
+        return n.outputs["Fac"]
+    rnd, cl = attr("blade_rnd"), attr("clump")
+    root = nb.mix(rnd, (0.008, 0.035, 0.13), (0.014, 0.055, 0.19))
+    tip_a = nb.mix(rnd, (0.035, 0.16, 0.44), (0.07, 0.25, 0.56))
+    tip_b = nb.mix(rnd, (0.05, 0.22, 0.40), (0.10, 0.20, 0.52))       # Büschel: türkisstichig / violettstichig
+    tip = nb.mix(cl, tip_a, tip_b)
+    dry = nb.math("MULTIPLY", nb.math("POWER", v, 3.0), nb.math("MULTIPLY", nb.math("GREATER_THAN", rnd, 0.82), 0.45))
+    tip = nb.mix(dry, tip, (0.30, 0.36, 0.48))                        # vereinzelt trockene, blasse Spitzen
     col = nb.mix(nb.math("POWER", v, 0.8), root, tip)
-    p = fpv.principled(nb, Base_Color=col, Roughness=0.55)
+    col = nb.vmath("SCALE", col, scale=nb.math("ADD", 0.8, nb.math("MULTIPLY", cl, 0.4)))
+    p = fpv.principled(nb, Base_Color=col, Roughness=0.5)
+    p.inputs["Specular IOR Level"].default_value = 0.35
     tr = nb.node("ShaderNodeBsdfTranslucent")
     nb.set_in(tr, "Color", col)
     mix = nb.node("ShaderNodeMixShader")
@@ -380,7 +391,7 @@ def ajisa_variant(name, leaf_mat, bark_mat, height=8.0, crown_r=3.2, leaves=2600
 # --------------------------------------------------------------------------
 
 def grass_field(name, height_fn, path_xy, mat, rng, band=30.0, dens=(360.0, 170.0, 8.0), ymin=None, ymax=None,
-                exclude=(), zmin=None, max_blades=2_000_000):
+                exclude=(), zmin=None, max_blades=2_000_000, mask_fn=None, clump=0.0, height=(0.12, 0.32)):
     """Halme entlang der Route; Dichte fällt stetig mit dem Abstand (dens = nah-Zusatz, Grund, Abfall-Länge),
     weicher Rand bei `band` – keine sichtbaren Dichte-Stufen (dichtes Gras wirkt dunkler)."""
     pts = []
@@ -409,15 +420,22 @@ def grass_field(name, height_fn, path_xy, mat, rng, band=30.0, dens=(360.0, 170.
     P = np.concatenate(pts, 0)
     for (ex, ey, er) in exclude:
         P = P[np.hypot(P[:, 0] - ex, P[:, 1] - ey) > er]
+    if mask_fn is not None:
+        P = P[mask_fn(P[:, 0], P[:, 1])]
+    # Büschel: großräumiges Rauschen dünnt aus (kahle Stellen) und verdichtet (Horste)
+    cl = 0.5 + 0.5 * fpv.fbm2(P[:, 0] / 2.2, P[:, 1] / 2.2, 3, seed=77)
+    if clump:
+        keep = rng.random(len(P)) < np.clip(1.0 - clump + clump * 1.6 * cl, 0, 1) ** 1.5
+        P, cl = P[keep], cl[keep]
     Z = height_fn(P[:, 0], P[:, 1])
     if zmin is not None:
         keep = Z > zmin
-        P, Z = P[keep], Z[keep]
+        P, Z, cl = P[keep], Z[keep], cl[keep]
     if len(P) > max_blades:
         sel = rng.choice(len(P), max_blades, replace=False)
-        P, Z = P[sel], Z[sel]
+        P, Z, cl = P[sel], Z[sel], cl[sel]
     n = len(P)
-    h = rng.uniform(0.12, 0.32, n) * (0.7 + 0.6 * rng.random(n))
+    h = rng.uniform(*height, n) * (0.7 + 0.6 * rng.random(n)) * (0.75 + 0.5 * cl)
     a = rng.uniform(0, 2 * np.pi, n)
     lean = rng.normal(0, 0.3, (n, 2)) * h[:, None]
     w = 0.008 + 0.006 * rng.random(n)
@@ -438,6 +456,11 @@ def grass_field(name, height_fn, path_xy, mat, rng, band=30.0, dens=(360.0, 170.
     luv[:, 2, 1] = 1.0
     luv[:, 1, 0] = 1.0
     uvl.data.foreach_set("uv", luv.ravel())
+    # Attribute: Spitze (für Wind/Druckwelle), Halmhöhe, Zufall je Halm und Büschelwert (Farbvariation im Shader)
+    for nm, vals in (("tip", np.concatenate([np.zeros(2 * n), np.ones(n)])), ("bh", np.tile(h, 3)),
+                     ("blade_rnd", np.tile(rng.random(n), 3)), ("clump", np.tile(cl, 3))):
+        at = me.attributes.new(nm, "FLOAT", "POINT")
+        at.data.foreach_set("value", vals.astype(np.float32))
     me.update()
     ob = bpy.data.objects.new(name, me)
     me.materials.append(mat)
@@ -669,3 +692,297 @@ def mushrooms(name, clusters, height_fn, rng):
             M = Matrix.Translation((x + lean[0] * h, y + lean[1] * h, z + h)) @ Matrix.Diagonal((1, 1, 0.55, 1))
             bmesh.ops.transform(bm_c, verts=res["verts"], matrix=M)
     return fpv.mesh_from_bmesh(bm_c, name + "Caps", mat_c), fpv.mesh_from_bmesh(bm_s, name + "Stems", mat_s)
+
+
+# --------------------------------------------------------------------------
+# Tafelberg-Wand (echtes Mesh statt Heightfield: Schichtbänke, Überhänge, Rinnen)
+# --------------------------------------------------------------------------
+
+def ring_wall(name, center, edge_fn, top_fn, mat, n_ang=1500, n_z=150, base_z=-3.0, seed=3, lip=(2.0, 4.0, 6.8)):
+    """Umlaufende Steilwand um einen Tafelberg. edge_fn(ang) -> Radius der Kante, top_fn(X, Y) -> Plateauhöhe.
+    Radius = Kante + Versatz aus großen Beulen, senkrechten Karstrinnen, sägezahnförmigen Schichtbänken (Bank springt
+    oben vor), einer vorspringenden Deckbank (Überhang, stellenweise bis ~2,5 m) und einer Brandungskehle.
+    Oben rollt die Wand als Felskante nach innen ein und taucht ~6,5 m hinter der Kante unter das Plateau
+    (keine Naht, das Heightfield fällt dahinter ab)."""
+    cx, cy = center
+    rng = np.random.default_rng(seed)
+    ang = np.linspace(0, 2 * math.pi, n_ang, endpoint=False)
+    E = edge_fn(ang)
+    ca, sa = np.cos(ang), np.sin(ang)
+    Hr = top_fn(cx + (E - lip[1]) * ca, cy + (E - lip[1]) * sa) + 0.05      # Höhe der Felskante je Winkel
+    U = np.linspace(0, 1, n_z)[:, None]
+    Z = base_z + U * (Hr[None, :] - base_z)
+    arc = (ang * np.mean(E))[None, :] + 0 * Z                                  # Meter entlang des Umfangs
+    ph = rng.uniform(0, 1000, 6)
+    big = fpv.fbm2(arc / 16 + ph[0], Z / 14, 4, seed=seed)                     # große Beulen
+    flutes = fpv.fbm2(arc / 2.4 + ph[1] + Z * 0.03, Z / 8, 4, seed=seed + 5)   # unregelmäßige Rinnen
+    mid = fpv.fbm2(arc / 4.5 + ph[2], Z / 3.5, 4, seed=seed + 7)
+    fine = fpv.fbm2(arc / 0.9 + ph[3], Z / 0.9, 3, seed=seed + 8)
+    d = 1.7 * big + 0.22 * flutes + 0.5 * mid + 0.1 * fine
+    # Schichtbänke: Dicke 1,4–3,2 m schwankend, leicht geneigt, Stufentiefe je Bank 45–135 %
+    bed_h = 2.2
+    u = (Z + 1.4 * bed_h * fpv.fbm2(Z * 0.05 + ph[4], arc * 0.004, 2, seed + 13) + 0.015 * arc * 0.3
+         + 0.9 * fpv.fbm2(arc / 7 + ph[5], Z * 0.02, 3, seed + 11)) / bed_h
+    k = np.floor(u)
+    fu = u - k
+    hk = np.sin(k * 12.9898 + seed * 78.233) * 43758.5453
+    amp = 0.45 + 0.9 * (hk - np.floor(hk))
+    d += 0.55 * amp * (fu ** 3 - 0.25)
+    # Deckbank: oberste 2–6 m springen vor (Überhang), Stärke wechselt entlang der Kante
+    cap_h = 3.0 + 2.5 * (0.5 + 0.5 * fpv.fbm2(arc / 30 + 7.0, 0 * arc + 1.3, 3, seed + 21))
+    zc = (Z - (Hr[None, :] - cap_h)) / np.maximum(cap_h, 0.5)
+    cap = np.clip(zc * 3.0, 0, 1)
+    cap = cap * cap * (3 - 2 * cap) * np.clip((1.0 - zc) * 6.0, 0, 1)
+    cap_amp = 1.2 + 1.3 * (0.5 + 0.5 * fpv.fbm2(arc / 22 + 3.3, 0 * arc + 7.7, 3, seed + 22))
+    d += cap * cap_amp
+    # Brandungskehle an der Wasserlinie
+    d -= 1.3 * np.exp(-((Z - 0.9) / 1.3) ** 2)
+    d = np.maximum(d, -1.8)
+    R = E[None, :] + d
+    # Felskante: abgerundet, dann flach nach innen unter das Plateau
+    top_d = d[-1]
+    rows_r = [E + top_d - 0.5, E - lip[0], E - lip[1], E - lip[2]]
+    rows_z = [Hr + 0.12, Hr + 0.1, Hr, top_fn(cx + (E - lip[2]) * ca, cy + (E - lip[2]) * sa) - 0.35]
+    R = np.vstack([R] + [r[None, :] for r in rows_r])
+    Z = np.vstack([Z] + [z[None, :] for z in rows_z])
+    nz = R.shape[0]
+    X = cx + R * ca[None, :]
+    Y = cy + R * sa[None, :]
+    verts = np.stack([X.ravel(), Y.ravel(), Z.ravel()], axis=1)
+    idx = np.arange(nz * n_ang).reshape(nz, n_ang)
+    a = idx[:-1, :]
+    b = np.roll(idx[:-1, :], -1, axis=1)
+    c = np.roll(idx[1:, :], -1, axis=1)
+    dd = idx[1:, :]
+    faces = np.stack([a.ravel(), b.ravel(), c.ravel(), dd.ravel()], axis=1)
+    me = bpy.data.meshes.new(name)
+    me.vertices.add(len(verts))
+    me.vertices.foreach_set("co", verts.astype(np.float32).ravel())
+    me.loops.add(len(faces) * 4)
+    me.loops.foreach_set("vertex_index", faces.astype(np.int32).ravel())
+    me.polygons.add(len(faces))
+    me.polygons.foreach_set("loop_start", (np.arange(len(faces)) * 4).astype(np.int32))
+    me.polygons.foreach_set("use_smooth", np.ones(len(faces), dtype=bool))
+    me.update()
+    ob = bpy.data.objects.new(name, me)
+    me.materials.append(mat)
+    fpv.link(ob)
+    return ob
+
+
+# --------------------------------------------------------------------------
+# Krater (Form entsteht beim Einschlag, Rand glüht und kühlt ab)
+# --------------------------------------------------------------------------
+
+def heat_variant(base_mat, name, f0, fps=24, cool_s=3.5, glow=6.0, scorch_col=(0.035, 0.03, 0.028)):
+    """Kopie eines Bodenmaterials mit Brandspuren und Glut: Werte 'Scorch'/'Heat' (Value-Knoten, gekeyt) sind vor
+    dem Einschlag 0 -> identisch mit dem Boden ringsum. Maske = Attribut 'heat_mask' (Randzone), Glutfarbe
+    Schwarzkörper, beim Abkühlen dunkler und röter."""
+    mat = base_mat.copy()
+    mat.name = name
+    nt = mat.node_tree
+    bsdf = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
+    nb = fpv.NB(nt)
+    sc_v = nt.nodes.new("ShaderNodeValue")
+    sc_v.name = "Scorch"
+    ht_v = nt.nodes.new("ShaderNodeValue")
+    ht_v.name = "Heat"
+    tp_v = nt.nodes.new("ShaderNodeValue")
+    tp_v.name = "Temp"
+    mask = nb.node("ShaderNodeAttribute")
+    mask.attribute_name = "heat_mask"
+    cr = nb.noise(nb.coords("Object"), scale=2.2, detail=6)
+    crack = nb.node("ShaderNodeMapRange", clamp=True)
+    nb.link(nb.out(cr, "Fac"), crack.inputs["Value"])
+    crack.inputs["From Min"].default_value = 0.42
+    crack.inputs["From Max"].default_value = 0.62
+    # Grundfarbe mit Ruß überblenden
+    src = bsdf.inputs["Base Color"]
+    col_in = src.links[0].from_socket if src.links else src.default_value[:3]
+    sm = nb.math("MULTIPLY", sc_v.outputs[0], nb.math("MINIMUM", nb.math("MULTIPLY", mask.outputs["Fac"], 1.6), 1.0))
+    col = nb.mix(sm, col_in, scorch_col)
+    nb.link(col, src)
+    rough = bsdf.inputs["Roughness"]
+    # Glut: Maske * Risse * Hitze, Farbe per Schwarzkörper (Temp)
+    bb = nb.node("ShaderNodeBlackbody")
+    nb.link(tp_v.outputs[0], bb.inputs["Temperature"])
+    em = nb.math("MULTIPLY", nb.math("MULTIPLY", mask.outputs["Fac"], crack.outputs[0]), ht_v.outputs[0])
+    nb.link(bb.outputs[0], bsdf.inputs["Emission Color"])
+    nb.link(nb.math("MULTIPLY", em, glow), bsdf.inputs["Emission Strength"])
+    mat.cycles.emission_sampling = "NONE"
+    # Zeitverlauf
+    fc = lambda t: int(round(t * fps)) + f0
+    for nd, keys in ((sc_v, [(f0 - 1, 0.0), (f0, 1.0)]),
+                     (ht_v, [(f0 - 1, 0.0), (f0, 1.0), (fc(0.4), 0.85), (fc(cool_s * 0.5), 0.35), (fc(cool_s), 0.12),
+                             (fc(cool_s * 2.5), 0.03)]),
+                     (tp_v, [(f0, 2400.0), (fc(0.5), 1700.0), (fc(cool_s * 0.5), 1150.0), (fc(cool_s), 850.0)])):
+        for f, v in keys:
+            nd.outputs[0].default_value = v
+            nd.outputs[0].keyframe_insert("default_value", frame=f)
+    act = nt.animation_data.action if nt.animation_data else None
+    if act:
+        for fcu in _action_fcurves(act):
+            for kp in fcu.keyframe_points:
+                kp.interpolation = "LINEAR" if kp.co[0] > f0 else "CONSTANT"
+    _ = rough
+    return mat
+
+
+def _action_fcurves(act):
+    try:
+        return list(act.fcurves)
+    except AttributeError:
+        out = []
+        for layer in act.layers:
+            for strip in layer.strips:
+                for cb in strip.channelbags:
+                    out += list(cb.fcurves)
+        return out
+
+
+def crater(name, x, y, r, ground_fn, mat, f0, fps=24, seed=1, depth=0.38, rim=0.2, n_r=34, n_a=96, pad=1.6):
+    """Krater als Scheibe (Radius pad*r) auf dem Boden: Grundform = Boden (flach), Formschlüssel 'Blast' = Mulde
+    mit aufgeworfenem, zerklüftetem Rand; springt beim Einschlag in 3 Frames auf 1. Attribut 'heat_mask' für
+    Glut (Muldenrand + Risse). Der Boden darunter braucht ein Loch (punch_hole)."""
+    rng = np.random.default_rng(seed)
+    rho = np.linspace(0, pad, n_r)[:, None]
+    a = np.linspace(0, 2 * math.pi, n_a, endpoint=False)[None, :]
+    X = x + rho * r * np.cos(a)
+    Y = y + rho * r * np.sin(a)
+    Z0 = ground_fn(X, Y)
+    edge = rho >= pad - 1e-6
+    Z0 = np.where(edge, Z0 - 0.04, Z0 + 0.0)
+    wob = 1 + 0.12 * fpv.fbm2(np.cos(a) * 2 + seed, np.sin(a) * 2, 3, seed=seed) + 0 * rho
+    q = rho / wob
+    bowl = -depth * r * np.clip(1 - q ** 2, 0, 1) ** 1.3
+    lip = rim * r * np.exp(-((q - 1.02) / 0.2) ** 2) * (1 + 0.45 * fpv.fbm2(X * 1.3, Y * 1.3, 3, seed=seed + 3))
+    rough = 0.05 * r * fpv.fbm2(X * 2.5, Y * 2.5, 3, seed=seed + 5) * np.exp(-((q - 0.9) / 0.5) ** 2)
+    fade = np.clip((pad - rho) / (pad - 1.25), 0, 1)
+    Z1 = Z0 + (bowl + lip + rough) * fade
+    verts0 = np.stack([X.ravel(), Y.ravel(), Z0.ravel()], axis=1)
+    verts1 = np.stack([X.ravel(), Y.ravel(), Z1.ravel()], axis=1)
+    idx = np.arange(n_r * n_a).reshape(n_r, n_a)
+    quads = np.stack([idx[:-1, :].ravel(), np.roll(idx[:-1, :], -1, 1).ravel(), np.roll(idx[1:, :], -1, 1).ravel(),
+                      idx[1:, :].ravel()], axis=1)
+    me = bpy.data.meshes.new(name)
+    me.from_pydata(verts0.tolist(), [], quads.tolist())
+    for p in me.polygons:
+        p.use_smooth = True
+    ob = bpy.data.objects.new(name, me)
+    me.materials.append(mat)
+    fpv.link(ob)
+    hm = np.exp(-((q - 1.0) / 0.3) ** 2) * 0.9 + np.clip(1 - q, 0, 1) * 0.5
+    at = me.attributes.new("heat_mask", "FLOAT", "POINT")
+    at.data.foreach_set("value", np.clip(hm, 0, 1).ravel().astype(np.float32))
+    ob.shape_key_add(name="Basis")
+    sk = ob.shape_key_add(name="Blast")
+    sk.data.foreach_set("co", verts1.astype(np.float32).ravel())
+    for f, v in ((f0 - 1, 0.0), (f0, 0.55), (f0 + 2, 1.0)):
+        sk.value = v
+        sk.keyframe_insert("value", frame=f)
+    ob.cycles.use_deform_motion = False
+    return ob
+
+
+def punch_hole(ob, holes):
+    """Flächen eines Boden-Meshes entfernen, deren Mitte in einem Kreis (x, y, r) liegt."""
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    kill = [f for f in bm.faces
+            if any(math.hypot(f.calc_center_median().x - x, f.calc_center_median().y - y) < r for (x, y, r) in holes)]
+    bmesh.ops.delete(bm, geom=kill, context="FACES")
+    bm.to_mesh(ob.data)
+    bm.free()
+
+
+# --------------------------------------------------------------------------
+# Gras in Bewegung: Wind, Druckwellen, verbrannte Kraterflächen (Geometry Nodes, Szenenzeit)
+# --------------------------------------------------------------------------
+
+def grass_motion(ob, shocks=(), burns=(), wind=0.35, gust=(0.9, 0.35), sway=0.28):
+    """Halmspitzen (Attribute 'tip', 'bh') per GN verschieben. shocks = [(x, y, t0, tempo m/s, stärke, breite)]:
+    Front läuft radial nach außen, drückt die Halme weg und lässt sie abklingend nachschwingen;
+    burns = [(x, y, r, t0)]: Halme im Krater verschwinden (Spitze auf die Basis). Wind: 4D-Rauschen, Böen
+    wandern mit `gust` m/s über das Feld."""
+    ng = bpy.data.node_groups.new(ob.name + "Motion", "GeometryNodeTree")
+    ng.interface.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+    ng.interface.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+    g = fpv.NB(ng)
+    gi, go = g.node("NodeGroupInput"), g.node("NodeGroupOutput")
+    ts = g.node("GeometryNodeInputSceneTime").outputs["Seconds"]
+    pos = g.node("GeometryNodeInputPosition").outputs[0]
+    px, py, _ = g.sep(pos)
+
+    def attr(nm):
+        n = g.node("GeometryNodeInputNamedAttribute")
+        n.data_type = "FLOAT"
+        n.inputs["Name"].default_value = nm
+        return n.outputs["Attribute"]
+    tip, bh = attr("tip"), attr("bh")
+    # Wind
+    nz = g.node("ShaderNodeTexNoise")
+    nz.noise_dimensions = "4D"
+    nz.inputs["Scale"].default_value = 1.0
+    nz.inputs["Detail"].default_value = 2.0
+    wp = g.vmath("ADD", g.vmath("SCALE", pos, scale=0.07), g.comb(g.math("MULTIPLY", ts, -gust[0] * 0.07),
+                                                                   g.math("MULTIPLY", ts, -gust[1] * 0.07), 0.0))
+    g.link(wp, nz.inputs["Vector"])
+    g.link(g.math("MULTIPLY", ts, 0.25), nz.inputs["W"])
+    cr, cg, _ = g.sep(nz.outputs["Color"])
+    fl = g.node("ShaderNodeTexNoise")
+    fl.noise_dimensions = "4D"
+    fl.inputs["Scale"].default_value = 1.0
+    g.link(g.vmath("SCALE", pos, scale=1.3), fl.inputs["Vector"])
+    g.link(g.math("MULTIPLY", ts, 1.6), fl.inputs["W"])
+    fr, fg, _ = g.sep(fl.outputs["Color"])
+    gustf = g.math("MAXIMUM", g.math("MULTIPLY", g.math("SUBTRACT", cr, 0.42), 3.0), 0.0)
+    ox = g.math("ADD", g.math("MULTIPLY", g.math("ADD", 0.35, gustf), wind * gust[0] / 0.97),
+                g.math("MULTIPLY", g.math("SUBTRACT", fr, 0.5), sway))
+    oy = g.math("ADD", g.math("MULTIPLY", g.math("ADD", 0.35, gustf), wind * gust[1] / 0.97),
+                g.math("MULTIPLY", g.math("SUBTRACT", fg, 0.5), sway))
+    # Druckwellen
+    for (sx, sy, t0, v, amp, w) in shocks:
+        dx, dy = g.math("SUBTRACT", px, sx), g.math("SUBTRACT", py, sy)
+        dist = g.math("MAXIMUM", g.math("SQRT", g.math("ADD", g.math("MULTIPLY", dx, dx), g.math("MULTIPLY", dy, dy))), 0.3)
+        age = g.math("SUBTRACT", ts, t0)
+        on = g.math("GREATER_THAN", age, 0.0)
+        front = g.math("MULTIPLY", g.math("MAXIMUM", age, 0.0), v)
+        rel = g.math("DIVIDE", g.math("SUBTRACT", dist, front), w)
+        bump = g.math("EXPONENT", g.math("MULTIPLY", g.math("MULTIPLY", rel, rel), -1.0))
+        passed = g.math("MINIMUM", g.math("MAXIMUM", g.math("DIVIDE", g.math("SUBTRACT", front, dist), 2 * w), 0.0), 1.0)
+        ring = g.math("MULTIPLY", g.math("SINE", g.math("MULTIPLY", age, 9.0)),
+                      g.math("EXPONENT", g.math("MULTIPLY", age, -1.4)))
+        after = g.math("MULTIPLY", passed, g.math("ADD", g.math("MULTIPLY", ring, 0.45),
+                                                  g.math("MULTIPLY", g.math("EXPONENT", g.math("MULTIPLY", age, -0.8)), 0.3)))
+        fall = g.math("DIVIDE", 1.0, g.math("ADD", 1.0, g.math("MULTIPLY", dist, 1.0 / (4 * w + 6.0))))
+        s = g.math("MULTIPLY", g.math("MULTIPLY", g.math("ADD", bump, after), on), g.math("MULTIPLY", fall, amp))
+        ox = g.math("ADD", ox, g.math("MULTIPLY", g.math("DIVIDE", dx, dist), s))
+        oy = g.math("ADD", oy, g.math("MULTIPLY", g.math("DIVIDE", dy, dist), s))
+    # Länge begrenzen (max. 0,95 der Halmhöhe), Spitze senkt sich beim Umbiegen
+    hl = g.math("SQRT", g.math("ADD", g.math("MULTIPLY", ox, ox), g.math("MULTIPLY", oy, oy)))
+    k = g.math("DIVIDE", g.math("MINIMUM", hl, 0.95), g.math("MAXIMUM", hl, 1e-4))
+    ox, oy = g.math("MULTIPLY", ox, k), g.math("MULTIPLY", oy, k)
+    hl = g.math("MINIMUM", hl, 0.95)
+    oz = g.math("SUBTRACT", g.math("SQRT", g.math("SUBTRACT", 1.0, g.math("MULTIPLY", hl, hl))), 1.0)
+    # verbrannt: Spitze auf die Basis
+    burn = None
+    for (bx, by, br, bt) in burns:
+        dx, dy = g.math("SUBTRACT", px, bx), g.math("SUBTRACT", py, by)
+        inside = g.math("LESS_THAN", g.math("ADD", g.math("MULTIPLY", dx, dx), g.math("MULTIPLY", dy, dy)), br * br)
+        b = g.math("MULTIPLY", inside, g.math("GREATER_THAN", ts, bt - 0.02))
+        burn = b if burn is None else g.math("MAXIMUM", burn, b)
+    scale = bh
+    if burn is not None:
+        keep = g.math("SUBTRACT", 1.0, burn)
+        ox, oy = g.math("MULTIPLY", ox, keep), g.math("MULTIPLY", oy, keep)
+        oz = g.math("SUBTRACT", g.math("MULTIPLY", oz, keep), burn)
+    off = g.vmath("SCALE", g.comb(ox, oy, oz), scale=scale)
+    sp = g.node("GeometryNodeSetPosition")
+    g.link(gi.outputs[0], sp.inputs["Geometry"])
+    g.link(g.math("GREATER_THAN", tip, 0.5), sp.inputs["Selection"])
+    g.link(off, sp.inputs["Offset"])
+    g.link(sp.outputs[0], go.inputs[0])
+    mod = ob.modifiers.new("GrassMotion", "NODES")
+    mod.node_group = ng
+    ob.cycles.use_deform_motion = False
+    return ob

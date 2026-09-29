@@ -1,19 +1,20 @@
 """Welt 3 – Dragon Ball: Planet Namek.
 
-Türkiser Himmel mit drei Sonnen, grünliches Meer, Felsnadeln, Tafelberg mit Ajisa-Bäumen,
-Namekianer-Kuppelhäusern, den sieben Dragon Balls und Friezas Raumschiff.
+Tiefe Hauptsonne über grünlich-türkisem Meer, Felsnadeln, Tafelberg mit Steilwand und Überhängen, blaues Gras,
+Namekianer-Kuppelhäuser, Ajisa-Bäume, Dragon Balls und Freezers Raumschiff.
 
-Flug (20 s, konstant 18 m/s, eine durchgehende Aufnahme):
-  0–3 s      tief über dem Meer zwischen Felsnadeln hindurch; über dem Tafelberg blitzen Zusammenstöße
-  3–8,5 s    Steigflug an der Steilwand hinauf, Goku und Freezer kämpfen hoch über der Kante
-  ~8,7 s     über der Kante: Dorf, Dragon Balls, Raumschiff; der Kampf ist jetzt direkt vor der Kamera
-  8,5–11,5 s Schlagabtausch 18–24 m vor der Kamera (Schockwellen bei jedem Treffer)
-  11,5–13 s  Freezer wird weggeschleudert, feuert Todesstrahlen ins Plateau (Explosionen, Staub, Brocken),
-             Goku weicht aus, Freezer lenkt zwei Ki-Kugeln aufs Meer ab
-  13–15,5 s  Goku schwebt über der Flugbahn und feuert das Kamehameha; die Kamera fliegt unter ihm durch
-             und am Strahl entlang, Strahlenduell mit Freezers Todesstrahl, bei 15,5 s bricht das
-             Kamehameha durch -> große Explosion über der Nordkante
-  15,5–20 s  weiter über die Kante hinaus aufs Meer, die Explosion verglüht
+Eine durchgehende FPV-Aufnahme (20 s, 24 fps, 9:16, 28 mm), Speed-Ramp über zeitgestempelte Wegpunkte:
+  0–2,7 s    Hook: hell, tief über dem Meer (~27 m/s), Slalom links/rechts an zwei Felsnadeln vorbei
+  2,7–5,2 s  über offenes Wasser auf den Tafelberg zu (~30 m/s), ferne Zusammenstöße über der Kante
+  5,2–7,8 s  Hochziehen und Steigflug dicht an der Steilwand (Schichtbänke, Überhang), über die Felskante:
+             Reveal des Plateaus, dabei auf ~40 % abgebremst
+  7,8–10 s   tief über blaues Gras, an Kuppelhäusern und den Dragon Balls vorbei (~27 m/s)
+  10–20 s    Kampf Goku gegen Freezer, Kamera 3–10 m/s:
+             10,0 Zusammenprall in der Luft · 10,5 / 10,95 / 11,4 Schlagabtausch · 11,95 Doppelfaust von oben,
+             12,15 Freezer schlägt in den Boden (Krater, Bruchstücke) · 13,15 / 13,4 Todesstrahlen (glühende Krater)
+             · 13,6 Freezer weicht übers Meer aus, Goku am Nordrand · 14,3 Aufladen · 15,0 Strahlenduell
+             · 15,8 Durchbruch: Explosion über dem Meer (Klimax) · 16,5–20 Nachglühen, Rauchsäule,
+             Kamera zieht langsam zurück und steigt
 """
 import argparse
 import math
@@ -26,6 +27,7 @@ import bpy  # noqa: E402
 import bmesh  # noqa: E402,I100
 import numpy as np  # noqa: E402
 
+import choreo  # noqa: E402
 import dbz  # noqa: E402
 import fpv  # noqa: E402
 import namek  # noqa: E402
@@ -38,48 +40,445 @@ from mathutils import Vector  # noqa: E402
 
 FPS = 24
 SECONDS = 20
-SPEED = 18.0
-SUN_ELEV, SUN_AZIM = 24.0, 300.0          # Hauptsonne (links vorn)
-SUNS2 = [(38.0, 40.0, 0.35), (9.0, 22.0, 0.25)]  # zwei weitere Sonnen (elev, azim, Stärke rel.)
+LENS_MM = 28.0
+# Licht (Schritt 3.2): tiefe Hauptsonne links hinten (Felsen/Figuren von vorn-seitlich beleuchtet, heller Hook),
+# Aufhellsonne hinten rechts, dritte Sonne tief rechts vorn (sichtbar am Horizont, Gegenlicht)
+SUN_ELEV, SUN_AZIM = 19.0, 225.0
+SUN_KELVIN, SUN_STRENGTH = 4300, 5.0
+SUNS2 = [(36.0, 140.0, 1.3, 5600), (7.0, 16.0, 0.7, 4700)]          # (Höhe, Azimut, W/m², Kelvin)
+RIM = dict(elev=18, azim=10, strength=2.6, kelvin=7800, angle=3)
+ATMO_DENSITY = float(os.environ.get("NIDO_ATMO", "0"))
 
-MESA_C, MESA_R, MESA_H = (0.0, 250.0), 78.0, 42.0
-FAR_TREES = []
+MESA_C, MESA_R = (0.0, 250.0), 74.0
 DB_C = (1.0, 232.0)
-SHIP_C = (40.0, 268.0)
-
-ROUTE = [
-    (-2, 36, 3.4), (2, 95, 4.2), (1, 128, 12.0), (0, 152, 30.0), (0, 170, 47.0),
-    (2, 190, 49.0), (4, 220, 47.5), (7, 252, 47.5), (7, 288, 48.0), (4, 312, 44.0), (1, 336, 43.6),
-    (-2, 372, 43.0), (-5, 410, 43.0), (-8, 450, 43.0),
-]
-PLATEAU = 39.0                  # mittlere Plateauhöhe (Grund unter der Flugbahn)
+SHIP_C = (42.0, 262.0)
 GOLD, KAME, DEATH, KI = (1.0, 0.62, 0.10), (0.10, 0.36, 1.0), (0.85, 0.25, 1.0), (1.0, 0.80, 0.28)
 
 SPIRES = [
-    # (x, y, r, h, seed)
-    (-15, 52, 7.0, 46, 1), (16, 72, 8.0, 58, 2), (-48, 20, 6.0, 30, 3), (42, 18, 5.0, 24, 4),
-    (-42, 110, 10.0, 52, 5), (55, 128, 9.0, 40, 6), (-95, 170, 14.0, 70, 7), (110, 200, 12.0, 60, 8),
-    (-150, 60, 16.0, 55, 9), (140, 40, 10.0, 48, 10), (25, 120, 4.0, 14, 11), (-22, 150, 5.0, 20, 12),
+    # (x, y, r, h, seed, Neigung x°, Neigung y°)
+    (-15, 52, 7.0, 46, 1, 4, -3), (16, 72, 8.0, 58, 2, -3, 5), (-48, 20, 6.0, 30, 3, 6, 2), (42, 18, 5.0, 24, 4, -5, -4),
+    (-42, 110, 10.0, 52, 5, 2, 6), (55, 128, 9.0, 40, 6, -4, 3), (-95, 170, 14.0, 70, 7, 3, -2),
+    (110, 200, 12.0, 60, 8, -2, 4), (-150, 60, 16.0, 55, 9, 5, 1), (140, 40, 10.0, 48, 10, -6, -2),
+    (25, 120, 4.0, 14, 11, 8, -5), (-22, 150, 5.0, 20, 12, -7, 4),
 ]
 
 
+# ------------------------------------------------------------------------------------------------ Gelände
+def mesa_edge(ang):
+    ca, sa = np.cos(ang), np.sin(ang)
+    return MESA_R * (1 + 0.08 * np.sin(ang * 3 + 1) + 0.05 * np.sin(ang * 7 + 2)
+                     + 0.06 * fpv.fbm2(ca * 3, sa * 3, 3, seed=21)
+                     + 0.025 * fpv.fbm2(ca * 25, sa * 25, 3, seed=24))  # Rinnen
+
+
+def plateau(X, Y):
+    return 39.0 + 2.0 * fpv.fbm2(X / 40, Y / 40, 4, seed=22) + 0.4 * fpv.fbm2(X / 6, Y / 6, 3, seed=23)
+
+
+def mesa_height(X, Y):
+    """Plateau innen; 2,5–6,5 m hinter der Kante fällt das Heightfield steil ab (verdeckt von der Wand und ihrer
+    einrollenden Felskante), außen ein Schuttfuß an der Wand."""
+    r = np.sqrt((X - MESA_C[0]) ** 2 + (Y - MESA_C[1]) ** 2)
+    ang = np.arctan2(Y - MESA_C[1], X - MESA_C[0])
+    edge = mesa_edge(ang)
+    s = edge - r
+    u = np.clip((s - 2.5) / 4.0, 0, 1)
+    u = u * u * (3 - 2 * u)
+    foot = np.clip((edge + 18 - r) / 18.0, 0, 1) ** 2 * 7 - 3
+    return foot + u * (plateau(X, Y) - foot)
+
+
+def gz(x, y):
+    return float(mesa_height(np.array([float(x)]), np.array([float(y)]))[0])
+
+
+def over(x, y, dz):
+    """Punkt dz m über dem Plateau."""
+    return (x, y, float(plateau(np.array([float(x)]), np.array([float(y)]))[0]) + dz)
+
+
+# ------------------------------------------------------------------------------------------------ Schritt 3.1
+# Kamera: Wegpunkte mit Uhrzeit (Speed-Ramp aus Abstand/Zeit, monoton-kubisch geglättet)
+CAM_KEYS = [
+    (0.00, (-2.0, 0.0, 3.4)),        # Hook: tief über dem Meer, Sonnenglitzern, zwei Felsnadeln voraus
+    (1.00, (-3.0, 26.0, 2.8)),
+    (1.90, (-4.2, 50.0, 2.6)),       # links an Felsnadel 1 vorbei
+    (2.65, (3.4, 70.0, 3.0)),        # rechts an Felsnadel 2 vorbei
+    (3.50, (2.0, 95.0, 3.4)),
+    (4.45, (-2.0, 124.0, 4.0)),
+    (5.15, (-3.0, 143.0, 5.0)),
+    (5.70, (-3.5, 155.5, 12.5)),     # Hochziehen
+    (6.25, (-3.5, 162.5, 26.5)),     # dicht an der Wand hinauf (Wand ~11 m voraus, Überhang oben)
+    (6.80, (-3.5, 166.5, 37.5)),
+    (7.30, over(-3.3, 173.0, 5.2)),  # über die Felskante: Reveal, auf ~35 % abgebremst
+    (7.85, over(-3.0, 179.5, 4.4)),
+    (8.45, over(0.0, 195.5, 3.4)),
+    (9.05, over(3.5, 213.0, 3.2)),
+    (9.55, over(4.6, 229.0, 3.3)),   # Dragon Balls links, 3,5 m
+    (10.00, over(5.5, 242.5, 3.6)),  # erster Zusammenprall ~40 m voraus, Kamera bremst
+    (10.60, over(6.5, 256.5, 4.2)),  # Schlagabtausch 12–17 m voraus
+    (11.30, over(7.5, 263.5, 4.8)),
+    (12.10, over(8.0, 266.5, 5.2)),  # Krater 13 m voraus
+    (12.90, over(8.0, 268.5, 5.5)),
+    (13.60, over(7.0, 281.0, 6.2)),  # folgt den Kämpfern nach Norden
+    (14.40, over(4.8, 301.0, 6.8)),
+    (15.10, over(2.8, 314.0, 7.2)),  # hinter Goku am Nordrand, Freezer über dem Meer
+    (15.80, over(2.5, 316.8, 7.4)),  # Klimax
+    (16.40, over(3.0, 315.2, 7.9)),  # von der Druckwelle zurückgedrückt
+    (20.05, over(6.0, 305.5, 12.8)), # langsam zurück und hoch: Nachglühen, Rauchsäule
+]
+
+T_CLIMAX = 15.8
+CH = 1.2                               # Brust über dem Figurenursprung (m)
+P_CRATER = (3.0, 278.5)
+G_RIM = Vector((-0.5, 323.2, 43.9))    # Goku am Nordrand (Brust)
+Z_SEA = Vector((0.5, 369.0, 36.0))     # Freezer über dem Meer (Brust)
+
+POSES.update({
+    "axe_up": {"spine": (18, 0, 0), "head": (-10, 0, 0), "shoulder.R": (165, -8, 18), "elbow.R": (15, 0, 0),
+               "shoulder.L": (165, 8, -18), "elbow.L": (15, 0, 0), "hip.R": (35, 0, 0), "knee.R": (-70, 0, 0),
+               "hip.L": (5, 0, 0), "knee.L": (-50, 0, 0)},
+    "axe_down": {"spine": (-32, 0, 0), "head": (18, 0, 0), "shoulder.R": (55, -6, 14), "elbow.R": (5, 0, 0),
+                 "shoulder.L": (55, 6, -14), "elbow.L": (5, 0, 0), "hip.R": (50, 0, 0), "knee.R": (-40, 0, 0),
+                 "hip.L": (20, 0, 0), "knee.L": (-60, 0, 0)},
+    "hover": {"spine": (-3, 0, 0), "shoulder.R": (8, -18, 0), "elbow.R": (28, 0, 0), "shoulder.L": (8, 18, 0),
+              "elbow.L": (28, 0, 0), "hip.R": (12, 0, 0), "knee.R": (-28, 0, 0), "hip.L": (-4, 0, 0),
+              "knee.L": (-14, 0, 0), "ankle.R": (25, 0, 0), "ankle.L": (20, 0, 0)},
+    "slam": {"spine": (35, 0, 0), "head": (-25, 0, 0), "shoulder.R": (120, -60, 0), "elbow.R": (20, 0, 0),
+             "shoulder.L": (120, 60, 0), "elbow.L": (20, 0, 0), "hip.R": (-20, 0, 0), "knee.R": (-30, 0, 0),
+             "hip.L": (10, 0, 0), "knee.L": (-50, 0, 0)},
+})
+
+
+def _key(t, pose, chest, look, lean=0.0, roll=0.0, rot=None, air=True):
+    c = Vector(chest)
+    return (t, pose, c - Vector((0, 0, CH)) if air else c, Vector(look), air, {"lean": lean, "roll": roll, "rot": rot})
+
+
+def _aim_rot(frm, to, both=False):
+    d = Vector(to) - Vector(frm)
+    aim = math.degrees(math.atan2(d.z, Vector((d.x, d.y)).length))
+    if both:
+        return {"shoulder.R": (88 + aim, 0, 12), "shoulder.L": (88 + aim, 0, -12)}
+    return {"shoulder.R": (90 + aim, -5, 0)}
+
+
+BEAM_HITS = [(13.15, (4.0, 283.5, 53.0), (-5.5, 268.5)), (13.4, (4.2, 283.8, 53.4), (-9.5, 272.0))]
+
+
+def beam_hits():
+    """Todesstrahlen: (Zeit, Ursprung ~Hand, Einschlag am Boden). Freezer zielt knapp unter Goku, der ausweicht;
+    der Strahl schlägt hinter ihm ins Plateau."""
+    return [(t, a, (x, y, gz(x, y))) for (t, a, (x, y)) in BEAM_HITS]
+
+
+def fight_plan():
+    """Blocking Goku (G) / Freezer (Z): Listen (t, Pose, Ort, Blickziel, in der Luft, opts) in Welt-Metern."""
+    G, Z = [], []
+    # ---- ferne Zusammenstöße hoch über dem Plateau (Teaser während des Anflugs)
+    teas = [(2.3, (-6, 262, 70), (1, 0.2, 0)), (4.6, (6, 280, 66), (-1, 0.3, 0.1)),
+            (7.6, (-2, 300, 62), (1, -0.2, -0.1)), (8.8, (4, 294, 58), (-1, 0.1, 0.2))]
+    for (t, c, ax) in teas:
+        c, ax = Vector(c), Vector(ax).normalized()
+        G += [_key(t - 0.3, "fly", c - ax * 3.0, c, lean=-55), _key(t, "punch_R", c - ax * 0.55, c + ax),
+              _key(t + 0.2, "recoil", c - ax * 2.6, c, lean=15), _key(t + 0.6, "hover", c - ax * 3.2, c)]
+        Z += [_key(t - 0.3, "fly", c + ax * 3.0, c, lean=-40), _key(t, "punch_L", c + ax * 0.5, c - ax),
+              _key(t + 0.2, "recoil", c + ax * 2.8, c, lean=15), _key(t + 0.6, "hover", c + ax * 3.4, c)]
+    # ---- Nahkampf: (Zeit, Treffpunkt, Achse G->Z, G-Pose, Z-Pose)
+    melee = [(10.0, (1.0, 273.0, 45.5), (1, 0.15, 0.0), "punch_R", "punch_L"),
+             (10.5, (1.6, 274.3, 45.1), (1, -0.2, -0.15), "kick_R", "guard"),
+             (10.95, (0.8, 275.4, 45.4), (1, 0.25, 0.1), "guard", "kick_L"),
+             (11.4, (1.8, 276.4, 45.7), (1, 0.0, 0.2), "punch_L", "recoil")]
+    for k, (t, c, ax, gp, zp) in enumerate(melee):
+        c, ax = Vector(c), Vector(ax).normalized()
+        G += [_key(t - 0.22, "fly", c - ax * 2.2, c + ax, lean=-45), _key(t, gp, c - ax * 0.55, c + ax)]
+        Z += [_key(t - 0.22, "fly", c + ax * 2.2, c - ax, lean=-30),
+              _key(t, zp, c + ax * (0.9 if zp == "recoil" else 0.5), c - ax, lean=25 if zp == "recoil" else 0)]
+        if k < len(melee) - 1:
+            G += [_key(t + 0.14, "recoil", c - ax * 2.0, c + ax, lean=10)]
+            Z += [_key(t + 0.14, "recoil", c + ax * 2.3, c - ax, lean=15)]
+    # ---- Doppelfaust von oben, Freezer schlägt in den Boden
+    zc = Vector((3.0, 277.9, 45.6))
+    G += [_key(11.75, "axe_up", (2.2, 277.4, 48.4), zc), _key(11.95, "axe_down", (2.6, 277.9, 47.2), zc)]
+    g0 = gz(*P_CRATER)
+    Z += [_key(11.75, "recoil", zc, (2.2, 277.4, 48.4), lean=25), _key(11.95, "recoil", (3.0, 278.2, 45.1), (0, 273, 48), lean=40),
+          _key(12.15, "slam", (P_CRATER[0], P_CRATER[1], g0 + 0.3), (0, 273, 48), lean=75),
+          _key(12.3, "land", (P_CRATER[0], P_CRATER[1], g0 - 1.1), (0, 273, 46), air=False),
+          _key(12.75, "land", (P_CRATER[0] + 0.1, P_CRATER[1], g0 - 1.1), (0, 273, 46), air=False),
+          _key(12.95, "fly", (3.5, 281.0, g0 + 5.0), (-2.5, 272.5, 46.5), lean=10),
+          _key(13.08, "point_R", (4.0, 283.5, 53.0 + CH - 1.2), (-2.5, 272.5, 45.6))]
+    G += [_key(12.2, "guard", (1.6, 276.3, 46.8), (3, 278.5, g0)), _key(12.8, "guard", (-1.5, 273.8, 46.2), (3, 279, g0 + 2)),
+          _key(13.08, "guard", (-2.5, 272.5, 45.6), (4, 283.5, 53))]
+    # Todesstrahlen, Goku weicht aus
+    shots = beam_hits()
+    for (t, a, p) in shots:
+        Z += [_key(t - 0.05, "point_R", a, p, rot=_aim_rot(a, p)),
+              _key(t + 0.08, "point_R", a, p, rot=_aim_rot(a, (p[0], p[1], p[2] + 3)))]
+    G += [_key(13.28, "fly", (-6.0, 274.5, 47.8), (4, 283.5, 53), lean=-20, roll=35),
+          _key(13.5, "fly", (-5.0, 276.5, 50.2), (4, 284, 53.4), lean=-15, roll=-20)]
+    # ---- Trennung: Freezer übers Meer, Goku an den Nordrand
+    Z += [_key(13.6, "recoil", (5.5, 288.0, 54.5), (-5, 276.5, 50), lean=-10),
+          _key(13.95, "fly", (3.0, 335.0, 45.0), G_RIM, lean=20),
+          _key(14.3, "point_R", Z_SEA, G_RIM, rot=_aim_rot(Z_SEA, G_RIM))]
+    G += [_key(13.9, "fly", (-2.5, 300.0, 47.0), Z_SEA, lean=-65),
+          _key(14.25, "hover", G_RIM + Vector((0.2, -0.6, 0.4)), Z_SEA),
+          _key(14.45, "kame_charge", G_RIM, Z_SEA),
+          _key(14.95, "kame_charge", G_RIM + Vector((0, 0.05, -0.05)), Z_SEA)]
+    fire = _aim_rot(G_RIM, Z_SEA, both=True)
+    G += [_key(15.05, "kame_fire", G_RIM, Z_SEA, rot=fire),
+          _key(T_CLIMAX + 0.5, "kame_fire", G_RIM + Vector((0, -0.35, 0.05)), Z_SEA, rot=fire),
+          _key(16.9, "hover", G_RIM + Vector((0, -0.2, 0.3)), Z_SEA),
+          _key(20.2, "hover", G_RIM + Vector((0, -0.25, 0.45)), Z_SEA + Vector((0, 0, 6)))]
+    Z += [_key(15.0, "point_R", Z_SEA, G_RIM, rot=_aim_rot(Z_SEA, G_RIM)),
+          _key(T_CLIMAX - 0.1, "point_R", Z_SEA + Vector((0, 0.8, 0)), G_RIM, rot=_aim_rot(Z_SEA, G_RIM)),
+          _key(T_CLIMAX + 0.05, "recoil", Z_SEA + Vector((0, 1.5, 0.3)), G_RIM, lean=40)]
+    # vor dem ersten Schlüssel: dort, wo der erste Teaser beginnt
+    return G, Z, shots
+
+
+HITS = [(10.0, 3), (10.5, 2), (10.95, 2), (11.4, 3), (11.95, 3), (12.15, 4), (T_CLIMAX, 4)]
+SHAKES = [(10.0, 1.2, 6), (11.4, 0.8, 5), (11.95, 1.0, 6), (12.15, 2.4, 9), (13.2, 1.0, 6), (13.45, 1.0, 6),
+          (15.05, 0.7, 8), (T_CLIMAX, 3.6, 12), (16.35, 1.3, 10)]
+CAM_HOLDS = [(12.15, 3), (T_CLIMAX, 3)]
+
+
+def camera_positions(frames):
+    return choreo.keyed_path(CAM_KEYS, FPS, frames)
+
+
+def hit_warp(t):
+    return choreo.time_warp(t, HITS, FPS)
+
+
+def camera_path(frames, G_keys, Z_keys):
+    """Positionen (Speed-Ramp) + Blickführung: Flug geradeaus (leicht zum Tafelberg), ab dem Anflug auf das
+    Kämpferpaar, beim Einschlag auf den Krater, beim Strahlenduell zwischen Goku und Freezer, am Ende auf Goku
+    und die Rauchsäule."""
+    t, pos, v = camera_positions(frames)
+    tw = choreo.time_warp(t, CAM_HOLDS, FPS)
+    pos = np.stack([np.interp(tw, t, pos[:, k]) for k in range(3)], axis=1)
+    a = choreo.track(G_keys, hit_warp(t)) + np.array([0, 0, CH])
+    b = choreo.track(Z_keys, hit_warp(t)) + np.array([0, 0, CH])
+    sm = choreo.smooth
+
+    def between(p, q, wq):
+        """Blickziel zwischen zwei Punkten nach Winkel (nicht nach Abstand): gewichtete Richtungen."""
+        dp = p - pos
+        dq = q - pos
+        u = dp / np.linalg.norm(dp, axis=1)[:, None] * (1 - wq) + dq / np.linalg.norm(dq, axis=1)[:, None] * wq
+        return pos + u / np.linalg.norm(u, axis=1)[:, None] * 12.0
+    pair = between(a, b, 0.5)
+    crater = np.array([P_CRATER[0], P_CRATER[1], gz(*P_CRATER) + 1.0])
+    tgt = pair.copy()
+    wc = sm(12.0, 12.25, t) * (1 - sm(12.8, 13.0, t))                        # Einschlag: auf den Krater
+    tgt = tgt * (1 - wc[:, None]) + between(a, np.tile(crater, (len(t), 1)), 0.62) * wc[:, None]
+    hits = np.array([[x, y, gz(x, y)] for (_, _, (x, y)) in BEAM_HITS]).mean(axis=0)
+    wb = sm(12.85, 13.05, t) * (1 - sm(13.5, 13.75, t))                      # Todesstrahlen: Goku + Einschläge
+    tgt = tgt * (1 - wb[:, None]) + between(a, np.tile(hits, (len(t), 1)), 0.35) * wb[:, None]
+    wd = sm(13.6, 14.3, t)                                                    # Duell: Goku vorn links, Freezer
+    tgt = tgt * (1 - wd[:, None]) + between(a, b, 0.5) * wd[:, None]
+    smoke = np.tile(np.array([Z_SEA.x, Z_SEA.y, Z_SEA.z + 7.0]), (len(t), 1))
+    we = sm(16.2, 17.6, t)                                                    # Ende: Goku + Rauchsäule
+    tgt = tgt * (1 - we[:, None]) + between(a, smoke, 0.45) * we[:, None]
+    keys_w = [(0.0, 0.0), (5.0, 0.0), (7.3, 0.0), (8.4, 0.25), (9.4, 0.5), (10.0, 0.85), (10.4, 1.0), (21.0, 1.0)]
+    w = choreo.pchip([k for k, _ in keys_w], [x for _, x in keys_w], np.clip(t, 0, 21.0))
+    d = tgt - pos
+    look_yaw = np.unwrap(np.arctan2(d[:, 1], d[:, 0]))
+    look_pit = np.arctan2(d[:, 2], np.hypot(d[:, 0], d[:, 1]))
+    pos_f, quats, info = fpv.fpv_orient(pos, FPS, look_pitch=-3.0, pitch_follow=0.45, bank_gain=1.0, max_bank=32,
+                                        micro=1.0, seed=13, look=(w, look_yaw, look_pit))
+    choreo.camera_shakes(pos_f, quats, t, SHAKES, FPS, seed=78)
+    info.update(v=v, t=t, look_w=w, tgt=tgt, G=a, Z=b)
+    return pos_f, quats, info
+
+
+def sound_markers(info):
+    t, pos = info["t"], info["pos"]
+
+    def when(cond):
+        idx = np.where(cond)[0]
+        return float(t[idx[0]]) if len(idx) else None
+    m = [("AMBIENCE", 0.0), ("WHOOSH", when(pos[:, 1] > 50.0)), ("WHOOSH", when(pos[:, 1] > 70.0)),
+         ("WHOOSH", 5.7), ("WHOOSH", when(pos[:, 2] > 41.0)), ("WHOOSH", when(pos[:, 1] > 231.0))]
+    m += [("IMPACT", h) for h, _ in HITS[:-1]] + [("IMPACT", 13.15), ("IMPACT", 13.4)]
+    m += [("BEAT_DROP", T_CLIMAX), ("AMBIENCE", 17.0)]
+    return [(nm, tt) for nm, tt in m if tt is not None]
+
+
+# ------------------------------------------------------------------------------------------------ Schritt 3.4
+def stage_fight(G_keys, Z_keys, n, cam_pos):
+    G = dbz.goku((0, 0, 0), 0.0)
+    Z = dbz.freezer((0, 0, 0), 0.0)
+    for fig in (G, Z):
+        for o in [fig.base] + list(fig.J.values()):
+            o.animation_data_clear()
+    choreo.bake_fighter(G, G_keys, n, FPS, HITS, cam_pos=cam_pos, look_win=(17.0, 21.0), seed=3)
+    choreo.bake_fighter(Z, Z_keys, n, FPS, HITS, seed=4)
+    # Freezer verschwindet im Feuerball
+    for f, s in ((F(T_CLIMAX) + 1, 1.0), (F(T_CLIMAX) + 2, 0.001)):
+        Z.base.scale = (s, s, s)
+        Z.base.keyframe_insert("scale", frame=f)
+    return G, Z
+
+
+def F(t):
+    return int(round(t * FPS)) + 1
+
+
+# ------------------------------------------------------------------------------------------------ Schritt 3.5 – FX
+def fight_fx(G, Z, shots, rock, ground_mat, mesa):
+    """Treffer, Krater mit Bruchstücken, Todesstrahlen mit glühenden Kratern, Kamehameha-Duell, Explosion."""
+    sc = bpy.context.scene
+    vfx.aura("GokuAura", G.base, GOLD, F(9.4), F(20.5), height=1.95, width=0.95, light_w=700.0, opacity=0.4,
+             edge_w=0.25, strength=0.7)
+    # Teaser-Blitze (fern, Glühkern gut sichtbar)
+    for k, (t, c) in enumerate(((2.3, (-6, 262, 70)), (4.6, (6, 280, 66)), (7.6, (-2, 300, 62)), (8.8, (4, 294, 58)))):
+        vfx.burst(f"Teaser{k}", c, F(t) - 1, (1.0, 0.8, 0.45), r_max=11.0, dur=12, light_w=90000.0, ring=False,
+                  bolts=False, seed=30 + k, core_s=25.0, glow_s=6.0, glow_alpha=0.35, core_color=(1.0, 0.95, 0.85))
+    # Nahkampf-Treffer
+    for k, (t, c, r, lw) in enumerate(((10.0, (1.0, 273.0, 45.5), 3.2, 9000.0), (10.5, (1.6, 274.3, 45.1), 1.6, 3000.0),
+                                       (10.95, (0.8, 275.4, 45.4), 1.6, 3000.0), (11.4, (1.8, 276.4, 45.7), 2.2, 5000.0),
+                                       (11.95, (2.9, 278.0, 46.0), 2.4, 6000.0))):
+        vfx.burst(f"Hit{k}", c, F(t), (1.0, 0.78, 0.35), r_max=r, dur=9, light_w=lw, bolts=False, seed=20 + k,
+                  core_s=8.0, glow_s=2.0, glow_alpha=0.25, ring_s=2.5, core_color=(1.0, 0.95, 0.8))
+        vfx.sparks_gn(f"HitSparks{k}", c, t, n=110, speed=(6, 14), life=(0.15, 0.45), color=(1.0, 0.8, 0.45),
+                      strength=60.0, seed=40 + k)
+    vfx.shockwave("ClashWave0", (1.0, 273.0, 45.5), F(10.0) + 1, r_max=9.0, dur=10, color=(1.0, 0.9, 0.7), thick=0.12,
+                  glow=2.0)
+    # ---- Einschlag im Boden (12,15 s): Krater, Bruchstücke (Voronoi + Rigid Body), Staub, Druckwelle
+    t_c = 12.15
+    cx, cy = P_CRATER
+    g0 = gz(cx, cy)
+    craters = [(cx, cy, 3.2, t_c, 71)]
+    for k, (t, a, p) in enumerate(shots):
+        craters.append((p[0], p[1], 2.1, t + 0.1, 72 + k))
+    holes = []
+    for k, (x, y, r, t, seed) in enumerate(craters):
+        hm = namek.heat_variant(ground_mat, f"CraterMat{k}", F(t), fps=FPS, cool_s=3.2)
+        namek.crater(f"Crater{k}", x, y, r, mesa_height, hm, F(t), fps=FPS, seed=seed)
+        holes.append((x, y, r * 1.5))
+    namek.punch_hole(mesa, holes)
+    vfx.burst("SlamBurst", (cx, cy, g0 + 0.8), F(t_c), (1.0, 0.7, 0.4), r_max=4.5, dur=14, light_w=40000.0, bolts=False,
+              seed=61, ring_dz=-0.6, core_s=12.0, glow_s=3.0, ring_s=3.0, core_color=(1.0, 0.9, 0.75))
+    vfx.shockwave("SlamWave", (cx, cy, g0 + 0.35), F(t_c) + 1, r_max=16.0, dur=12, color=(0.95, 0.85, 0.7), thick=0.18,
+                  glow=2.0)
+    vfx.dust_gn("SlamDust", (cx, cy, g0 + 0.2), t_c, n=1400, r_max=9.0, rise=2.2, life=2.2, color=(0.38, 0.36, 0.33),
+                size=(0.03, 0.09), seed=62)
+    vfx.sparks_gn("SlamSparks", (cx, cy, g0 + 0.5), t_c, n=200, speed=(8, 18), life=(0.3, 0.8), color=(1.0, 0.7, 0.35),
+                  strength=50.0, seed=63)
+    # Bruchstücke: Bodenplatte über dem Krater zerlegt, von unten weggesprengt
+    bm = bmesh.new()
+    bmesh.ops.create_cone(bm, cap_ends=True, segments=24, radius1=2.3, radius2=2.2, depth=0.45)
+    for v in bm.verts:
+        v.co.x += cx
+        v.co.y += cy
+        v.co.z += g0 - 0.2
+    rng = np.random.default_rng(64)
+    seeds = [(cx + rng.uniform(-2, 2), cy + rng.uniform(-2, 2), g0 - 0.2 + rng.uniform(-0.2, 0.2)) for _ in range(16)]
+    pieces = vfx.voronoi_fracture("SlamChunk", bm, seeds, rock)
+    bm.free()
+    floor = fpv.grid_mesh("DebrisFloor", 60, 60, 2, 2, lambda X, Y: X * 0 + g0 - 0.05, None, origin=(cx, cy))
+    vfx.rigid_sim(pieces, [floor], F(t_c), F(t_c) + 60, [((cx, cy, g0 - 1.2), 38000.0, F(t_c), F(t_c) + 1)], fps=FPS)
+    bpy.data.objects.remove(floor, do_unlink=True)
+    for ob in pieces:
+        for f, hid in ((1, True), (F(t_c) - 1, True), (F(t_c), False)):
+            ob.hide_render = hid
+            ob.keyframe_insert("hide_render", frame=f)
+    # ---- Todesstrahlen: Strahl, Einschlag, glühender Krater (s. o.), Staub, Brocken
+    for k, (t, a, p) in enumerate(shots):
+        a, p = Vector(a), Vector(p)
+        sc.frame_set(F(t))
+        o = Z.J["wrist.R"].matrix_world.translation.copy()
+        vfx.energy_ball(f"DeathTip{k}", Z.J["wrist.R"], (0, 0, -0.17), DEATH, 0.09, F(t) - 5, F(t) - 1, F(t) + 5,
+                        light_w=150.0, swirl=False, spin=False)
+        vfx.beam(f"DeathBeam{k}", o, p - o, (p - o).length, 0.18, DEATH, F(t), F(t) + 2, F(t) + 7, light_w=4000.0,
+                 core_s=5.0, whiten=0.3, glow_s=3.0)
+        vfx.burst(f"BeamImpact{k}", p + Vector((0, 0, 0.8)), F(t) + 2, (1.0, 0.55, 0.85), r_max=4.0, dur=16,
+                  light_w=35000.0, bolts=False, seed=80 + k, ring_dz=-0.7, core_s=12.0, glow_s=4.0, ring_s=3.0,
+                  core_color=(1.0, 0.9, 0.95))
+        vfx.dust_gn(f"BeamDust{k}", tuple(p + Vector((0, 0, 0.2))), t + 0.1, n=900, r_max=7.0, rise=2.5, life=2.0,
+                    color=(0.36, 0.34, 0.31), size=(0.03, 0.08), seed=85 + k)
+        vfx.debris(f"BeamDebris{k}_", p + Vector((0, 0, 0.3)), F(t) + 2, rock, n=12, speed=12.0, size=0.22,
+                   seed=88 + k, ground=p.z - 0.1)
+    # ---- Kamehameha gegen Todesstrahl
+    vfx.energy_ball("KameCharge", G.J["wrist.R"], (-0.07, 0.06, -0.13), KAME, 0.34, F(14.45), F(14.95), F(15.1),
+                    light_w=1500.0)
+    vfx.energy_ball("DeathCharge", Z.J["wrist.R"], (0, 0, -0.17), DEATH, 0.22, F(14.4), F(14.95), F(15.05),
+                    light_w=500.0, swirl=False)
+    sc.frame_set(F(15.05))
+    o = (G.J["wrist.R"].matrix_world.translation + G.J["wrist.L"].matrix_world.translation) / 2
+    oz = Z.J["wrist.R"].matrix_world.translation.copy()
+    L = (oz - o).length
+    dk = (oz - o).normalized()
+    o = o + dk * 0.2
+    Lc = 0.55 * L
+    t0 = 15.05
+    wob = [(0.0, 0.01), (0.25, Lc), (0.45, Lc - 3.0), (0.6, Lc + 2.0), (0.75, Lc - 1.5), (T_CLIMAX - t0, L)]
+    kl = [(F(t0 + dt), v) for dt, v in wob]
+    zl = [(F(t0), 0.01)] + [(F(t0 + dt), L - v) for dt, v in wob[1:-1]] + [(F(T_CLIMAX) - 1, 0.3)]
+    vfx.beam("Kamehameha", o, dk, kl, 0.95, KAME, F(t0), F(t0 + 0.25), F(T_CLIMAX + 0.5), light_w=26000.0,
+             wobble=(F(t0 + 0.25), F(T_CLIMAX + 0.4), 0.12), core_s=5.0, whiten=0.35, glow_s=3.0, core_r=0.3)
+    vfx.beam("DeathBeamDuel", oz, -dk, zl, 0.55, DEATH, F(t0), F(t0 + 0.25), F(T_CLIMAX), light_w=12000.0,
+             wobble=(F(t0 + 0.25), F(T_CLIMAX - 0.1), 0.15), core_s=5.0, whiten=0.35, glow_s=2.6)
+    mid = bpy.data.objects.new("DuelPoint", None)
+    fpv.link(mid)
+    for f, v in kl[1:]:
+        mid.location = o + dk * v
+        mid.keyframe_insert("location", frame=f)
+    vfx.energy_ball("DuelBall", mid, (0, 0, 0), (0.62, 0.55, 1.0), 2.0, F(t0 + 0.2), F(t0 + 0.3), F(T_CLIMAX),
+                    light_w=30000.0)
+    vfx.lightning("DuelArcs", mid, (0, 0, 0), (0.75, 0.7, 1.0), F(t0 + 0.25), F(T_CLIMAX), radius=4.5, n_bolts=10,
+                  variants=6, seed=12, light_w=0.0, thickness=0.06)
+    b = vfx.burst("DuelMeet", o + dk * Lc, F(t0 + 0.25), (0.6, 0.55, 1.0), r_max=6.0, dur=18, light_w=90000.0,
+                  bolts=False, seed=13, core_s=12.0, glow_s=3.0, ring_s=3.5)
+    b.rotation_mode = "QUATERNION"
+    b.rotation_quaternion = dk.to_track_quat("Z", "Y")
+    # ---- Klimax 15,8 s: Explosion über dem Meer
+    explosion(Z_SEA)
+    return craters
+
+
+def explosion(c):
+    """Durchbruch: weißer Blitz, Feuerball + Rauchsäule (prozedurales Volumen, keine Fluid-Simulation – Mantaflow
+    bricht in diesem bpy-Build ab), Druckwelle in der Luft und auf dem Wasser, Gischt, Funken; Licht warm -> kühl."""
+    f0 = F(T_CLIMAX)
+    vfx.burst("FinalFlash", c, f0, (1.0, 0.75, 0.4), r_max=7.0, dur=10, light_w=0.0, seed=14, core_s=20.0,
+              glow_s=4.0, glow_alpha=0.4, ring_s=4.0, core_color=(1.0, 0.95, 0.85), bolts=False)
+    vfx.volume_blast("FinalBlast", c, f0, r_fire=8.0, r_smoke=9.0, rise=14.0, dur=int(4.4 * FPS), fps=FPS, seed=7,
+                     fire=14.0)
+    lt = vfx.point_light("FinalLight", (1.0, 0.62, 0.3), 0.0, 5.0)
+    lt.location = c
+    vfx.key_energy(lt, [(f0 - 1, 0.0), (f0, 900000.0), (f0 + 4, 600000.0), (f0 + 14, 220000.0), (f0 + 40, 60000.0),
+                        (F(20.2), 20000.0)])
+    for f, col in ((f0, (1.0, 0.62, 0.3)), (f0 + 18, (1.0, 0.7, 0.45)), (f0 + 44, (0.72, 0.8, 1.0))):
+        lt.data.color = col
+        lt.data.keyframe_insert("color", frame=f)
+    vfx.shockwave("FinalWave", c, f0 + 1, r_max=60.0, dur=20, color=(1.0, 0.85, 0.65), thick=0.5, glow=2.5)
+    vfx.shockwave("SeaWave", (c.x, c.y, 0.3), f0 + 6, r_max=70.0, dur=26, color=(0.9, 0.95, 1.0), thick=0.3, glow=0.6)
+    vfx.sparks_gn("FinalSparks", c, T_CLIMAX, n=500, speed=(15, 35), life=(0.5, 1.4), color=(1.0, 0.7, 0.35),
+                  strength=60.0, radius=(0.03, 0.08), seed=15)
+    vfx.dust_gn("Spray", (c.x, c.y, 0.2), T_CLIMAX + 0.3, n=2500, r_max=30.0, rise=9.0, life=3.2,
+                color=(0.78, 0.85, 0.84), size=(0.05, 0.16), k_drag=2.0, seed=16)
+
+
+# ------------------------------------------------------------------------------------------------ Welt
 def namek_sky(nb, d):
+    """Himmel (Schritt 3.2): grüner Verlauf, gegenüber der Anime-Vorlage um ~30 % entsättigt: Horizont blass
+    gelbgrün, Zenit tiefes Blaugrün; Leuchten um Hauptsonne und dritte Sonne. Diffuses Himmelslicht kommt
+    entsättigt an (sonst färbt es blaues Gras und beigen Fels türkis)."""
     x, y, z = nb.sep(d)
     zz = nb.math("MAXIMUM", z, 0.0)
-    t = nb.math("POWER", zz, 0.55)
-    # Referenz (Anime/Manga): gesättigtes Grasgrün, am Horizont hell gelbgrün
-    col = nb.ramp(t, [(0.0, (0.80, 0.88, 0.42)), (0.07, (0.50, 0.74, 0.20)), (0.30, (0.12, 0.47, 0.07)),
-                      (1.0, (0.035, 0.30, 0.02))])
+    t = nb.math("POWER", zz, 0.5)
+    col = nb.ramp(t, [(0.0, (0.80, 0.89, 0.56)), (0.07, (0.50, 0.75, 0.33)), (0.30, (0.19, 0.50, 0.19)),
+                      (1.0, (0.06, 0.30, 0.12))])
     below = nb.math("LESS_THAN", z, 0.0)
-    col = nb.mix(below, col, (0.55, 0.72, 0.35))
-    # Leuchten um die Hauptsonne
-    sd = fpv.sun_dir(SUN_ELEV, SUN_AZIM)
-    dp = nb.math("MAXIMUM", nb.vmath("DOT_PRODUCT", d, tuple(sd)), 0.0)
-    glow = nb.math("ADD", nb.math("MULTIPLY", nb.math("POWER", dp, 8.0), 0.5),
-                   nb.math("MULTIPLY", nb.math("POWER", dp, 64.0), 1.5))
-    col = nb.vmath("ADD", col, nb.vmath("SCALE", (1.0, 0.97, 0.85), scale=glow))
-    # Kamera- und Spiegelstrahlen sehen den kräftigen Himmel; diffuses Licht kommt entsättigt an,
-    # damit blaues Gras und beiger Fels ihre Farbe behalten (sonst färbt der grüne Himmel alles türkis)
+    col = nb.mix(below, col, (0.52, 0.64, 0.50))
+    for (e, a, s8, s64) in ((SUN_ELEV, SUN_AZIM, 0.55, 1.6), (SUNS2[1][0], SUNS2[1][1], 0.45, 1.6)):
+        sd = fpv.sun_dir(e, a)
+        dp = nb.math("MAXIMUM", nb.vmath("DOT_PRODUCT", d, tuple(sd)), 0.0)
+        glow = nb.math("ADD", nb.math("MULTIPLY", nb.math("POWER", dp, 8.0), s8),
+                       nb.math("MULTIPLY", nb.math("POWER", dp, 64.0), s64))
+        col = nb.vmath("ADD", col, nb.vmath("SCALE", (1.0, 0.93, 0.78), scale=glow))
     lp = nb.node("ShaderNodeLightPath")
     vivid = nb.math("MAXIMUM", lp.outputs["Is Camera Ray"], lp.outputs["Is Glossy Ray"])
     lum = nb.vmath("DOT_PRODUCT", col, (0.2126, 0.7152, 0.0722))
@@ -88,225 +487,36 @@ def namek_sky(nb, d):
 
 
 def namek_rock():
-    return nature.rock_material("NamekRock", c1=(0.16, 0.10, 0.12), c2=(0.62, 0.40, 0.27), c3=(0.46, 0.30, 0.24),
-                                wet_line=1.6, algae=(0.03, 0.06, 0.04), moss=(0.02, 0.11, 0.34), moss_amount=0.3,
-                                strata_scale=2.2, bump=0.9, crack_w=0.15, scale=1.5, lichen=0.1,
-                                moss_tex=os.path.join(fpv.ASSETS, "grasslight-big.jpg"), moss_tex_scale=4.0)
+    """Fels (Schritt 3.3): warmes Beige bis Rostbraun, Schichtfugen, Regen-/Sinterstreifen, dunkle Nässe- und
+    Algenzone an der Wasserlinie, Moos in Nischen, Streuung pro Objekt."""
+    return nature.rock_material("NamekRock", c1=(0.15, 0.10, 0.10), c2=(0.58, 0.40, 0.28), c3=(0.44, 0.31, 0.25),
+                                wet_line=1.6, algae=(0.03, 0.06, 0.05), moss=(0.02, 0.10, 0.28), moss_amount=0.22,
+                                strata_scale=2.2, bump=1.0, crack_w=0.15, scale=1.5, lichen=0.12,
+                                moss_tex=os.path.join(fpv.ASSETS, "grasslight-big.jpg"), moss_tex_scale=4.0,
+                                variation=0.6, bedding=0.35, bed_h=2.2, streak=0.5)
 
 
-def mesa_height(X, Y):
-    r = np.sqrt((X - MESA_C[0]) ** 2 + (Y - MESA_C[1]) ** 2)
-    ang = np.arctan2(Y - MESA_C[1], X - MESA_C[0])
-    ca, sa = np.cos(ang), np.sin(ang)
-    edge = MESA_R * (1 + 0.08 * np.sin(ang * 3 + 1) + 0.05 * np.sin(ang * 7 + 2)
-                     + 0.06 * fpv.fbm2(ca * 3, sa * 3, 3, seed=21)
-                     + 0.025 * fpv.fbm2(ca * 25, sa * 25, 3, seed=24))  # Rinnen
-    s = edge - r
-    W = 16.0
-    u = np.clip(s / W, 0, 1)
-    # Felsstufen (Schichtbänke)
-    k = 5.0
-    fu = u * k
-    step = np.floor(fu)
-    fr = fu - step
-    fr = np.clip((fr - 0.55) / 0.45, 0, 1)
-    fr = fr * fr * (3 - 2 * fr)
-    ut = (step + fr) / k
-    ut = np.where(u >= 1.0, 1.0, ut)
-    top = MESA_H + 2.0 * fpv.fbm2(X / 40, Y / 40, 4, seed=22) + 0.4 * fpv.fbm2(X / 6, Y / 6, 3, seed=23)
-    foot = np.clip((edge + 18 - r) / 18.0, 0, 1) ** 2 * 7
-    rough = 0.8 * fpv.fbm2(X / 3, Y / 3, 3, seed=25) * (u > 0) * (u < 1)
-    h = foot + ut * (top - foot) + rough - 3
-    return h
+def namek_cliff():
+    """Steilwand und Felskante des Tafelbergs: wie der Fels der Nadeln, aber kaum Moos (die flache Oberseite der
+    Felskante würde sonst blau)."""
+    return nature.rock_material("NamekCliff", c1=(0.15, 0.10, 0.10), c2=(0.60, 0.42, 0.29), c3=(0.45, 0.32, 0.25),
+                                wet_line=1.6, algae=(0.03, 0.06, 0.05), moss=(0.03, 0.08, 0.16), moss_amount=0.04,
+                                strata_scale=2.2, bump=1.0, crack_w=0.15, scale=1.5, lichen=0.1, variation=0.4,
+                                bedding=0.3, bed_h=2.2, streak=0.55)
 
 
-def namek_fight(pos, top_z, rock, houses):
-    """Goku (SSJ) gegen Freezer, getaktet auf den Kameraflug (pos[i] = Kameraposition in Frame i).
-    Alle Nahkampfpositionen werden relativ zur Kamera bestimmt (D m voraus, X m rechts, Z m über dem Plateau),
-    damit der Kampf im Bild bleibt, obwohl die Drohne mit 18 m/s geradeaus fliegt."""
-    n = len(pos)
-
-    def F(t):
-        return int(round(t * FPS)) + 1
-
-    def cam(t):
-        return Vector(pos[min(max(F(t), 0), n - 1)])
-
-    def fwd(t):
-        i = F(t)
-        a, b = Vector(pos[max(i - 6, 0)]), Vector(pos[min(i + 6, n - 1)])
-        return Vector((b.x - a.x, b.y - a.y, 0)).normalized()
-
-    def rel(t, D, X, Z, above_cam=False):
-        h = fwd(t)
-        p = cam(t) + h * D + Vector((h.y, -h.x, 0)) * X
-        p.z = (cam(t).z if above_cam else PLATEAU) + Z
-        return p
-
-    G = dbz.goku((0, 0, 0), 0.0)
-    Z = dbz.freezer((0, 0, 0), 0.0)
-    vfx.aura("GokuAura", G.base, GOLD, 1, n + 2, height=1.95, width=0.95, light_w=900.0)
-    chest = {G: 1.15 * G.s, Z: 1.15 * Z.s}
-    last_yaw = {}
-
-    def key(fig, t, pose, p, look, lean=0.0, extra=None, roll=0.0):
-        d = look - p
-        yaw = math.degrees(math.atan2(-d.x, d.y))
-        if fig in last_yaw:                      # Gier stetig halten (kein 340°-Dreher beim Interpolieren)
-            while yaw - last_yaw[fig] > 180:
-                yaw -= 360
-            while yaw - last_yaw[fig] < -180:
-                yaw += 360
-        last_yaw[fig] = yaw
-        rot = dict(POSES[pose])
-        if extra:
-            rot.update(extra)
-        fig.pose(F(t), rot, loc=(p.x, p.y, p.z - chest[fig]), yaw=yaw, base_rot=(lean, roll, 0))
-
-    # ---- Schlagabtausch: (Zeit, Treffpunkt, Achse Goku->Freezer, Goku-Pose, Freezer-Pose, Stärke)
-    teaser = [(1.9, (-6, 222, 74), (1, 0.2, 0.1)), (2.7, (8, 214, 80), (-1, 0.3, -0.2)),
-              (3.5, (-3, 230, 70), (1, -0.4, 0.3)), (4.3, (10, 220, 84), (-1, -0.2, 0.1)),
-              (5.0, (-8, 212, 76), (1, 0.5, -0.1)), (5.8, (4, 206, 70), (-1, 0.1, 0.3)),
-              (6.6, (-4, 200, 66), (1, -0.3, 0.0)), (7.45, (3, 196, 60), (-1, 0.2, 0.2))]
-    # Nahkampf 8,5–11 m vor der Kamera, 1,8–2,8 m über Kamerahöhe (Blick ~13° nach oben, oberes Bilddrittel)
-    melee = [(8.3, 11, -2.0, 3.2, (1, 0.3, -0.1)), (8.8, 9.5, 2.3, 2.6, (-1, 0.2, 0.2)),
-             (9.3, 9, -2.6, 2.0, (1, -0.2, 0.1)), (9.75, 8.5, 1.8, 2.4, (-1, -0.3, -0.2)),
-             (10.2, 8.5, -1.0, 1.8, (1, 0.35, 0.25)), (10.65, 9, 2.6, 2.4, (-1, 0.1, -0.1)),
-             (11.1, 8.5, -2.0, 2.0, (1, -0.25, 0.0)), (11.5, 9.5, 0.5, 2.6, (-0.3, 1.0, 0.25))]
-    clashes = [(t, Vector(c), Vector(a).normalized(), 3.0, 60000.0) for (t, c, a) in teaser]
-    clashes += [(t, rel(t, D, X, Zh, True), Vector(a).normalized(), 0.6, 4000.0) for (t, D, X, Zh, a) in melee]
-    g_moves = ["punch_R", "kick_R", "punch_L", "kick_L"]
-    z_moves = ["guard", "punch_L", "kick_R", "guard"]
-    prev = None
-    for k, (t, C, ax, r, lw) in enumerate(clashes):
-        # Achse im Kamerabezug drehen (Nahkampf: seitlich im Profil sichtbar)
-        if t > 8.0:
-            h = fwd(t)
-            rt = Vector((h.y, -h.x, 0))
-            ax = (rt * ax.x + h * ax.y + Vector((0, 0, ax.z))).normalized()
-        sep = 1.6 if t > 8 else 3.0
-        gA, zA = C - ax * sep, C + ax * sep
-        if prev:
-            # Bogen zwischen zwei Treffern: bei Seitenwechsel fliegt Goku über, Freezer unter dem anderen durch
-            tp, gP, zP, axp = prev
-            tm = 0.5 * (tp + t - 0.12)
-            up = Vector((0, 0, 2.2 if axp.dot(ax) < 0 else 0.9))
-            key(G, tm, "fly", (gP + gA) / 2 + up, (zP + zA) / 2, lean=-60)
-            key(Z, tm, "fly", (zP + zA) / 2 - up, (gP + gA) / 2, lean=-40)
-        key(G, t - 0.12, "fly", gA, C + ax, lean=-45)
-        key(Z, t - 0.12, "fly", zA, C - ax, lean=-30)
-        key(G, t, g_moves[k % 4], C - ax * 0.55, C + ax)
-        key(Z, t, z_moves[k % 4], C + ax * 0.5, C - ax)
-        gR, zR = C - ax * 2.3, C + ax * 2.6
-        key(G, t + 0.14, "recoil", gR, C + ax, lean=10)
-        key(Z, t + 0.14, "recoil", zR, C - ax, lean=15)
-        prev = (t + 0.14, gR, zR, ax)
-        b = vfx.burst(f"Hit{k}", C, F(t), (1.0, 0.78, 0.35), r_max=r, dur=10 if t > 8 else 12, light_w=lw,
-                      bolts=False, seed=20 + k, core_s=8.0, glow_s=2.0, glow_alpha=0.25, ring_s=2.5,
-                      core_color=(1.0, 0.95, 0.8))
-        b.rotation_mode = "QUATERNION"
-        b.rotation_quaternion = ax.to_track_quat("Z", "Y")
-
-    # ---- 11,5 s: Gokus Schlag schleudert Freezer davon (Salto rückwärts), er fängt sich hoch voraus
-    Zp = rel(12.05, 34, 7, 18)
-    key(Z, 11.8, "recoil", rel(11.8, 24, 4, 13), cam(11.8), lean=120)
-    key(Z, 12.05, "point_R", Zp, cam(12.05) + fwd(12.05) * 24, lean=0)
-    # ---- Todesstrahlen ins Plateau, Goku weicht aus und kontert mit einer Ki-Kugel
-    for (t, pose, X) in ((11.75, "fly", -1.0), (12.05, "guard", -4.0), (12.33, "guard", 3.0), (12.6, "point_R", 1.0),
-                         (12.8, "guard", -1.0)):
-        key(G, t, pose, rel(t, 10, X, 2.6, True), Zp, lean=-20 if pose == "fly" else 0)
-    shots = [(12.12, -7.0, 24), (12.36, 8.0, 26), (12.58, -9.0, 25)]
-    for k, (t, X, D) in enumerate(shots):
-        tgt = rel(t + 0.05, D, X, 0)
-        if any(math.hypot(tgt.x - hx, tgt.y - hy) < hr + 4 for (hx, hy, hr) in houses):
-            X = -X
-            tgt = rel(t + 0.05, D, X, 0)
-        tgt.z = top_z(tgt.x, tgt.y) + 0.2
-        d = tgt - Zp
-        aim = math.degrees(math.atan2(d.z, Vector((d.x, d.y)).length))
-        key(Z, t - 0.06, "point_R", Zp, tgt, extra={"shoulder.R": (90 + aim, -5, 0)})
-        key(Z, t + 0.1, "point_R", Zp, tgt, extra={"shoulder.R": (90 + aim + 12, -5, 0)})
-        bpy.context.scene.frame_set(F(t))
-        o = Z.J["wrist.R"].matrix_world.translation + d.normalized() * 0.18
-        vfx.energy_ball(f"DeathTip{k}", Z.J["wrist.R"], (0, 0, -0.17), DEATH, 0.09, F(t) - 5, F(t) - 1, F(t) + 5,
-                        light_w=120.0, swirl=False, spin=False)
-        vfx.beam(f"DeathBeam{k}", o, tgt - o, (tgt - o).length, 0.2, DEATH, F(t), F(t) + 2, F(t) + 7,
-                 light_w=4000.0, core_s=5.0, whiten=0.3, glow_s=3.0)
-        vfx.burst(f"Impact{k}", tgt + Vector((0, 0, 0.8)), F(t) + 2, (1.0, 0.55, 0.85), r_max=4.5, dur=18,
-                  light_w=45000.0, bolts=False, seed=40 + k, ring_dz=-0.7, core_s=12.0, glow_s=4.0, ring_s=3.0,
-                  core_color=(1.0, 0.9, 0.95))
-        vfx.dust_cloud(f"Dust{k}", tgt, F(t) + 3, 5.0, color=(0.50, 0.45, 0.36), dur=60, seed=60 + k)
-        vfx.debris(f"Debris{k}_", tgt + Vector((0, 0, 0.3)), F(t) + 2, rock, n=14, speed=13.0, size=0.28,
-                   seed=80 + k, ground=tgt.z - 0.1)
-    # Gokus Ki-Kugel: Freezer schlägt sie weg, sie schlägt in eine ferne Felsnadel ein
-    far = Vector((110, 498, 52))
-    bpy.context.scene.frame_set(F(12.62))
-    o = G.J["wrist.R"].matrix_world.translation.copy()
-    hitp = Zp + Vector((-0.5, -0.5, 0.3))
-    vfx.ki_blast("Ki", o, hitp, F(12.62), F(12.84), KI, radius=0.34, impact=False)
-    key(Z, 12.78, "guard", Zp, o)
-    key(Z, 12.86, "punch_L", Zp, far)
-    vfx.burst("KiSwat", hitp, F(12.84), KI, r_max=1.6, dur=10, light_w=8000.0, ring=False, bolts=False, seed=91)
-    vfx.ki_blast("KiDeflect", hitp, far, F(12.84), F(13.66), KI, radius=0.34, r_impact=11.0, seed=90)
-
-    # ---- Kamehameha gegen Todesstrahl
-    ZK = Vector((3.0, 358.0, 72.0))
-    GK = cam(14.35) + Vector((-3.2, 0, 0))
-    GK.z = PLATEAU + 9.5
-    key(Z, 13.25, "fly", Zp.lerp(ZK, 0.6) + Vector((0, 0, 4)), ZK, lean=-60)
-    key(Z, 13.6, "point_R", ZK, GK)
-    key(G, 13.2, "kame_charge", GK + Vector((0.3, -0.8, 0.2)), ZK)
-    key(G, 13.3, "kame_charge", GK, ZK)
-    key(G, 13.85, "kame_charge", GK + Vector((0, 0.05, -0.05)), ZK)
-    d = ZK - GK
-    aim = math.degrees(math.atan2(d.z, Vector((d.x, d.y)).length))
-    fire = {"shoulder.R": (88 + aim, 0, 12), "shoulder.L": (88 + aim, 0, -12)}
-    key(G, 13.95, "kame_fire", GK, ZK, extra=fire)
-    key(G, 15.6, "kame_fire", GK + Vector((0, -0.3, 0)), ZK, extra=fire)
-    key(G, 16.3, "guard", GK + Vector((0, 0.5, 0.4)), ZK)
-    aimz = math.degrees(math.atan2(-d.z, Vector((d.x, d.y)).length))
-    key(Z, 13.9, "point_R", ZK, GK, extra={"shoulder.R": (90 + aimz, -5, 0)})
-    key(Z, 15.4, "point_R", ZK + Vector((0, 0.8, 0)), GK, extra={"shoulder.R": (90 + aimz, -5, 0)})
-    vfx.energy_ball("KameCharge", G.J["wrist.R"], (-0.07, 0.06, -0.13), KAME, 0.34, F(13.2), F(13.85), F(14.0),
-                    light_w=900.0)
-    sc = bpy.context.scene
-    sc.frame_set(F(13.95))
-    o = (G.J["wrist.R"].matrix_world.translation + G.J["wrist.L"].matrix_world.translation) / 2
-    sc.frame_set(F(13.9))
-    oz = Z.J["wrist.R"].matrix_world.translation.copy()
-    L = (oz - o).length
-    dk = (oz - o).normalized()
-    o = o + dk * 0.2
-    Lc = 0.52 * L
-    wob = [(-0.0, 0.01), (0.25, Lc), (0.55, Lc - 2.5), (0.85, Lc + 1.5), (1.1, Lc - 1.0), (1.5, L)]
-    kl = [(F(13.95 + dt), v) for dt, v in wob]
-    zl = [(F(13.95), 0.01)] + [(F(13.95 + dt), L - v) for dt, v in wob[1:-1]] + [(F(15.45), 0.3)]
-    vfx.beam("Kamehameha", o, dk, kl, 0.95, KAME, F(13.95), F(14.2), F(16.0), light_w=26000.0,
-             wobble=(F(14.2), F(15.9), 0.12), core_s=5.0, whiten=0.35, glow_s=3.0, core_r=0.3)
-    vfx.beam("DeathBeamDuel", oz, -dk, zl, 0.55, DEATH, F(13.95), F(14.2), F(15.5), light_w=12000.0,
-             wobble=(F(14.2), F(15.4), 0.15), core_s=5.0, whiten=0.35, glow_s=2.6)
-    # Treffpunkt der Strahlen: knisternde Energiekugel, die hin und her drückt und dann zu Freezer rast
-    mid = bpy.data.objects.new("DuelPoint", None)
-    fpv.link(mid)
-    for f, v in kl[1:]:
-        mid.location = o + dk * v
-        mid.keyframe_insert("location", frame=f)
-    vfx.energy_ball("DuelBall", mid, (0, 0, 0), (0.62, 0.55, 1.0), 2.0, F(14.18), F(14.3), F(15.45), light_w=30000.0)
-    vfx.lightning("DuelArcs", mid, (0, 0, 0), (0.75, 0.7, 1.0), F(14.2), F(15.45), radius=4.5, n_bolts=10,
-                  variants=6, seed=12, light_w=0.0, thickness=0.06)
-    b = vfx.burst("DuelMeet", o + dk * Lc, F(14.2), (0.6, 0.55, 1.0), r_max=6.0, dur=18, light_w=90000.0, bolts=False,
-                  seed=13, core_s=12.0, glow_s=3.0, ring_s=3.5)
-    b.rotation_mode = "QUATERNION"
-    b.rotation_quaternion = dk.to_track_quat("Z", "Y")
-    # Durchbruch: riesige Explosion um Freezer, Druckwelle, Rauch
-    vfx.burst("FinalBlast", ZK, F(15.45), (1.0, 0.62, 0.22), r_max=17.0, dur=60, light_w=450000.0, seed=14,
-              core_s=12.0, glow_s=3.5, glow_alpha=0.45, ring_s=4.0, core_color=(1.0, 0.92, 0.7))
-    vfx.dust_cloud("FinalSmoke", ZK + Vector((0, 0, -9)), F(16.0), 13.0, color=(0.30, 0.28, 0.27), dur=90, seed=15,
-                   puffs=16, rise=0.5)
-    for fig_f, s in ((F(15.45), 1.0), (F(15.5), 0.001)):
-        Z.base.scale = (s, s, s)
-        Z.base.keyframe_insert("scale", frame=fig_f)
-    return G, Z
+def plateau_ground():
+    """Boden unter dem Gras: dunkle, humose Erde mit blaugrünen Moosflecken und Sand."""
+    mat, nb, out = fpv.new_material("NamekGround")
+    co = nb.coords("Object")
+    n1 = nb.noise(co, scale=0.18, detail=4)
+    n2 = nb.noise(co, scale=2.5, detail=4)
+    soil = nb.mix(nb.out(n2, "Fac"), (0.08, 0.065, 0.05), (0.16, 0.13, 0.10))
+    col = nb.mix(nb.math("GREATER_THAN", nb.out(n1, "Fac"), 0.55), soil, (0.03, 0.08, 0.16))
+    p = fpv.principled(nb, Base_Color=col, Roughness=0.85)
+    nb.link(nb.bump(nb.out(n2, "Fac"), strength=0.3, distance=0.05), p.inputs["Normal"])
+    nb.link(p.outputs[0], out.inputs[0])
+    return mat
 
 
 def build(args):
@@ -314,73 +524,70 @@ def build(args):
     frames = FPS * SECONDS
     fpv.setup_render(args.out, res=args.res, fps=FPS, seconds=SECONDS, samples=args.samples,
                      motion_blur=not args.no_mblur, mist_depth=6000.0)
-    extra = [(SUN_ELEV, SUN_AZIM, 0.9, 900.0, (1.0, 0.98, 0.9))]
-    for (e, a, s) in SUNS2:
-        extra.append((e, a, 0.6, 500.0 * s, (1.0, 0.97, 0.9)))
-    fpv.build_world(sun_elev=SUN_ELEV, sun_azim=SUN_AZIM, sky_strength=0.85, clouds=True, cloud_cover=0.25,
-                    cloud_ref=1.1, custom_sky=namek_sky, extra_suns=extra, cloud_color=(1.0, 1.0, 0.78),
+    extra = [(SUN_ELEV, SUN_AZIM, 0.9, 900.0, (1.0, 0.95, 0.85))]
+    for (e, a, s, k) in SUNS2:
+        extra.append((e, a, 0.6, 350.0 * s, (1.0, 0.96, 0.9)))
+    fpv.build_world(sun_elev=SUN_ELEV, sun_azim=SUN_AZIM, sky_strength=0.8, clouds=True, cloud_cover=0.22,
+                    cloud_ref=1.1, custom_sky=namek_sky, extra_suns=extra, cloud_color=(1.0, 1.0, 0.86),
                     cloud_scale=1.3)
-    fpv.add_sun(SUN_ELEV, SUN_AZIM, strength=5.6, color=(1.0, 0.92, 0.76), name="Sun1", angle_deg=1.5)
-    for i, (e, a, s) in enumerate(SUNS2):
-        fpv.add_sun(e, a, strength=4.6 * s, color=((0.92, 0.97, 1.0), (0.93, 1.0, 0.9))[i], name=f"Sun{i + 2}",
-                    angle_deg=(2.5, 3.0)[i])
+    key = fpv.add_sun(SUN_ELEV, SUN_AZIM, strength=SUN_STRENGTH, color=(1, 1, 1), name="Sun1", angle_deg=1.2)
+    key.data.use_temperature, key.data.temperature = True, SUN_KELVIN
+    for i, (e, a, s, k) in enumerate(SUNS2):
+        sn = fpv.add_sun(e, a, strength=s, color=(1, 1, 1), name=f"Sun{i + 2}", angle_deg=(2.5, 1.5)[i])
+        sn.data.use_temperature, sn.data.temperature = True, k
+    if ATMO_DENSITY > 0:
+        fpv.add_atmosphere(ATMO_DENSITY, size=(900.0, 900.0, 200.0), center=(0.0, 250.0), color=(0.9, 1.0, 0.94))
     rng = np.random.default_rng(31)
-    top_z = lambda x, y: float(mesa_height(np.array([x]), np.array([y]))[0])
-    # Route über dem Plateau: 3,6 m über Grund (tiefer Vorbeiflug an den Dragon Balls);
-    # über die Nordkante hinaus bleibt die Höhe erhalten (Blick aufs Meer)
-    route = []
-    for (x, y, z) in ROUTE:
-        if 185 <= y <= 320 and top_z(x, y) > MESA_H - 8:
-            z = top_z(x, y) + 3.6
-        route.append((x, y, z))
+    top_z = gz
 
     rock = namek_rock()
-    # Tafelberg (Heightfield)
-    mesa = fpv.grid_mesh("Mesa", 2 * MESA_R + 50, 2 * MESA_R + 50, 360, 360, mesa_height, rock, origin=MESA_C)
-    # Felsnadeln (zylindrisch-vertikal, pilzförmiger Kopf, Schichtbänke)
-    spires = []
-    for (x, y, r, h, seed) in SPIRES:
-        ob = fpv.rock_mesh(f"Spire{seed}", radius=r, height=h + 4, seed=seed + 50, detail=5, taper=-0.35, mat=rock,
-                           base_z=-4.0, lumpy=0.18, strata=2.2)
+    ground = plateau_ground()
+    # Tafelberg: Plateau als Heightfield + umlaufende Steilwand als eigenes Mesh
+    mesa = fpv.grid_mesh("Mesa", 2 * MESA_R + 60, 2 * MESA_R + 60, 400, 400, mesa_height, ground, origin=MESA_C)
+    wall = namek.ring_wall("MesaWall", MESA_C, mesa_edge, plateau, namek_cliff(), n_ang=1500, n_z=150, seed=5)
+    # Felsnadeln: Schichtbänke, Karstrinnen, Kopf breiter (Pilzform), leicht geneigt, Höhe variiert
+    spires, far_trees = [], []
+    for (x, y, r, h, seed, tx, ty) in SPIRES:
+        ob = fpv.rock_mesh(f"Spire{seed}", radius=r, height=h + 4, seed=seed + 50, detail=6, taper=-0.35, mat=rock,
+                           base_z=-4.0, lumpy=0.22, strata=0.6, flute=0.06, ledges=0.03, bed=(1.8, 4.0))
         ob.location = (x, y, 0)
-        ob.rotation_euler = (0, 0, seed * 2.1)
+        ob.rotation_euler = (math.radians(tx), math.radians(ty), seed * 2.1)
         spires.append(ob)
-    # ferne Inseln: große Pilzfelsen + Tafelberge
     for k, (x, y, r, h) in enumerate(((-160, 470, 26, 95), (120, 520, 20, 70), (-60, 640, 34, 120),
                                       (260, 700, 30, 85), (-330, 820, 45, 140), (40, 980, 55, 150),
                                       (420, 1050, 50, 120), (-620, 1150, 70, 170))):
         ob = fpv.rock_mesh(f"FarSpire{k}", radius=r, height=h + 4, seed=200 + k, detail=4, taper=-0.3, mat=rock,
-                           base_z=-4.0, lumpy=0.2, strata=2.0)
+                           base_z=-4.0, lumpy=0.22, strata=0.6, ledges=0.025)
         ob.location = (x, y, 0)
         for j in range(int(r * 0.5)):
             a = rng.uniform(0, 2 * math.pi)
             rr = r * 1.1 * math.sqrt(rng.random())
-            FAR_TREES.append((x + math.cos(a) * rr, y + math.sin(a) * rr, h - 0.6))
+            far_trees.append((x + math.cos(a) * rr, y + math.sin(a) * rr, h - 0.6))
     for k, (x, y, r, h) in enumerate(((-900, 1400, 260, 150), (800, 1700, 300, 170))):
         def hf(X, Y, x=x, y=y, r=r, h=h, k=k):
             rr = np.sqrt((X - x) ** 2 + (Y - y) ** 2) / r
             e = 1 + 0.12 * fpv.fbm2(X / r * 2, Y / r * 2, 3, seed=40 + k)
-            t = np.clip((e - rr) / 0.12, 0, 1)
-            return t * t * (3 - 2 * t) * h * (1 + 0.05 * fpv.fbm2(X / 30, Y / 30, 3, seed=50 + k)) - 3
+            tt = np.clip((e - rr) / 0.12, 0, 1)
+            return tt * tt * (3 - 2 * tt) * h * (1 + 0.05 * fpv.fbm2(X / 30, Y / 30, 3, seed=50 + k)) - 3
         fpv.grid_mesh(f"Island{k}", r * 2.6, r * 2.6, 180, 180, hf, rock, origin=(x, y))
     bpy.context.view_layer.update()
 
-    # Meer: smaragdgrün, Flachwasser + Brandung an Felsen und Tafelberg (Abstandsfeld)
-    shore_img, shore_map = ocean.shore_distance_image(spires + [mesa], -200, -100, 200, 420, cell=0.5,
+    # Meer (Schritt 3.2/3.3): dunkleres Blaugrün, Fresnel (Principled, IOR 1,333), Flachwasser/Brandung an Felsen
+    shore_img, shore_map = ocean.shore_distance_image(spires + [wall], -200, -100, 200, 420, cell=0.5,
                                                       name="NamekShore")
-    wmat = ocean.water_material("NamekSea", deep=(0.012, 0.10, 0.035), shallow=(0.07, 0.30, 0.10),
-                                wake_fn=foam_builder(shore_img, shore_map), foam_amount=0.4,
-                                color_fn=shallow_tint(shore_img, shore_map, color=(0.05, 0.25, 0.09)))
-    ocean.animate_time_value(wmat, FPS, frames)
+    wmat = ocean.water_material("NamekSea", deep=(0.004, 0.032, 0.030), shallow=(0.025, 0.14, 0.11),
+                                wake_fn=foam_builder(shore_img, shore_map), foam_amount=0.4, view_dark=0.5, micro=0.6,
+                                color_fn=shallow_tint(shore_img, shore_map, color=(0.02, 0.11, 0.09)))
+    frames_all = frames
+    ocean.animate_time_value(wmat, FPS, frames_all)
     tile = 100.0
     x0, y0, nx, ny = -140.0, -40.0, 3, 5
     ocean.make_ocean(x0, y0, nx, ny, tile=tile, res=13, wind=6.5, wave_scale=0.7, chop=1.1, fps=FPS, frames=frames,
                      mat=wmat, direction_deg=60, alignment=0.3, foam_coverage=0.1)
-    far = ocean.water_material("NamekFarSea", deep=(0.012, 0.10, 0.035), shallow=(0.07, 0.30, 0.10), far=True)
+    far = ocean.water_material("NamekFarSea", deep=(0.004, 0.032, 0.030), shallow=(0.025, 0.14, 0.11), far=True)
     ocean.far_plane(x0 - tile / 2 + 1, x0 - tile / 2 + tile * nx - 1, y0 - tile / 2 + 1, y0 - tile / 2 + tile * ny - 1,
                     mat=far, z=-0.05)
 
-    # Materialien Plateau
     mats = {
         "clay": namek.clay_material("NamekClay"),
         "clay_dark": namek.clay_material("NamekClayDark", color=(0.62, 0.64, 0.58)),
@@ -391,14 +598,10 @@ def build(args):
         "rim": namek.hazard_rim_material(),
         "shipwin": fpv.simple_mat("ShipWin", (0.4, 0.05, 0.05), rough=0.1, emission=(1.0, 0.3, 0.2), estrength=1.2),
     }
-
-    # Namekianer-Häuser (glatte Lehm-Kuppeln, Rippen, gehörnte Oberkuppel, Rundfenster)
     houses = [(-20, 204, 6.5), (-36, 224, 8.0), (-22, 252, 5.5), (-46, 252, 6.0), (-28, 276, 7.5), (26, 204, 6.0),
-              (30, 228, 5.0), (-16, 298, 6.0), (-46, 292, 5.0), (26, 308, 7.0)]
+              (30, 228, 5.0), (-17, 300, 6.0), (-44, 290, 5.0), (27, 300, 6.5)]
     for i, (x, y, r) in enumerate(houses):
         namek.house(f"House{i}", x, y, top_z(x, y), r, mats, rng)
-
-    # Dragon Balls in realer Größe (Ø ~0,4 m) auf einem niedrigen, runden Steinsockel links der Flugbahn
     ang = np.linspace(0, 2 * np.pi, 24, endpoint=False)
     ring_z = mesa_height(DB_C[0] + 1.7 * np.cos(ang), DB_C[1] + 1.7 * np.sin(ang))
     plinth_top = top_z(*DB_C) + 0.4
@@ -408,50 +611,67 @@ def build(args):
     slab = fpv.mesh_from_bmesh(bm, "DBPlinth", rock)
     slab.location = (DB_C[0], DB_C[1], (plinth_top + base) / 2)
     namek.dragon_balls(DB_C, mesa_height, rng, radius=0.2, ring=0.8, lift=plinth_top)
-
     namek.spaceship(mats, SHIP_C[0], SHIP_C[1], top_z(*SHIP_C) + 1.5)
 
-    # Ajisa-Bäume (verdrehte dünne Stämme, perfekte Kugelkronen)
+    # Kamera + Kämpfer (Schritt 3.1/3.4)
+    G_keys, Z_keys, shots = fight_plan()
+    cam_t, cam_p, _ = camera_positions(frames)
+    G, Z = stage_fight(G_keys, Z_keys, frames + 2, cam_p)
+    fpv.rim_light([G.base, Z.base], RIM["elev"], RIM["azim"], strength=RIM["strength"], kelvin=RIM["kelvin"],
+                  angle=RIM["angle"])
+    pos, quats, info = camera_path(frames, G_keys, Z_keys)
+    info["pos"] = pos
+    path_xy = pos[:, :2]
+
+    # Ajisa-Bäume
     leaf = nature.leaf_material("AjisaLeaf", c1=(0.004, 0.045, 0.30), c2=(0.03, 0.12, 0.50), trans=0.3)
     bark = nature.bark_material("AjisaBark", c=(0.42, 0.33, 0.18))
     variants = [namek.ajisa_variant(f"Ajisa{i}", leaf, bark, height=h, crown_r=cr, leaves=int(900 * cr * cr / 4),
                                     seed=70 + i, leaf_size=0.36, turns=tw)
                 for i, (h, cr, tw) in enumerate(((12.0, 2.8, 0.8), (15.0, 3.3, 1.0), (9.0, 2.3, 0.6), (17.0, 3.6, 1.1)))]
     _, subs = nature.make_tree_collection("AjisaTrees", variants)
-    pos, _, _ = fpv.fpv_path(route, SPEED, FPS, frames, micro=0.0)
-    path_xy = pos[:, :2]
     pts, scl = [], []
     avoid = [(x, y, r + 3) for (x, y, r) in houses] + [(DB_C[0], DB_C[1], 5), (SHIP_C[0], SHIP_C[1], 22)]
+    avoid += [(P_CRATER[0], P_CRATER[1], 12)] + [(p[0], p[1], 8) for (_, _, p) in shots]
     groves = [(-56, 205, 9, 8), (50, 210, 8, 6), (-6, 270, 6, 4), (-52, 312, 10, 8), (38, 322, 9, 7),
               (62, 240, 7, 5), (-66, 264, 8, 6), (20, 186, 6, 4), (-28, 184, 6, 5), (-4, 334, 6, 4),
-              (24, 250, 5, 3), (-16, 226, 4, 3), (26, 286, 6, 4)]
+              (24, 250, 5, 3), (-16, 226, 4, 3), (26, 286, 6, 4), (-24, 312, 5, 4), (18, 316, 4, 3)]
     cand = []
     for (gx, gy, gr, gn) in groves:
         for _ in range(gn * 3):
             a = rng.uniform(0, 2 * math.pi)
             rr = gr * math.sqrt(rng.random())
             cand.append((gx + math.cos(a) * rr, gy + math.sin(a) * rr))
+    edge_s = lambda x, y: mesa_edge(np.array([math.atan2(y - MESA_C[1], x - MESA_C[0])]))[0] - math.hypot(x - MESA_C[0], y - MESA_C[1])
     for (x, y) in cand:
         if any(math.hypot(x - ax, y - ay) < ar for (ax, ay, ar) in avoid):
             continue
-        if np.min(np.hypot(path_xy[:, 0] - x, path_xy[:, 1] - y)) < 11:
+        if np.min(np.hypot(path_xy[:, 0] - x, path_xy[:, 1] - y)) < 9:
             continue
-        z = top_z(x, y)
-        if z < MESA_H - 6:
+        if edge_s(x, y) < 9:
             continue
-        pts.append((x, y, z - 0.2))
+        pts.append((x, y, top_z(x, y) - 0.2))
         scl.append(rng.uniform(0.7, 1.25))
-    for p in FAR_TREES:
+    for p in far_trees:
         pts.append(p)
         scl.append(rng.uniform(1.2, 2.2))
+    for ob, (x, y, r, h, seed, tx, ty) in zip(spires, SPIRES):
+        M = ob.matrix_world
+        zt = max((M @ Vector(v.co)).z for v in ob.data.vertices[-400:])
+        for k in range(int(3 + r * 0.8)):
+            a = rng.uniform(0, 2 * math.pi)
+            rr = r * 0.9 * math.sqrt(rng.random())
+            pts.append((x + math.cos(a) * rr, y + math.sin(a) * rr, zt - 1.2))
+            scl.append(rng.uniform(0.45, 0.9))
+    nature.scatter_instances("Ajisa", subs, pts, scales=scl, seed=4)
     # Findlinge
     boulders = []
     for k in range(45):
         a = rng.uniform(0, 2 * math.pi)
-        rr = MESA_R * 0.9 * math.sqrt(rng.random())
+        rr = MESA_R * 0.85 * math.sqrt(rng.random())
         x, y = MESA_C[0] + math.cos(a) * rr, MESA_C[1] + math.sin(a) * rr
         if np.min(np.hypot(path_xy[:, 0] - x, path_xy[:, 1] - y)) < 5 or any(
-                math.hypot(x - ax, y - ay) < ar for (ax, ay, ar) in avoid):
+                math.hypot(x - ax, y - ay) < ar for (ax, ay, ar) in avoid) or edge_s(x, y) < 8:
             continue
         br = rng.uniform(0.6, 2.4)
         bm = bmesh.new()
@@ -462,25 +682,15 @@ def build(args):
         fpv.displace_obj(ob, "CLOUDS", size=br * 0.6, strength=br * 0.35, depth=3, name=f"Boulder{k}_d")
         ob.location = (x, y, top_z(x, y) - br * 0.15)
         boulders.append((x, y, br * 1.2))
-    for (x, y, r, h, seed) in SPIRES:
-        for k in range(int(3 + r * 0.8)):
-            a = rng.uniform(0, 2 * math.pi)
-            rr = r * 1.1 * math.sqrt(rng.random())
-            pts.append((x + math.cos(a) * rr, y + math.sin(a) * rr, h - 0.6))
-            scl.append(rng.uniform(0.45, 0.9))
-    nature.scatter_instances("Ajisa", subs, pts, scales=scl, seed=4)
-    print("ajisa", len(pts))
-
-    # Sandflecken im blauen Gras und rote Pilzgruppen (Referenzbilder)
+    # Sandflecken (kahle Stellen) und rote Pilzgruppen
     prng = np.random.default_rng(58)
     patches = []
-    while len(patches) < 26:
+    while len(patches) < 30:
         a = prng.uniform(0, 2 * math.pi)
-        rr = MESA_R * 0.72 * math.sqrt(prng.random())
+        rr = MESA_R * 0.8 * math.sqrt(prng.random())
         x, y = MESA_C[0] + math.cos(a) * rr, MESA_C[1] + math.sin(a) * rr
         rx = prng.uniform(1.5, 6.0)
-        rim = [top_z(x + rx * math.cos(b), y + rx * math.sin(b)) for b in np.linspace(0, 2 * math.pi, 12)]
-        if min(rim) < MESA_H - 4.5 or any(math.hypot(x - ax, y - ay) < ar + 2 for (ax, ay, ar) in avoid):
+        if edge_s(x, y) < rx + 8 or any(math.hypot(x - ax, y - ay) < ar + 2 for (ax, ay, ar) in avoid):
             continue
         patches.append((x, y, rx, rx * prng.uniform(0.45, 0.9), prng.uniform(0, math.pi)))
     namek.sand_patches("SandPatches", patches, mesa_height, namek.sand_material())
@@ -493,25 +703,44 @@ def build(args):
         tng = path_xy[min(k + 1, len(path_xy) - 1)] - path_xy[max(k - 1, 0)]
         tng = tng / (np.linalg.norm(tng) + 1e-9)
         x, y = p + np.array([-tng[1], tng[0]]) * prng.uniform(2.5, 14) * prng.choice([-1, 1])
-        if any(math.hypot(x - ax, y - ay) < ar for (ax, ay, ar) in avoid) or top_z(x, y) < MESA_H - 5:
+        if any(math.hypot(x - ax, y - ay) < ar for (ax, ay, ar) in avoid) or edge_s(x, y) < 8:
             continue
         mclusters.append((float(x), float(y)))
     namek.mushrooms("Mushroom", mclusters, mesa_height, prng)
 
-    # Blaues Gras als echte Halme entlang der Flugbahn (Dichte fällt mit dem Abstand)
+    # Blaues Gras (Schritt 3.3): Büschel, kahle Stellen, Variation; Wind + Druckwellen + Krater (3.5)
     excl = [(x, y, r * 0.95) for (x, y, r) in houses] + [(DB_C[0], DB_C[1], 1.7), (SHIP_C[0], SHIP_C[1], 17.5)]
-    excl += boulders
-    excl += [(x, y, min(rx, ry) * 0.7) for (x, y, rx, ry, _) in patches]
-    namek.grass_field("NamekGrass", mesa_height, path_xy, namek.grass_blade_material(), rng, ymin=172, ymax=330,
-                      exclude=excl, zmin=MESA_H - 5)
+    excl += boulders + [(x, y, min(rx, ry) * 0.7) for (x, y, rx, ry, _) in patches]
 
-    pos, quats, info = fpv.fpv_path(route, SPEED, FPS, frames, look_pitch=-3.0, pitch_follow=0.5,
-                                    bank_gain=1.0, max_bank=30, micro=1.0, seed=13,
-                                    pitch_overrides=[(8.6, 15.9, 6.0)])   # Blick leicht nach oben: Kampf
-    fpv.make_camera(pos, quats, fov_deg=92.0)
-    namek_fight(pos, top_z, rock, houses)
-    bpy.context.scene.cycles.transparent_max_bounces = 16   # Aura, Strahlen, Glühhüllen übereinander
-    print(f"route length {info['total']:.1f} m, used {info['used']:.1f} m")
+    def on_top(X, Y):
+        r = np.hypot(X - MESA_C[0], Y - MESA_C[1])
+        return mesa_edge(np.arctan2(Y - MESA_C[1], X - MESA_C[0])) - r > 7.5
+    grass = namek.grass_field("NamekGrass", mesa_height, path_xy, namek.grass_blade_material(), rng, ymin=176,
+                              ymax=330, exclude=excl, mask_fn=on_top, clump=0.6, max_blades=2_200_000,
+                              height=(0.1, 0.42))
+    craters = fight_fx(G, Z, shots, rock, ground, mesa)
+    shocks = [(1.0, 273.0, 10.0, 45.0, 0.35, 1.5), (P_CRATER[0], P_CRATER[1], 12.15, 38.0, 0.9, 2.0)]
+    shocks += [(x, y, t, 30.0, 0.55, 1.5) for (x, y, r, t, _) in craters[1:]]
+    shocks += [(Z_SEA.x, Z_SEA.y, T_CLIMAX, 75.0, 1.0, 4.0)]
+    namek.grass_motion(grass, shocks=shocks, burns=[(x, y, r * 1.15, t) for (x, y, r, t, _) in craters])
+
+    cam = fpv.make_camera(pos, quats, fov_deg=60.0)
+    cam.data.sensor_fit = "VERTICAL"
+    cam.data.sensor_height = 36.0
+    cam.data.lens_unit = "MILLIMETERS"
+    cam.data.lens = LENS_MM
+    marks = sound_markers(info)
+    for name, tt in marks:
+        sc.timeline_markers.new(name, frame=int(round(tt * FPS)) + 1)
+    os.makedirs(args.out, exist_ok=True)
+    with open(os.path.join(args.out, "sound_markers.csv"), "w") as fh:
+        fh.write("marker,seconds,frame\n")
+        for name, tt in marks:
+            fh.write(f"{name},{tt:.2f},{int(round(tt * FPS)) + 1}\n")
+    sc.cycles.transparent_max_bounces = 16
+    sc.cycles.volume_step_rate = 2.0          # Explosionsvolumen: gröbere Schritte (Kosten), Detail reicht auf 50 m
+    sc.cycles.volume_max_steps = 128
+    print(f"Tempo {info['v'].min():.1f}–{info['v'].max():.1f} m/s")
     return sc
 
 

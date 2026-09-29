@@ -194,6 +194,56 @@ def bloom(img, thr=2.5, strength=0.35, f=8, fog=0.0, clamp=None):
     return img + strength * up
 
 
+def lens_flare(img, F, env):
+    """Linsenreflexe nur aus sehr hellen Quellen (bildbasiert, folgt der Quelle von selbst): Geisterbilder entlang
+    der Achse Quelle -> Bildmitte (gespiegelt/skaliert, getönt, weich) und ein waagerechter Streifen.
+    F = dict(thr, strength, streak, ghosts=[(Skala, (r, g, b)), ...]); env = 0..1 (Zeitfenster)."""
+    if env <= 0:
+        return img
+    h, w, _ = img.shape
+    f = 8
+    hh, ww = h // f, w // f
+    src = np.maximum(img - F.get("thr", 8.0), 0)
+    src = src * (4.0 / np.maximum(src.max(-1, keepdims=True), 4.0))
+    b = src[:hh * f, :ww * f].reshape(hh, f, ww, f, 3).mean((1, 3)).astype(np.float32)
+    if b.max() <= 0:
+        return img
+    acc = np.zeros_like(b)
+    cx, cy = ww / 2, hh / 2
+    for sc, col in F.get("ghosts", [(-0.55, (0.5, 0.8, 1.0)), (-1.0, (1.0, 0.6, 0.3)), (0.4, (0.6, 1.0, 0.7)),
+                                     (-1.6, (0.7, 0.5, 1.0))]):
+        # Geist an Punkt p zeigt die Quelle bei Mitte + (p - Mitte) / sc
+        a = 1.0 / sc
+        coeffs = (a, 0, cx - a * cx, 0, a, cy - a * cy)
+        g = np.stack([np.asarray(Image.fromarray(b[..., c], mode="F").transform((ww, hh), Image.AFFINE, coeffs,
+                                                                                 resample=Image.BILINEAR))
+                      for c in range(3)], -1)
+        acc += _blur(g, 2.5 + 2.0 * abs(sc)) * np.array(col, np.float32) * min(1.0, 0.6 / abs(sc))
+    k = F.get("streak", 0.0)
+    if k:
+        st = b
+        for sig in (6.0, 18.0):
+            r = int(3 * sig)
+            x = np.arange(-r, r + 1, dtype=np.float32)
+            ker = np.exp(-x * x / (2 * sig * sig))
+            ker /= ker.sum()
+            p = np.pad(st, ((0, 0), (r, r), (0, 0)), mode="constant")
+            st = sum(wk * p[:, i:i + ww] for i, wk in enumerate(ker))
+        acc += k * st * np.array((0.6, 0.8, 1.0), np.float32)
+    up = np.stack([np.asarray(Image.fromarray(acc[..., c], mode="F").resize((w, h), Image.BILINEAR))
+                   for c in range(3)], -1)
+    return img + env * F.get("strength", 1.0) * up
+
+
+def flare_env(P, t):
+    F = P.get("flare")
+    if not F or t is None:
+        return 0.0
+    t0, t1 = F["t0"], F["t1"]
+    fi, fo = F.get("fade_in", 0.08), F.get("fade_out", 0.6)
+    return float(np.clip((t - t0) / fi + 1 / 24 / fi, 0, 1) * np.clip((t1 - t) / fo, 0, 1))
+
+
 def pulse(P, t):
     """Impact-Pulse (P['pulses'] = [(t0, ev, dispersion, abklingzeit)]): Belichtungs- und Dispersionsspitze,
     1 Frame Anstieg, dann exponentiell abklingend."""
@@ -240,6 +290,7 @@ def grade(img, P, ev, t=None, seed=0):
     if P.get("bloom"):
         img = bloom(img, thr=P.get("bloom_thr", 2.5), strength=P["bloom"], fog=P.get("fog_glow", 0.0),
                     clamp=P.get("bloom_clamp"))
+    img = lens_flare(img, P.get("flare", {}), flare_env(P, t))
     img = dispersion(img, P.get("dispersion", 0.0) + pdisp)
     out = np.clip(tonemap(img, P.get("look")), 0, 1)
     h, w = out.shape[:2]

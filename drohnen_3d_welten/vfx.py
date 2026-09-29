@@ -315,6 +315,9 @@ def beam(name, origin, direction, length, radius, color, f_start, f_full, f_end,
             ob.scale = (v, v, 1.0)
             ob.keyframe_insert("scale", index=0, frame=f)
             ob.keyframe_insert("scale", index=1, frame=f)
+        for f, hid in ((f_start - 2, True), (f_start - 1, False), (f_end + 1, True)):   # ganz weg nach dem Ende
+            ob.hide_render = hid
+            ob.keyframe_insert("hide_render", frame=f)
         for f, L in [(f_start - 1, 0.01)] + lengths:
             ob.scale = (1.0, 1.0, L)
             ob.keyframe_insert("scale", index=2, frame=f)
@@ -452,7 +455,8 @@ def ki_blast(name, p0, p1, f0, f1, color, radius=0.35, impact=True, r_impact=3.0
     return ob
 
 
-def aura(name, parent, color, f_on, f_off, height=1.9, width=0.75, light_w=600.0):
+def aura(name, parent, color, f_on, f_off, height=1.9, width=0.75, light_w=600.0, opacity=1.0, edge_w=1.0,
+         strength=1.0):
     """Super-Saiyajin-Aura: flammenförmige, nach oben strömende Glühhülle mit hellem Rand um den Körper,
     Flammenzungen oben, weicher Halo und flackerndes Licht."""
     rim = tuple(min(1.0, c * 0.5 + 0.55) for c in color)
@@ -472,7 +476,8 @@ def aura(name, parent, color, f_on, f_off, height=1.9, width=0.75, light_w=600.0
         lw.inputs["Blend"].default_value = 0.4
         edge = nb.math("POWER", lw.outputs["Facing"], 1.2)
         a = nb.math("ADD", 0.01, nb.math("MULTIPLY", streak, 0.10))
-        a = nb.math("ADD", a, nb.math("MULTIPLY", edge, nb.math("ADD", nb.math("MULTIPLY", streak, 0.35), 0.12)))
+        a = nb.math("ADD", a, nb.math("MULTIPLY", nb.math("MULTIPLY", edge, edge_w),
+                                      nb.math("ADD", nb.math("MULTIPLY", streak, 0.35), 0.12)))
         a = nb.math("MINIMUM", nb.math("MULTIPLY", a, nb.math("MULTIPLY", fade.outputs[0], alpha)), 1.0)
         em = nb.node("ShaderNodeEmission")
         nb.set_in(em, "Color", nb.mix(edge, color, rim))
@@ -505,9 +510,9 @@ def aura(name, parent, color, f_on, f_off, height=1.9, width=0.75, light_w=600.0
                 v.co.z = z * 0.85
         return ob
 
-    m1, _, _ = shell_mat(name + "Mat", 1.0, 1.0, 2.6)
+    m1, _, _ = shell_mat(name + "Mat", strength, opacity, 2.6)
     flame_shell(name, m1, 1.0)
-    m2, _, _ = shell_mat(name + "HaloMat", 0.4, 0.22, 1.6)
+    m2, _, _ = shell_mat(name + "HaloMat", 0.4 * strength, 0.22 * opacity, 1.6)
     flame_shell(name + "Halo", m2, 1.22)
     for m in (m1, m2):
         key_fade(m, [(f_on - 1, 0.0), (f_on + 3, 1.0), (f_off - 3, 1.0), (f_off, 0.0)])
@@ -847,3 +852,105 @@ def dust_gn(name, loc, t0, n=700, r_max=7.0, rise=1.6, life=1.5, color=(0.46, 0.
     mod.node_group = ng
     ob.visible_shadow = False
     return ob
+
+
+def _volume_body(name, mat, seed):
+    bm = bmesh.new()
+    bmesh.ops.create_icosphere(bm, subdivisions=3, radius=1.0)
+    ob = fpv.mesh_from_bmesh(bm, name, mat)
+    ob.visible_shadow = True
+    ob.cycles.use_motion_blur = False
+    return ob
+
+
+def _volume_material(name, color, dens, fire, seed, noise_scale=3.4, cool=0.8, t_hot=1500.0, lumps=0.95):
+    """Prozedurales Volumen (Objektkoordinaten -1..1): Dichte aus zwei 4D-Rauschlagen mit Verzerrung (quellende
+    Ballen), Rand je Richtung zwischen ~0,55 und ~0,95 des Radius (kein Kugelumriss); Glut per Schwarzkörper,
+    fleckig verteilt (auch an der Oberfläche) und mit dem Alter abkühlend. Gekeyte Value-Knoten: 'Age' (s),
+    'Dens' (Dichte-Faktor), 'Fire' (Glut-Faktor)."""
+    mat, nb, out = fpv.new_material(name)
+    age = nb.node("ShaderNodeValue")
+    age.name = "Age"
+    dn = nb.node("ShaderNodeValue")
+    dn.name = "Dens"
+    dn.outputs[0].default_value = dens
+    fr = nb.node("ShaderNodeValue")
+    fr.name = "Fire"
+    fr.outputs[0].default_value = fire
+    co = nb.coords("Object")
+    r = nb.vmath("LENGTH", co)
+
+    def noise(vec, scale, w_rate, detail, rough, sd):
+        n = nb.node("ShaderNodeTexNoise")
+        n.noise_dimensions = "4D"
+        n.inputs["Scale"].default_value = scale
+        n.inputs["Detail"].default_value = detail
+        n.inputs["Roughness"].default_value = rough
+        nb.link(vec, n.inputs["Vector"])
+        nb.link(nb.math("ADD", nb.math("MULTIPLY", age.outputs[0], w_rate), sd), n.inputs["W"])
+        return n.outputs["Fac"]
+    f0 = noise(co, noise_scale * 0.45, 0.25, 1.0, 0.5, seed * 3.7)                 # große Ballen (Umriss)
+    f1 = noise(co, noise_scale, 0.5, 3.0, 0.62, seed * 1.9)                          # Quellstruktur (+ Feinanteil)
+    edge = nb.math("ADD", 0.55, nb.math("MULTIPLY", f0, lumps * 0.75))
+    shape = nb.math("SUBTRACT", nb.math("SUBTRACT", edge, r), nb.math("MULTIPLY", nb.math("SUBTRACT", f1, 0.5), 0.22))
+    billow = nb.math("POWER", nb.math("MINIMUM", nb.math("MAXIMUM", nb.math("MULTIPLY", nb.math("SUBTRACT", f1, 0.25),
+                                                                               2.2), 0.0), 1.0), 1.6)
+    d = nb.math("MULTIPLY", nb.math("MINIMUM", nb.math("MAXIMUM", nb.math("MULTIPLY", shape, 8.0), 0.0), 1.0),
+                nb.math("ADD", 0.12, billow))
+    heat = nb.math("MULTIPLY", nb.math("MINIMUM", nb.math("MAXIMUM", nb.math("MULTIPLY", shape, 4.0), 0.0), 1.0),
+                   nb.math("MAXIMUM", nb.math("SUBTRACT", nb.math("MULTIPLY", f1, 1.8),
+                                               nb.math("MULTIPLY", age.outputs[0], cool)), 0.0))
+    heat = nb.math("MINIMUM", heat, 1.0)
+    pv = nb.node("ShaderNodeVolumePrincipled")
+    pv.inputs["Color"].default_value = (*color, 1)
+    pv.inputs["Anisotropy"].default_value = 0.3
+    nb.link(nb.math("MULTIPLY", d, dn.outputs[0]), pv.inputs["Density"])
+    nb.link(nb.math("MULTIPLY", nb.math("MULTIPLY", heat, heat), fr.outputs[0]), pv.inputs["Blackbody Intensity"])
+    nb.link(nb.math("ADD", 800.0, nb.math("MULTIPLY", heat, t_hot)), pv.inputs["Temperature"])
+    nb.link(pv.outputs[0], out.inputs["Volume"])
+    return mat
+
+
+def _key_value(mat, name, keys, interp="LINEAR"):
+    nd = mat.node_tree.nodes[name]
+    for f, v in keys:
+        nd.outputs[0].default_value = v
+        nd.outputs[0].keyframe_insert("default_value", frame=f)
+
+
+def volume_blast(name, center, f0, r_fire=9.0, r_smoke=15.0, rise=16.0, dur=100, fps=24, seed=7, fire=18.0):
+    """Explosion als prozedurales Volumen – KEINE Fluid-Simulation (Mantaflow bricht in diesem bpy-Build ab):
+    Feuerball quillt in ~0,3 s auf (turbulente Dichte, Schwarzkörper-Glut 3350 K -> 750 K), kühlt über ~1,5 s zu
+    Ruß ab; ein größerer Rauchkörper wächst aus ihm heraus, rollt (Rauschen läuft mit dem Alter) und steigt auf.
+    Zeit über gekeyte Value-Knoten; jeder Frame einzeln renderbar."""
+    c = Vector(center)
+    fm = _volume_material(name + "FireMat", (0.13, 0.11, 0.10), 1.6, fire, seed, noise_scale=5.0, cool=0.5)
+    fb = _volume_body(name + "Fire", fm, seed)
+    fb.location = c
+    for f, s, dz in ((f0 - 1, 0.001, 0.0), (f0, 0.3, 0.0), (f0 + 3, 0.72, 0.3), (f0 + 8, 0.93, 1.0),
+                     (f0 + 24, 1.08, 3.5), (f0 + dur, 1.25, rise * 0.55)):
+        fb.scale = (r_fire * s * 1.3,) * 3
+        fb.keyframe_insert("scale", frame=f)
+        fb.location = c + Vector((0, 0, dz))
+        fb.keyframe_insert("location", frame=f)
+    _key_value(fm, "Age", [(f0, 0.0), (f0 + dur, dur / fps)])
+    _key_value(fm, "Dens", [(f0 - 1, 0.0), (f0, 1.0), (f0 + 12, 1.6), (f0 + 48, 1.4), (f0 + dur, 0.5)])
+    _key_value(fm, "Fire", [(f0 - 1, 0.0), (f0, fire * 1.6), (f0 + 6, fire), (f0 + 30, fire * 0.5), (f0 + 60, fire * 0.2),
+                            (f0 + dur, fire * 0.08)])
+    sm = _volume_material(name + "SmokeMat", (0.20, 0.19, 0.18), 1.2, fire * 0.25, seed + 5, noise_scale=4.5,
+                          cool=1.4)
+    sb = _volume_body(name + "Smoke", sm, seed + 5)
+    for f, s, dz in ((f0 + 7, 0.001, 0.0), (f0 + 8, 0.5, 1.0), (f0 + 20, 0.8, 3.5), (f0 + 48, 1.0, rise * 0.55),
+                     (f0 + dur, 1.15, rise)):
+        sb.scale = (r_smoke * s * 1.3, r_smoke * s * 1.3, r_smoke * s * 1.45)
+        sb.keyframe_insert("scale", frame=f)
+        sb.location = c + Vector((0, 0, dz + r_smoke * 0.15 * s))
+        sb.keyframe_insert("location", frame=f)
+    _key_value(sm, "Age", [(f0, 0.0), (f0 + dur, dur / fps)])
+    _key_value(sm, "Dens", [(f0 + 8, 0.0), (f0 + 16, 1.2), (f0 + 60, 1.0), (f0 + dur, 0.55)])
+    _key_value(sm, "Fire", [(f0 + 3, fire * 0.4), (f0 + 30, fire * 0.1), (f0 + 60, 0.0)])
+    for ob in (fb, sb):
+        for f, hid in ((1, True), (f0 - 2, True), (f0 - 1, False)):
+            ob.hide_render = hid
+            ob.keyframe_insert("hide_render", frame=f)
+    return fb, sb

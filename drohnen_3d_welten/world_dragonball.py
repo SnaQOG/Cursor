@@ -66,9 +66,10 @@ SPIRES = [
 # ------------------------------------------------------------------------------------------------ Gelände
 def mesa_edge(ang):
     ca, sa = np.cos(ang), np.sin(ang)
+    # nur großräumige Buchten/Vorsprünge: feine Rinnen im Umriss würden an der senkrechten Wand zu
+    # regelmäßigen Säulen (Orgelpfeifen); die Wand bekommt ihre Unregelmäßigkeit in namek.ring_wall
     return MESA_R * (1 + 0.08 * np.sin(ang * 3 + 1) + 0.05 * np.sin(ang * 7 + 2)
-                     + 0.06 * fpv.fbm2(ca * 3, sa * 3, 3, seed=21)
-                     + 0.025 * fpv.fbm2(ca * 25, sa * 25, 3, seed=24))  # Rinnen
+                     + 0.06 * fpv.fbm2(ca * 3, sa * 3, 3, seed=21))
 
 
 def plateau(X, Y):
@@ -504,7 +505,7 @@ def namek_cliff():
     return nature.rock_material("NamekCliff", c1=(0.15, 0.10, 0.10), c2=(0.60, 0.42, 0.29), c3=(0.45, 0.32, 0.25),
                                 wet_line=1.6, algae=(0.03, 0.06, 0.05), moss=(0.03, 0.08, 0.16), moss_amount=0.04,
                                 strata_scale=2.2, bump=1.0, crack_w=0.15, scale=1.5, lichen=0.1, variation=0.4,
-                                bedding=0.55, bed_h=2.2, streak=0.6)
+                                bedding=0.35, bed_h=2.2, streak=0.3)
 
 
 def plateau_ground():
@@ -545,8 +546,13 @@ def build(args):
     rock = namek_rock()
     ground = plateau_ground()
     # Tafelberg: Plateau als Heightfield + umlaufende Steilwand als eigenes Mesh
+    cliff = namek_cliff()
     mesa = fpv.grid_mesh("Mesa", 2 * MESA_R + 60, 2 * MESA_R + 60, 400, 400, mesa_height, ground, origin=MESA_C)
-    wall = namek.ring_wall("MesaWall", MESA_C, mesa_edge, plateau, namek_cliff(), n_ang=1500, n_z=150, seed=5)
+    mesa.data.materials.append(cliff)            # Schuttfuß an der Wand: Fels statt Plateau-Erde
+    zc = np.zeros(len(mesa.data.polygons) * 3, dtype=np.float32)
+    mesa.data.polygons.foreach_get("center", zc)
+    mesa.data.polygons.foreach_set("material_index", (zc[2::3] < 30.0).astype(np.int32))
+    wall = namek.ring_wall("MesaWall", MESA_C, mesa_edge, plateau, cliff, n_ang=1500, n_z=150, seed=5)
     # Felsnadeln: Schichtbänke, Karstrinnen, Kopf breiter (Pilzform), leicht geneigt, Höhe variiert
     spires, far_trees = [], []
     for (x, y, r, h, seed, tx, ty) in SPIRES:

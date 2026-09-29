@@ -713,21 +713,29 @@ def ring_wall(name, center, edge_fn, top_fn, mat, n_ang=1500, n_z=150, base_z=-3
     U = np.linspace(0, 1, n_z)[:, None]
     Z = base_z + U * (Hr[None, :] - base_z)
     arc = (ang * np.mean(E))[None, :] + 0 * Z                                  # Meter entlang des Umfangs
-    ph = rng.uniform(0, 1000, 6)
-    big = fpv.fbm2(arc / 16 + ph[0], Z / 14, 4, seed=seed)                     # große Beulen
-    flutes = fpv.fbm2(arc / 2.4 + ph[1] + Z * 0.03, Z / 8, 4, seed=seed + 5)   # unregelmäßige Rinnen
-    mid = fpv.fbm2(arc / 4.5 + ph[2], Z / 3.5, 4, seed=seed + 7)
-    fine = fpv.fbm2(arc / 0.9 + ph[3], Z / 0.9, 3, seed=seed + 8)
-    d = 1.7 * big + 0.22 * flutes + 0.5 * mid + 0.1 * fine
-    # Schichtbänke: Dicke 1,4–3,2 m schwankend, leicht geneigt, Stufentiefe je Bank 45–135 %
+    ph = rng.uniform(0, 1000, 8)
+
+    def nz(su, sv, oct_, sd, off):
+        """Wertrauschen in gedrehten Koordinaten (kein achsenparalleles Gitter -> keine Orgelpfeifen)."""
+        u, v = arc / su, Z / sv
+        c, s_ = math.cos(0.61 + sd * 0.37), math.sin(0.61 + sd * 0.37)
+        return fpv.fbm2(u * c - v * s_ + off, u * s_ + v * c, oct_, seed=seed + sd)
+    # Großform: Pfeiler/Buchten (~38 m), Beulen (~13 m), mittlere und feine Unebenheit – isotrop
+    d = (2.4 * nz(38, 34, 3, 30, ph[6]) + 1.4 * nz(13, 12, 4, 1, ph[0]) + 0.5 * nz(4.5, 4.0, 4, 7, ph[2])
+         + 0.15 * nz(1.1, 1.1, 3, 8, ph[3]))
+    # Schichtbänke: Dicke 1–4 m (stark schwankend), Schichten wellig und entlang der Wand geneigt,
+    # Stufentiefe je Bank 20–100 %; weiche Bänke stellenweise tief ausgewaschen (Halbhöhlen)
     bed_h = 2.2
-    u = (Z + 1.4 * bed_h * fpv.fbm2(Z * 0.05 + ph[4], arc * 0.004, 2, seed + 13) + 0.015 * arc * 0.3
-         + 0.9 * fpv.fbm2(arc / 7 + ph[5], Z * 0.02, 3, seed + 11)) / bed_h
+    u = (Z + 2.2 * bed_h * fpv.fbm2(Z * 0.04 + ph[4], arc * 0.003, 2, seed + 13)
+         + 0.05 * arc * np.sin(arc / 90.0 + 1.3) + 1.6 * fpv.fbm2(arc / 11 + ph[5], Z * 0.03, 3, seed + 11)) / bed_h
     k = np.floor(u)
     fu = u - k
     hk = np.sin(k * 12.9898 + seed * 78.233) * 43758.5453
-    amp = 0.45 + 0.9 * (hk - np.floor(hk))
-    d += 0.55 * amp * (fu ** 3 - 0.25)
+    hk = hk - np.floor(hk)
+    amp = 0.2 + 0.8 * hk
+    d += 0.6 * amp * (fu ** 3 - 0.25)
+    soft = (hk > 0.8) * np.clip(nz(14, 12, 2, 14, 9.9) * 3.0, 0, 1)
+    d -= 0.9 * soft * np.sin(np.pi * np.clip(fu, 0, 1))
     # Deckbank: oberste 2–6 m springen vor (Überhang), Stärke wechselt entlang der Kante
     cap_h = 3.0 + 2.5 * (0.5 + 0.5 * fpv.fbm2(arc / 30 + 7.0, 0 * arc + 1.3, 3, seed + 21))
     zc = (Z - (Hr[None, :] - cap_h)) / np.maximum(cap_h, 0.5)

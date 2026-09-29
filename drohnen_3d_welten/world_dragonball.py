@@ -419,7 +419,7 @@ def fight_fx(G, Z, shots, rock, ground_mat, mesa):
     wob = [(0.0, 0.01), (0.25, Lc), (0.45, Lc - 3.0), (0.6, Lc + 2.0), (0.75, Lc - 1.5), (T_CLIMAX - t0, L)]
     kl = [(F(t0 + dt), v) for dt, v in wob]
     zl = [(F(t0), 0.01)] + [(F(t0 + dt), L - v) for dt, v in wob[1:-1]] + [(F(T_CLIMAX) - 1, 0.3)]
-    vfx.beam("Kamehameha", o, dk, kl, 0.95, KAME, F(t0), F(t0 + 0.25), F(T_CLIMAX + 0.5), light_w=9000.0,
+    vfx.beam("Kamehameha", o, dk, kl, 0.95, KAME, F(t0), F(t0 + 0.25), F(T_CLIMAX + 0.5), light_w=5000.0,
              wobble=(F(t0 + 0.25), F(T_CLIMAX + 0.4), 0.12), core_s=5.0, whiten=0.35, glow_s=3.0, core_r=0.3)
     vfx.beam("DeathBeamDuel", oz, -dk, zl, 0.55, DEATH, F(t0), F(t0 + 0.25), F(T_CLIMAX), light_w=12000.0,
              wobble=(F(t0 + 0.25), F(T_CLIMAX - 0.1), 0.15), core_s=5.0, whiten=0.35, glow_s=2.6)
@@ -457,7 +457,7 @@ def explosion(c):
         lt.data.color = col
         lt.data.keyframe_insert("color", frame=f)
     vfx.shockwave("FinalWave", c, f0 + 1, r_max=60.0, dur=20, color=(1.0, 0.85, 0.65), thick=0.5, glow=2.5)
-    vfx.shockwave("SeaWave", (c.x, c.y, 0.3), f0 + 6, r_max=70.0, dur=26, color=(0.9, 0.95, 1.0), thick=0.3, glow=0.6)
+    vfx.shockwave("SeaWave", (c.x, c.y, 0.3), f0 + 6, r_max=70.0, dur=26, color=(0.9, 0.95, 1.0), thick=0.15, glow=0.25)
     vfx.sparks_gn("FinalSparks", c, T_CLIMAX, n=500, speed=(15, 35), life=(0.5, 1.4), color=(1.0, 0.7, 0.35),
                   strength=60.0, radius=(0.03, 0.08), seed=15)
     vfx.dust_gn("Spray", (c.x, c.y, 0.2), T_CLIMAX + 0.3, n=2500, r_max=30.0, rise=9.0, life=3.2,

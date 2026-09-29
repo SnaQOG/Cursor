@@ -7,8 +7,8 @@ POST = dict(
     vignette=0.22, grain=0.025,                       # Vignette, Filmkorn ~2 % in den Mitteltönen
     # Impact-Blitze (Zeit, EV, Dispersion, Abklingzeit s): kleine Treffer +0,35…0,6 EV, Klimax +1,8 EV
     # (1–2 fast weiße Frames), Dispersion springt kurz mit
-    pulses=[(1.15, 0.4, 0.008, 0.06), (4.1, 0.35, 0.006, 0.06), (5.65, 0.35, 0.006, 0.06), (6.85, 0.4, 0.008, 0.06),
-            (12.6, 0.5, 0.01, 0.07), (13.15, 0.6, 0.012, 0.08), (15.0, 1.8, 0.02, 0.07)],
+    pulses=[(10.95, 0.4, 0.008, 0.06), (11.5, 0.35, 0.006, 0.06), (11.95, 0.35, 0.006, 0.06),
+            (12.35, 0.5, 0.01, 0.07), (12.9, 0.6, 0.012, 0.08), (15.0, 1.8, 0.02, 0.07)],
     bitrate="18M",                                    # H.264 High, Zwei-Pass 18 Mbit/s (max. 20)
     still_full=True,
 )

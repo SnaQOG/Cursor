@@ -1,12 +1,13 @@
 """Welt 2 – Naruto: Konohagakure mit Hokage-Felsen.
 
 Flug (20 s, eine durchgehende Aufnahme, Speed-Ramp 1–33 m/s, fest 35 mm):
-  0–2 s    Hook: Naruto und Sasuke prallen auf dem unteren Tor-Querbalken zusammen, Durchflug durchs Tor
-  2–6 s    Hauptstraße tief (3,5–5 m) unter den Laternenkabeln, die beiden jagen sich ~15 m voraus
-  6–8,6 s  langsam am alten Baum: Abstoß vom Stamm, Zusammenprall vor der Krone, links am Baum vorbei
-  8,6–12 s schnell über den Platz, Steigflug über die Brüstung aufs Dach der Hokage-Residenz
-  12–17 s  Dachkampf: Sprungtritt/Block, Konter gegen ein Horn, Rasengan gegen Chidori (Klimax 15,0 s)
-  17–20 s  ruhiges Schlussbild: Naruto in Untersicht, dahinter die fünf Hokage-Gesichter
+  0–2 s     Hook: Blick durchs Tor aufs Dorf, die Residenz und die Gesichter (ferne Blitze auf dem Dach), Durchflug
+  2–7 s     Hauptstraße tief (3,5–5 m) unter Laternenkabeln und Wäsche, Passanten und Stände
+  7–9 s     links am alten Baum vorbei, schnell über den Platz
+  9–10,9 s  Steigflug über die Brüstung aufs Dach der Hokage-Residenz – der Kampf läuft dort bereits
+  10,9–17 s Dachkampf: Luftzusammenprall, Tritt/Block, Schlag/Block, Sprungtritt, Konter gegen ein Horn,
+            Rasengan gegen Chidori (Klimax 15,0 s)
+  17–20 s   ruhiges Schlussbild: Naruto in Untersicht, dahinter die fünf Hokage-Gesichter
 Referenzen: Anime-/Spiel-Standbilder von Konoha (Pastellfassaden, bunte Dächer, Wassertanks,
 ockerfarbener Sandstein-Felsen mit Laufspuren, Treppen, Kuppelbauten), Model Sheets Naruto/Sasuke.
 """
@@ -20,8 +21,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bpy  # noqa: E402
 import bmesh  # noqa: E402,I100
 import numpy as np  # noqa: E402
-from mathutils import Euler, Matrix, Vector  # noqa: E402
+from mathutils import Matrix, Vector  # noqa: E402
 
+import choreo  # noqa: E402
 import fpv  # noqa: E402
 import konoha  # noqa: E402
 import konoha_life  # noqa: E402
@@ -170,25 +172,25 @@ def roof(x, y, z=0.0):
 
 # Kamera: Wegpunkte mit Uhrzeit (Speed-Ramp ergibt sich aus Abstand/Zeit, monoton-kubisch geglättet)
 CAM_KEYS = [
-    (0.00, (0.0, -30.0, 14.0)),      # Waldweg, Blick hinauf zum unteren Tor-Querbalken (Hook)
-    (1.40, (0.0, -10.5, 12.0)),
-    (2.20, (0.0, 0.0, 8.5)),         # Durchflug unter dem unteren Querbalken (16 m)
-    (3.20, (0.5, 22.0, 5.0)),
-    (3.70, (1.5, 33.0, 3.6)),        # unter Laternenkabel 1
-    (4.55, (-1.5, 52.0, 4.2)),
-    (5.35, (-2.0, 71.0, 3.6)),       # Kabel 2
-    (6.30, (-2.5, 92.0, 3.6)),       # Abbremsen vor dem alten Baum
-    (7.10, (-4.5, 101.0, 3.4)),      # Kabel 3 (y 109), Blick hinauf: Sprung über die Krone
-    (7.90, (-7.5, 112.0, 4.5)),
-    (8.60, (-7.0, 123.0, 5.5)),      # links am Baum vorbei
-    (9.30, (-5.0, 140.0, 7.5)),
-    (9.90, (-5.0, 157.0, 10.5)),     # über Kabel 4 (y 147) hinweg
-    (10.55, (-9.0, 177.0, 16.0)),
-    (11.15, (-15.0, 194.0, 24.0)),
-    (11.60, (-19.5, 205.5, 31.0)),
-    (11.90, tuple(roof(0.0, -18.8, 3.8))),   # über die Brüstung zwischen zwei Hörnern
-    (12.45, tuple(roof(2.0, -11.5, 2.8))),   # scharf abgebremst: Schlag und Konter ~20 m voraus
-    (13.30, tuple(roof(3.4, -11.0, 2.6))),
+    (0.00, (0.0, -32.0, 9.0)),       # Waldweg, Blick durchs Tor aufs Dorf und die Gesichter (Hook)
+    (1.80, (0.0, 0.0, 7.0)),         # Durchflug unter dem unteren Querbalken (16 m)
+    (2.70, (0.5, 20.0, 5.0)),
+    (3.20, (1.5, 31.0, 3.6)),        # unter Laternenkabel 1 (y 33)
+    (4.00, (-1.5, 50.0, 4.2)),       # unter der Wäscheleine
+    (4.80, (-2.0, 69.0, 3.6)),       # Kabel 2 (y 71)
+    (5.70, (-1.5, 90.0, 4.0)),
+    (6.40, (-4.5, 104.0, 3.6)),      # Kabel 3 (y 109)
+    (7.10, (-7.5, 116.0, 4.5)),      # links am alten Baum vorbei
+    (7.80, (-6.5, 128.0, 5.5)),
+    (8.40, (-5.0, 142.0, 7.5)),
+    (9.00, (-5.5, 157.0, 10.5)),     # über Kabel 4 (y 147) hinweg
+    (9.55, (-10.0, 174.0, 16.5)),    # schneller Steigflug über den Platz
+    (10.10, (-15.5, 192.0, 24.5)),
+    (10.55, (-19.5, 205.5, 31.0)),
+    (10.85, tuple(roof(0.0, -18.8, 3.8))),   # über die Brüstung: der Kampf ist schon im Gange
+    (11.30, tuple(roof(-2.5, -12.5, 3.0))),  # scharf abgebremst, langsamer Bogen um die beiden
+    (12.20, tuple(roof(0.5, -12.0, 2.7))),
+    (13.20, tuple(roof(3.4, -11.0, 2.6))),
     (14.45, tuple(roof(4.75, -10.4, 2.4))),  # Aufladen: beide (6,4 m Abstand) ganz im Bild
     (15.00, tuple(roof(4.75, -2.0, 2.0))),   # Vorstoß mit dem Ansturm, Zusammenprall 8,5 m voraus
     (15.90, tuple(roof(6.4, -3.0, 2.8))),    # von der Druckwelle zurück- und hochgedrückt
@@ -197,121 +199,52 @@ CAM_KEYS = [
 ]
 
 
-def _pchip(tk, yk, t):
-    """Monotone kubische Interpolation (Fritsch–Carlson): keine Überschwinger, stetige Geschwindigkeit."""
-    tk, yk = np.asarray(tk, float), np.asarray(yk, float)
-    h = np.diff(tk)
-    d = np.diff(yk) / h
-    m = np.zeros_like(yk)
-    m[0], m[-1] = d[0], d[-1]
-    for k in range(1, len(yk) - 1):
-        if d[k - 1] * d[k] > 0:
-            w1, w2 = 2 * h[k] + h[k - 1], h[k] + 2 * h[k - 1]
-            m[k] = (w1 + w2) / (w1 / d[k - 1] + w2 / d[k])
-    t = np.asarray(t, float)
-    k = np.clip(np.searchsorted(tk, t) - 1, 0, len(tk) - 2)
-    u = (t - tk[k]) / h[k]
-    h00, h10, h01, h11 = 2 * u ** 3 - 3 * u ** 2 + 1, u ** 3 - 2 * u ** 2 + u, -2 * u ** 3 + 3 * u ** 2, u ** 3 - u ** 2
-    return h00 * yk[k] + h10 * h[k] * m[k] + h01 * yk[k + 1] + h11 * h[k] * m[k + 1]
+_pchip = choreo.pchip
 
 
 def camera_positions(frames):
-    """Kameraorte pro Frame 0..frames+1 entlang einer Catmull-Rom-Kurve durch CAM_KEYS, Bogenlänge über die Zeit
-    monoton-kubisch (Speed-Ramp). Rückgabe: t, pos, Tempo (m/s)."""
-    n = frames + 2
-    t = (np.arange(n) - 1.0) / FPS
-    pts = [p for _, p in CAM_KEYS]
-    seg = 400
-    curve = fpv._catmull_rom(pts, samples_per_seg=seg)
-    sa = np.concatenate([[0], np.cumsum(np.linalg.norm(np.diff(curve, axis=0), axis=1))])
-    s_knot = [sa[min(k * seg, len(sa) - 1)] for k in range(len(pts))]
-    s_knot[-1] = sa[-1]
-    s = _pchip([k for k, _ in CAM_KEYS], s_knot, np.clip(t, 0, CAM_KEYS[-1][0]))
-    s[t < 0] = s_knot[0] + t[t < 0] * (s[2] - s[1]) * FPS      # Frame 0 (vor dem Start) für Motion-Blur
-    pos = np.stack([np.interp(s, sa, curve[:, k]) for k in range(3)], axis=1)
-    if (t < 0).any():
-        d0 = (curve[1] - curve[0]) / np.linalg.norm(curve[1] - curve[0])
-        pos[t < 0] = curve[0] + np.outer(s[t < 0] - s_knot[0], d0)
-    v = np.gradient(s) * FPS
-    return t, pos, v
+    """Kameraorte pro Frame 0..frames+1 entlang CAM_KEYS mit Speed-Ramp. Rückgabe: t, pos, Tempo (m/s)."""
+    return choreo.keyed_path(CAM_KEYS, FPS, frames)
 
 
 def fight_plan(cam_t, cam_pos):
-    """Blocking der Kämpfer: Liste (t, Pose, Ort, Blickziel, in der Luft) je Figur, in Welt-Metern.
-    Straße: Vorsprung vor der Kamera entlang ihrer Bahn, damit beide im Bild bleiben."""
-    def ahead(t, lead, dx=0.0, z=0.0):
-        i = int(np.clip(np.searchsorted(cam_t, t), 1, len(cam_t) - 1))
-        p = cam_pos[i]
-        # Ort `lead` Meter weiter auf der Kamerabahn (über die Bahnpunkte späterer Frames gesucht)
-        d = np.linalg.norm(np.diff(cam_pos[i:], axis=0), axis=1).cumsum()
-        k = int(np.searchsorted(d, lead))
-        q = cam_pos[min(i + k + 1, len(cam_pos) - 1)]
-        return Vector((q[0] + dx, q[1], z))
-
+    """Blocking der Kämpfer (nur auf dem Dach der Residenz): Liste (t, Pose, Ort, Blickziel, in der Luft) je Figur,
+    in Welt-Metern. Bei 1,3 und 5,3 s prallen sie fern über dem Dach zusammen (Teaser-Blitze); wenn die Kamera um
+    10,85 s über die Brüstung steigt, prallen sie gerade in der Luft zusammen."""
     N, S = [], []
-    V = Vector
-    # --- Hook: auf dem unteren Tor-Querbalken, Kunai-Zusammenprall 1,15 s, Absprung ins Dorf
-    Z = BEAM2_TOP
-    for L, sd in ((N, -1), (S, 1)):
-        o = -sd
-        L += [(0.0, "guard", V((sd * 3.4, -0.2, Z)), V((o * 3.0, -0.2, Z)), False),
-              (0.8, "guard", V((sd * 3.0, -0.2, Z)), V((o * 3.0, -0.2, Z)), False),
-              (1.02, "run_a" if sd < 0 else "run_b", V((sd * 1.5, -0.2, Z)), V((0, -0.2, Z)), False),
-              (1.15, "punch_R" if sd < 0 else "punch_L", V((sd * 0.62, -0.2, Z + 0.15)), V((o, -0.2, Z)), True),
-              (1.35, "recoil", V((sd * 1.7, 0.1, Z)), V((o, -0.2, Z)), False),
-              (1.6, "jump", V((sd * 2.0, 1.5, Z + 0.8)), V((sd * 2.0, 30, 5)), True),
-              (2.3, "jump", V((sd * 2.2, 16.0, 9.0)), V((sd * 2.0, 40, 0)), True)]
-    # --- Straße: laufen ~15 m vor der Kamera, zwei Schlagabtausche in der Luft
-    runs = np.arange(2.9, 6.35, 0.2)
-    clashes = (4.1, 5.65)
-    for L, sd in ((N, -1), (S, 1)):
-        L.append((2.85, "land", ahead(2.85, 15.0, sd * 2.4), ahead(3.2, 30.0, sd * 2.4), False))
-        for k, tr in enumerate(runs):
-            if any(abs(tr - tc) < 0.45 for tc in clashes):
-                continue
-            L.append((tr, "run_a" if (k + (sd > 0)) % 2 == 0 else "run_b", ahead(tr, 15.0, sd * 2.3),
-                      ahead(tr + 0.3, 30.0, sd * 2.3), False))
-        for k, tc in enumerate(clashes):
-            L += [(tc - 0.35, "jump", ahead(tc - 0.35, 15.0, sd * 2.0, 1.2), ahead(tc, 15.0, 0, 2.5), True),
-                  (tc, ("kick_R", "punch_R")[k] if sd < 0 else ("punch_L", "kick_L")[k],
-                   ahead(tc, 15.0, sd * 0.62, 2.6), ahead(tc, 15.0, -sd * 0.62, 2.6), True),
-                  (tc + 0.3, "land", ahead(tc + 0.3, 15.0, sd * 2.4), ahead(tc + 0.6, 30.0, sd * 2.4), False)]
-    # --- am alten Baum: Abstoß vom Stamm, Zusammenprall vor der Krone (6,85 s), rechts am Baum vorbei,
-    #     Sprint über den Platz, Sprünge auf die Residenz
-    tx, ty = TREE_POS
-    for L, sd in ((N, -1), (S, 1)):
-        o = -sd
-        L += [(6.4, "jump", V((tx + sd * 3.5, 104.0, 1.5)), V((tx, 108, 7)), True),
-              (6.62, "land", V((tx + sd * 1.2, ty - 1.3, 4.5)), V((tx, 108, 7)), True),        # Fuß am Stamm
-              (6.85, ("kick_R" if sd < 0 else "punch_L"), V((tx + sd * 0.62, 108.5, 7.5)),
-               V((tx + o * 0.62, 108.5, 7.5)), True),
-              (7.05, "recoil", V((tx + sd * 1.8, 109.0, 7.0)), V((tx + o, 108.5, 7.5)), True),
-              (7.35, "jump", V((tx + 9.0 + sd * 1.5, 116.0, 4.0)), V((10, 135, 0)), True),
-              (7.6, "land", V((9.0 + sd * 1.5, 128.0, 0.0)), V((0, 170, 0)), False)]
-        for k, tr in enumerate(np.arange(7.75, 9.75, 0.2)):
-            y = 131.0 + (tr - 7.6) * 28.0
-            L.append((tr, "run_a" if (k + (sd > 0)) % 2 == 0 else "run_b",
-                      V((9.0 + sd * 1.5 - 17.0 * (tr - 7.6) / 2.15, y, 0.0)),
-                      V((-20, 205, 0)), False))
-        gx = RES_POS[0] + sd * 4.5
-        L += [(9.95, "jump", V((gx, 196.0, 4.0)), V((gx, 207, 11)), True),
-              (10.25, "land", V((gx, 206.5, 11.2)), V((gx, 214, 19)), False),           # Dach des Torbaus
-              (10.5, "jump", V((gx, 208.5, 16.0)), V((gx, 212, 19)), True),
-              (10.7, "land", V((gx + sd * 1.0, 210.0, 19.1)), V((gx, 230, 32)), False),  # Ziegelkragen
-              (10.9, "jump", V((gx + sd * 2.0, 214.0, 28.0)), V((gx, 235, 32)), True)]
-    # --- Dach (relativ zur Dachmitte): Naruto Ost, Sasuke West
     R = roof
-    P = V(P_CLASH)
-    Y = 1.8   # Linie für Schlag und Konter (1,8 m neben der Mittelspitze)
-    N += [(11.3, "land", R(10, Y), R(-3.5, Y), False), (11.6, "guard", R(10, Y), R(-3.5, Y), False),
-          (12.1, "run_a", R(7.5, Y), R(-3, Y), False), (12.35, "jump", R(6.0, Y, 0.9), R(3, Y), True),
-          (12.6, "kick_R", R(4.7, Y, 0.8), R(3.2, Y, 1.0), True),            # Schlag: Sprungtritt
-          (12.75, "recoil", R(5.6, Y, 0.8), R(3, Y), True),                   # geblockt
-          (12.92, "recoil", R(7.4, Y - 1.0, 1.3), R(3, Y), True),             # Konter trifft
-          (13.12, "recoil", R(15.5, -6.3, 1.1), R(3, Y), True),               # gegen das Horn im Südosten (13,15 s)
-          (13.35, "land", R(15.1, -6.0), R(0, 6.5), False),
-          (13.6, "jump", R(11.2, 1.5, 1.0), R(0, 6.5), True),
-          (13.8, "crouch_charge_R", R(7.95, 6.5), R(1.55, 6.5), False),       # Rasengan
+    P = Vector(P_CLASH)
+    Y = 1.8   # Linie für Schlagabtausch und Konter (1,8 m neben der Mittelspitze)
+    for tt in (1.3, 5.3):   # ferne Teaser-Zusammenstöße (Blitz über dem Dach), danach zurück in Deckung
+        N += [(tt - 0.45, "guard", R(7.0, 4.5), R(0, 5.5), False),
+              (tt - 0.25, "jump", R(5.6, 4.8, 1.8), R(1.5, 5.2, 3.5), True),
+              (tt, "kick_R", R(3.9, 5.0, 3.3), R(2.6, 5.0, 3.4), True),
+              (tt + 0.2, "recoil", R(5.8, 4.6, 2.6), R(1, 5, 2), True),
+              (tt + 0.45, "land", R(7.0, 4.5), R(0, 5.5), False),
+              (tt + 0.9, "guard", R(7.0, 4.5), R(0, 5.5), False)]
+        S += [(tt - 0.45, "guard", R(0.0, 5.5), R(7, 4.5), False),
+              (tt - 0.25, "jump", R(1.4, 5.3, 1.8), R(5.5, 4.8, 3.5), True),
+              (tt, "punch_L", R(2.6, 5.0, 3.3), R(3.9, 5.0, 3.4), True),
+              (tt + 0.2, "recoil", R(0.8, 5.3, 2.6), R(7, 4, 2), True),
+              (tt + 0.45, "land", R(0.0, 5.5), R(7, 4.5), False),
+              (tt + 0.9, "guard", R(0.0, 5.5), R(7, 4.5), False)]
+    N += [(10.4, "guard", R(7.0, 4.5), R(0, 5.5), False),
+          (10.7, "jump", R(5.6, 4.8, 1.8), R(1.5, 5.2, 3.5), True),
+          (10.95, "kick_R", R(3.9, 5.0, 3.3), R(2.6, 5.0, 3.4), True),       # Zusammenprall in der Luft
+          (11.15, "recoil", R(5.8, 4.6, 2.6), R(1, 5, 2), True),
+          (11.35, "land", R(7.0, 2.6), R(2, Y), False),
+          (11.5, "guard", R(5.2, Y), R(3, Y), False),                         # blockt Sasukes Tritt
+          (11.7, "run_a", R(5.0, Y), R(3, Y), False),
+          (11.95, "punch_R", R(4.3, Y), R(3.0, Y, 1.0), False),               # Schlag, Sasuke blockt
+          (12.1, "recoil", R(5.6, Y, 0.3), R(3, Y), True),
+          (12.2, "jump", R(6.2, Y, 0.9), R(3, Y), True),
+          (12.35, "kick_R", R(4.7, Y, 0.8), R(3.2, Y, 1.0), True),            # Sprungtritt, geblockt
+          (12.5, "recoil", R(5.6, Y, 0.8), R(3, Y), True),
+          (12.67, "recoil", R(7.4, Y - 1.0, 1.3), R(3, Y), True),             # Konter trifft
+          (12.87, "recoil", R(15.5, -6.3, 1.1), R(3, Y), True),               # gegen das Horn im Südosten (12,9 s)
+          (13.1, "land", R(15.1, -6.0), R(0, 6.5), False),
+          (13.35, "jump", R(11.2, 1.5, 1.0), R(0, 6.5), True),
+          (13.6, "crouch_charge_R", R(7.95, 6.5), R(1.55, 6.5), False),       # Rasengan
           (14.5, "crouch_charge_R", R(7.9, 6.5), R(1.55, 6.5), False),
           (14.65, "run_b", R(6.9, 6.5), R(1.55, 6.5), False),
           (14.82, "dash_thrust_R", R(6.0, 6.5, 0.6), R(4, 6.5, 1), True),
@@ -321,11 +254,18 @@ def fight_plan(cam_t, cam_pos):
           (16.4, "stand", R(8.7, 3.9), R(6.3, -4.6, 1.0), False),             # steht auf, dreht sich zur Kamera
           (17.0, "hero", R(8.4, 3.6), R(6.6, -0.9, 1.2), False),               # Faust zur Kamera
           (20.1, "hero", R(8.4, 3.6), R(6.6, -0.9, 1.2), False)]
-    S += [(11.3, "land", R(-3.5, Y), R(10, Y), False), (11.6, "guard", R(-3.5, Y), R(10, Y), False),
-          (12.4, "guard", R(3.0, Y), R(8, Y), False), (12.6, "guard", R(3.3, Y), R(6, Y), False),   # blockt
-          (12.9, "kick_L", R(3.6, Y), R(7, Y), False),                         # Drehtritt als Konter
-          (13.2, "guard", R(3.0, Y + 0.4), R(15, -6), False),
-          (13.7, "crouch_charge_L", R(1.55, 6.5), R(7.95, 6.5), False),       # Chidori
+    S += [(10.4, "guard", R(0.0, 5.5), R(7, 4.5), False),
+          (10.7, "jump", R(1.4, 5.3, 1.8), R(5.5, 4.8, 3.5), True),
+          (10.95, "punch_L", R(2.6, 5.0, 3.3), R(3.9, 5.0, 3.4), True),
+          (11.15, "recoil", R(0.8, 5.3, 2.6), R(7, 4, 2), True),
+          (11.3, "run_a", R(1.8, 3.0), R(6, Y), False),
+          (11.5, "kick_L", R(3.3, Y), R(5.5, Y), False),                      # Tritt, Naruto blockt
+          (11.75, "guard", R(3.1, Y), R(5, Y), False),
+          (11.95, "guard", R(3.2, Y), R(4.5, Y), False),                      # blockt Narutos Schlag
+          (12.35, "guard", R(3.3, Y), R(6, Y), False),                        # blockt den Sprungtritt
+          (12.65, "kick_L", R(3.6, Y), R(7, Y), False),                       # Drehtritt als Konter
+          (12.95, "guard", R(3.0, Y + 0.4), R(15, -6), False),
+          (13.45, "crouch_charge_L", R(1.55, 6.5), R(7.95, 6.5), False),     # Chidori
           (14.5, "crouch_charge_L", R(1.6, 6.5), R(7.95, 6.5), False),
           (14.65, "run_a", R(2.6, 6.5), R(7.95, 6.5), False),
           (14.82, "dash_thrust_L", R(3.5, 6.5, 0.6), R(6, 6.5, 1), True),
@@ -338,8 +278,8 @@ def fight_plan(cam_t, cam_pos):
     return N, S, P
 
 
-HITS = [(1.15, 3), (4.1, 3), (5.65, 3), (6.85, 3), (12.6, 3), (13.15, 3), (T_CLASH, 4)]   # (Zeit, Halte-Frames)
-ATTACKS = ("punch_R", "punch_L", "kick_R", "kick_L", "dash_thrust_R", "dash_thrust_L")
+HITS = [(10.95, 3), (11.5, 3), (11.95, 3), (12.35, 3), (12.9, 3), (T_CLASH, 4)]   # (Zeit, Halte-Frames)
+ATTACKS = choreo.ATTACKS
 POSES.update({
     # Schlussbild: rechte Faust nach vorn zur Kamera gestreckt (Versprechen), links locker, leicht eingedreht
     "hero": {"spine": (4, 0, 7), "head": (4, 0, -5), "shoulder.R": (84, 4, 0), "elbow.R": (8, 0, 0),
@@ -348,106 +288,16 @@ POSES.update({
 })
 
 
-def _style(pose):
-    """(Dauer, Ausholen, Überschwingen) je Posenart: Angriffe mit Ausholen und Überschwingen, Treffer-Reaktion
-    schnell mit Nachschwingen, Landung federt, Lauf knapp, Halteposen weich."""
-    if pose in ATTACKS:
-        return 0.36, 0.2, 0.14
-    if pose == "recoil":
-        return 0.12, 0.0, 0.18
-    if pose in ("land", "squat"):
-        return 0.14, 0.0, 0.14
-    if pose == "jump":
-        return 0.2, 0.1, 0.06
-    if pose.startswith("run"):
-        return 0.14, 0.0, 0.05
-    if pose.startswith("crouch_charge"):
-        return 0.3, 0.1, 0.06
-    return 0.32, 0.06, 0.07
+_style = choreo.default_style
 
 
 def hit_warp(t):
-    """Zeitverzerrung für Treffer-Halte-Frames (Hit-Stop): an jedem Treffer steht die Zeit n Frames still und holt
-    danach in n Frames wieder auf – kein bleibender Versatz zur Kamera."""
-    tau = np.array(t, dtype=float)
-    for h, nf in HITS:
-        H = nf / FPS
-        a = (t >= h) & (t < h + H)
-        b = (t >= h + H) & (t < h + 2 * H)
-        tau[a] = h
-        tau[b] = h + 2 * (t[b] - h - H)
-    return tau
+    """Zeitverzerrung für Treffer-Halte-Frames (Hit-Stop) an HITS."""
+    return choreo.time_warp(t, HITS, FPS)
 
 
 def bake_fighter(fig, keys, n, cam_pos=None, look_win=None, seed=0):
-    """Blocking -> gebackene Animation: Posenwechsel mit Ausholen/Überschwingen (crew._prog), Nachziehen von
-    Unterarm/Hand/Kopf, Atmen/Mikrobewegung, Hit-Stop an Treffern, weiche Bahn (monoton-kubisch) mit Bodenkontakt
-    über Vorwärtskinematik, Blick zur Kamera im Fenster look_win."""
-    import crew
-    ks = []
-    for k in sorted(keys, key=lambda k: k[0]):
-        if ks and abs(k[0] - ks[-1][0]) < 1e-6:
-            ks[-1] = k
-        else:
-            ks.append(k)
-    tk = np.array([k[0] for k in ks])
-    t = (np.arange(n) - 1.0) / FPS
-    tw = hit_warp(t)
-    # Posenplan
-    sched = [(0.0, ks[0][1], 1.0, 0.0, 0.0)]
-    for k in range(1, len(ks)):
-        dur, a, o = _style(ks[k][1])
-        d = min(dur, max(tk[k] - tk[k - 1], 1.0 / FPS))
-        sched.append((tk[k] - d, ks[k][1], d, a, o))
-    R = {}
-    for j in fig.J:
-        lag = crew.LAG.get(j.split(".")[0], 0.0)
-        R[j] = crew._eval_schedule(sched, j, tw - lag)
-    rng = np.random.default_rng(seed)
-    ph = rng.uniform(0, 6.28, 4)
-    br = np.sin(2 * np.pi * 0.28 * t + ph[0])
-    R["spine"][:, 0] += 1.0 * br
-    R["shoulder.R"][:, 1] += 0.6 * br
-    R["shoulder.L"][:, 1] -= 0.6 * br
-    R["head"][:, 0] += 1.0 * np.sin(2 * np.pi * 0.41 * t + ph[1])
-    R["head"][:, 2] += 1.4 * np.sin(2 * np.pi * 0.23 * t + ph[2])
-    # Bahn: Basis-z je Schlüssel (Boden: Fußkontakt), monoton-kubisch dazwischen
-    P = np.array([tuple(k[2]) for k in ks], dtype=float)
-    air = np.array([k[4] for k in ks])
-    rot_at = lambda pose: POSES[pose] if isinstance(pose, str) else pose
-    bz = np.array([P[k, 2] if air[k] else P[k, 2] - fig.foot_drop(rot_at(ks[k][1])) for k in range(len(ks))])
-    L = np.stack([_pchip(tk, P[:, 0], np.clip(tw, tk[0], tk[-1])), _pchip(tk, P[:, 1], np.clip(tw, tk[0], tk[-1])),
-                  _pchip(tk, bz, np.clip(tw, tk[0], tk[-1]))], axis=1)
-    seg = np.clip(np.searchsorted(tk, tw, side="right") - 1, 0, len(ks) - 2)
-    ground_seg = (~air[seg]) & (~air[seg + 1])
-    for f in np.where(ground_seg)[0]:
-        u = np.clip((tw[f] - tk[seg[f]]) / max(tk[seg[f] + 1] - tk[seg[f]], 1e-6), 0, 1)
-        gz = P[seg[f], 2] * (1 - u) + P[seg[f] + 1, 2] * u
-        L[f, 2] = gz - fig.foot_drop({j: tuple(R[j][f]) for j in ("root", "hip.R", "knee.R", "ankle.R",
-                                                                  "hip.L", "knee.L", "ankle.L")})
-    # Blickrichtung (Yaw) je Schlüssel, stetig
-    yaw_k = np.unwrap(np.array([math.atan2(-(k[3] - k[2]).x, (k[3] - k[2]).y) for k in ks]))
-    yaw = _pchip(tk, yaw_k, np.clip(tw, tk[0], tk[-1]))
-    # Blick zur Kamera (Hals/Kopf), weich ein- und ausgeblendet
-    if cam_pos is not None and look_win:
-        w = _smooth(look_win[0], look_win[0] + 0.6, t) * (1 - _smooth(look_win[1] - 0.4, look_win[1], t))
-        head = L + np.array([0, 0, 1.5 * fig.s])
-        d = cam_pos[:n] - head
-        dyaw = np.degrees(np.arctan2(-d[:, 0], d[:, 1]) - yaw)
-        dyaw = (dyaw + 180) % 360 - 180
-        dpit = np.degrees(np.arctan2(d[:, 2], np.hypot(d[:, 0], d[:, 1])))
-        ay = crew._zero_phase(np.clip(dyaw - R["head"][:, 2] - R["spine"][:, 2], -60, 60) * w, 0.15)
-        ap = crew._zero_phase(np.clip(dpit - R["head"][:, 0] - R["spine"][:, 0], -25, 30) * w, 0.15)
-        R["neck"][:, 2] += 0.6 * ay
-        R["head"][:, 2] += 0.4 * ay
-        R["neck"][:, 0] += 0.5 * ap
-        R["head"][:, 0] += 0.5 * ap
-    for j, e in fig.J.items():
-        e.rotation_mode = "XYZ"
-        crew._bake(e, "rotation_euler", np.radians(R[j]))
-    crew._bake(fig.base, "location", L)
-    fig.base.rotation_mode = "XYZ"
-    crew._bake(fig.base, "rotation_euler", np.stack([np.zeros(n), np.zeros(n), yaw], axis=1))
+    return choreo.bake_fighter(fig, keys, n, FPS, HITS, _style, cam_pos=cam_pos, look_win=look_win, seed=seed)
 
 
 def stage_fight(N_keys, S_keys, n=None, cam_pos=None):
@@ -465,9 +315,9 @@ def stage_fight(N_keys, S_keys, n=None, cam_pos=None):
 
 # ------------------------------------------------------------------------------------------------ Schritt 3.5 – FX
 # Kamera: Stöße (Zeit, Stärke in Grad, Frames) und Halte-Frames nur auf dem Dach (Kamera dort langsam)
-SHAKES = [(1.15, 0.8, 6), (4.1, 0.9, 6), (5.65, 0.9, 6), (6.85, 1.0, 6), (12.6, 1.2, 7), (13.15, 1.6, 8),
+SHAKES = [(10.95, 1.0, 6), (11.5, 0.8, 6), (11.95, 0.8, 6), (12.35, 1.2, 7), (12.9, 1.6, 8),
           (T_CLASH, 3.2, 10)]
-CAM_HOLDS = [(12.6, 2), (13.15, 2), (T_CLASH, 4)]
+CAM_HOLDS = [(12.35, 2), (12.9, 2), (T_CLASH, 4)]
 BLUE = (0.12, 0.42, 1.0)
 
 
@@ -476,14 +326,7 @@ def F(t):
 
 
 def warp(t, holds):
-    tau = np.array(t, dtype=float)
-    for h, nf in holds:
-        H = nf / FPS
-        a = (t >= h) & (t < h + H)
-        b = (t >= h + H) & (t < h + 2 * H)
-        tau[a] = h
-        tau[b] = h + 2 * (t[b] - h - H)
-    return tau
+    return choreo.time_warp(t, holds, FPS)
 
 
 def impact_small(name, loc, t, color=(1.0, 0.75, 0.4), light_w=4000.0, ring=2.5, sparks=90, seed=1):
@@ -545,7 +388,7 @@ def break_fx(mats, deck_z):
     f_blast = F(T_CLASH) + 4
     colliders = [bpy.data.objects[n] for n in ("ResRoofDeck", "ResParapet", "ResCap")]
     hit = roof(14.6, -6.0, 1.9)          # Naruto trifft das Horn von innen -> Stücke fliegen nach außen
-    f_horn = F(13.15) + 3
+    f_horn = F(12.9) + 3
     # Kraftfeld-Stärken kalibriert (Test: 40 000 -> 1,4 m, 150 000 -> 10 m Steighöhe der Dachplatten)
     vfx.rigid_sim(horn_bits, colliders, f_horn, F(17.5), [(hit, 40000.0, f_horn, f_horn + 1)], mass_density=500.0)
     vfx.rigid_sim(deck_bits, colliders, f_blast, F(19.0), [(Pc - Vector((0, 0, 0.5)), 34000.0, f_blast, f_blast + 1)],
@@ -587,17 +430,26 @@ def break_fx(mats, deck_z):
 
 def fight_fx(nar, sas):
     """Rasengan/Chidori, Impact-Pakete an allen Treffern, volles Paket beim Zusammenprall."""
-    vfx.energy_ball("Rasengan", nar.J["wrist.R"], (0, 0.03, -0.21), BLUE, 0.34, F(13.62), F(14.25), F(15.05),
+    vfx.energy_ball("Rasengan", nar.J["wrist.R"], (0, 0.03, -0.21), BLUE, 0.34, F(13.55), F(14.2), F(15.05),
                     light_w=160.0)
-    vfx.lightning("Chidori", sas.J["wrist.L"], (0, 0.0, -0.12), (0.35, 0.6, 1.0), F(13.55), F(15.05), radius=0.85,
+    vfx.lightning("Chidori", sas.J["wrist.L"], (0, 0.0, -0.12), (0.35, 0.6, 1.0), F(13.4), F(15.05), radius=0.85,
                   n_bolts=10, seed=4, light_w=260.0)
     V = Vector
-    impact_small("HitGate", V((0.0, -0.2, BEAM2_TOP + 1.4)), 1.15, light_w=3000.0, ring=2.0)
-    impact_small("HitTree", V((TREE_POS[0], 108.5, 8.6)), 6.85, light_w=4000.0, ring=2.5, seed=3)
-    impact_small("HitStrike", roof(4.0, 1.8, 1.9), 12.6, color=(0.85, 0.9, 1.0), light_w=5000.0, ring=3.0, seed=4)
-    impact_small("HitHorn", roof(15.4, -6.2, 1.9), 13.15, color=(1.0, 0.8, 0.5), light_w=8000.0, ring=3.5, sparks=140,
+    # Teaser: zwei ferne Blitze auf dem Dach, während die Kamera durchs Dorf fliegt (der Kampf läuft schon)
+    for k, t in enumerate((1.3, 5.3)):
+        # sichtbarer Glühkern (Ø bis 4,5 m, Glühhülle 6,5 m: aus 150–250 m ca. 30–60 px) + Lichtspitze 30 kW
+        vfx.burst(f"Teaser{k}", roof(3.0, 5.0, 3.5), F(t) - 2, (0.55, 0.75, 1.0), r_max=6.5, dur=12, light_w=30000.0,
+                  ring=False, bolts=False, seed=30 + k, core_s=25.0, glow_s=6.0, glow_alpha=0.35,
+                  core_color=(0.85, 0.92, 1.0))
+        vfx.sparks_gn(f"TeaserSparks{k}", roof(3.0, 5.0, 3.5), t, n=120, speed=(6, 14), life=(0.2, 0.5),
+                      color=(0.6, 0.8, 1.0), strength=80.0, seed=30 + k)
+    impact_small("HitAir", roof(3.25, 5.0, 4.4), 10.95, color=(0.8, 0.88, 1.0), light_w=5000.0, ring=3.0, seed=2)
+    impact_small("HitKick", roof(4.3, 1.8, 1.3), 11.5, light_w=1000.0, ring=2.2, seed=3)
+    impact_small("HitPunch", roof(3.8, 1.8, 1.4), 11.95, light_w=1000.0, ring=2.2, seed=6)
+    impact_small("HitStrike", roof(4.0, 1.8, 1.9), 12.35, color=(0.85, 0.9, 1.0), light_w=1600.0, ring=3.0, seed=4)
+    impact_small("HitHorn", roof(15.4, -6.2, 1.9), 12.9, color=(1.0, 0.8, 0.5), light_w=8000.0, ring=3.5, sparks=140,
                  seed=5)
-    vfx.dust_gn("HornDust", roof(15.8, -6.4, 0.05), 13.15 + 3 / FPS, n=260, r_max=3.0, rise=1.2, life=1.2,
+    vfx.dust_gn("HornDust", roof(15.8, -6.4, 0.05), 12.9 + 3 / FPS, n=260, r_max=3.0, rise=1.2, life=1.2,
                 color=(0.62, 0.58, 0.52), size=(0.012, 0.04), seed=5)
     # --- Klimax: Rasengan gegen Chidori
     P = roof(*P_CLASH) + Vector((0, 0, 1.1))
@@ -619,21 +471,7 @@ def fight_fx(nar, sas):
                 life=1.6, color=(0.40, 0.33, 0.27), size=(0.015, 0.05), seed=12)
 
 
-def street_hits(N_keys, S_keys):
-    """Impact-Pakete an den Schlagabtauschen auf der Straße (Ort aus dem Blocking)."""
-    for k, t in enumerate((4.1, 5.65)):
-        a = track(N_keys, np.array([t]))[0]
-        b = track(S_keys, np.array([t]))[0]
-        impact_small(f"HitStreet{k}", Vector(tuple((a + b) / 2 + np.array([0, 0, 1.3]))), t, light_w=3500.0,
-                     ring=2.2, seed=6 + k)
-
-
-def track(keys, t):
-    """Ort einer Figur laut Blocking zu Zeiten t (linear zwischen den Schlüsseln), (n, 3)."""
-    ks = sorted(keys, key=lambda k: k[0])
-    tk = np.array([k[0] for k in ks])
-    P = np.array([tuple(k[2]) for k in ks])
-    return np.stack([np.interp(t, tk, P[:, j]) for j in range(3)], axis=1)
+track = choreo.track
 
 
 def camera_path(frames, N_keys, S_keys):
@@ -649,16 +487,17 @@ def camera_path(frames, N_keys, S_keys):
     nar_end = a + np.array([0, 0, 1.3])      # Schlussbild: Blick 8° nach oben, Gesichter über Naruto
     tgt = pair.copy()
     # Konter: Naruto fliegt gegen das Horn -> Blick folgt ihm
-    wN = _smooth(12.8, 13.0, t) * (1 - _smooth(13.3, 13.65, t))
+    wN = _smooth(12.55, 12.75, t) * (1 - _smooth(13.05, 13.4, t))
     # nach dem Zusammenprall: zwischen Naruto und Klimaxpunkt, ab 16,6 s nur Naruto
     wE = _smooth(15.12, 15.5, t)
     tgt = tgt * (1 - wN[:, None]) + nar * wN[:, None]
     tgt = tgt * (1 - wE[:, None]) + nar * wE[:, None]
     wZ = _smooth(16.8, 17.8, t)
     tgt = tgt * (1 - wZ[:, None]) + nar_end * wZ[:, None]
-    # Gewicht Blickziel gegen Flugrichtung: Hook 1, Tor-Durchflug 0, Straße 0,55, Baum 0,85, Anflug 0,6, Dach 1
-    keys_w = [(0.0, 1.0), (1.55, 1.0), (1.95, 0.4), (2.55, 0.4), (3.0, 0.55), (6.1, 0.55), (6.4, 0.85),
-              (7.4, 0.85), (7.8, 0.5), (11.2, 0.6), (11.9, 1.0), (21.0, 1.0)]
+    # Gewicht Blickziel (Dach der Residenz bzw. die Kämpfer) gegen Flugrichtung: Tor und Baum geradeaus,
+    # Straße leicht zur Residenz und den Gesichtern, Anflug zunehmend aufs Dach, auf dem Dach ganz
+    keys_w = [(0.0, 0.0), (1.8, 0.0), (2.6, 0.25), (6.0, 0.25), (6.5, 0.0), (7.8, 0.0), (8.6, 0.45), (10.3, 0.6),
+              (10.85, 1.0), (21.0, 1.0)]
     w = _pchip([k for k, _ in keys_w], [x for _, x in keys_w], np.clip(t, 0, 21.0))
     d = tgt - pos
     look_yaw = np.unwrap(np.arctan2(d[:, 1], d[:, 0]))
@@ -666,27 +505,25 @@ def camera_path(frames, N_keys, S_keys):
     pos_f, quats, info = fpv.fpv_orient(pos, FPS, look_pitch=-2.0, pitch_follow=0.45, bank_gain=1.0, max_bank=30,
                                         micro=1.0, seed=9, look=(w, look_yaw, look_pit))
     # Kamerastöße: kurzes, stark verrauschtes, abklingendes Rütteln (Rollen/Nicken/Gieren + 3 cm Versatz)
-    rng = np.random.default_rng(77)
-    for (h, amp, nf) in SHAKES:
-        idx = np.where((t >= h) & (t < h + nf / FPS))[0]
-        for k, i in enumerate(idx):
-            env = (1 - k / len(idx)) ** 1.5
-            r = rng.uniform(-1, 1, 3) * math.radians(amp) * env
-            quats[i] = quats[i] @ Euler((r[0], r[1] * 0.5, r[2]), "XYZ").to_quaternion()
-            pos_f[i] = pos_f[i] + rng.uniform(-1, 1, 3) * 0.03 * amp * env
+    choreo.camera_shakes(pos_f, quats, t, SHAKES, FPS, seed=77)
     info.update(v=v, t=t, look_w=w, tgt=tgt, N=a, S=b)
     return pos_f, quats, info
 
 
-def _smooth(x0, x1, t):
-    u = np.clip((np.asarray(t, float) - x0) / (x1 - x0), 0, 1)
-    return u * u * (3 - 2 * u)
+_smooth = choreo.smooth
 
 
 def sound_markers(info):
-    return [("AMBIENCE", 0.0), ("IMPACT", 1.15), ("WHOOSH", 2.2), ("IMPACT", 4.1), ("WHOOSH", 5.35),
-            ("IMPACT", 5.65), ("IMPACT", 6.85), ("WHOOSH", 11.9), ("IMPACT", 12.6), ("IMPACT", 13.15),
-            ("BEAT_DROP", T_CLASH), ("AMBIENCE", 17.0)]
+    """Zeitmarken fürs Sounddesign: Tor-Durchflug und Laternenkabel aus der tatsächlichen Bahn, Treffer aus HITS."""
+    t, pos = info["t"], info["pos"]
+
+    def when(cond):
+        idx = np.where(cond)[0]
+        return float(t[idx[0]]) if len(idx) else None
+    m = [("AMBIENCE", 0.0), ("WHOOSH", when(pos[:, 1] > 0.0))]
+    m += [("WHOOSH", when(pos[:, 1] > y)) for y in (33.0, 71.0, 109.0, 147.0)]
+    m += [("WHOOSH", 10.85)] + [("IMPACT", h) for h, _ in HITS[:-1]] + [("BEAT_DROP", T_CLASH), ("AMBIENCE", 17.0)]
+    return [(nm, tt) for nm, tt in m if tt is not None]
 
 
 def build(args):
@@ -1080,7 +917,6 @@ def build(args):
     fpv.rim_light([nar.base, sas.base], RIM["elev"], RIM["azim"], strength=RIM["strength"], kelvin=RIM["kelvin"],
                   angle=RIM["angle"])
     fight_fx(nar, sas)
-    street_hits(N_keys, S_keys)
     pos, quats, info = camera_path(frames, N_keys, S_keys)
     info["pos"] = pos
     cam = fpv.make_camera(pos, quats, fov_deg=60.0)

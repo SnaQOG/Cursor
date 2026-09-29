@@ -5,4 +5,5 @@ POST = dict(mist_depth=6000, haze_dist=1500, haze_start=30, haze_color=(0.66, 0.
                     (12.15, 0.7, 0.012, 0.09), (13.25, 0.4, 0.008, 0.07), (13.5, 0.4, 0.008, 0.07),
                     (15.05, 0.3, 0.006, 0.1), (15.8, 1.8, 0.02, 0.08)],
             flare=dict(t0=15.75, t1=17.2, thr=6.0, strength=0.6, streak=0.5, fade_out=0.8),
+            haze_fade=[(15.6, 1.0), (16.0, 0.0), (21.0, 0.0)],
             bitrate="18M", still_full=True)

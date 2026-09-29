@@ -32,7 +32,7 @@ import dbz  # noqa: E402
 import fpv  # noqa: E402
 import namek  # noqa: E402
 import nature  # noqa: E402
-from world_onepiece import foam_builder, shallow_tint  # noqa: E402
+from world_onepiece import foam_builder  # noqa: E402
 import ocean  # noqa: E402
 import vfx  # noqa: E402
 from figures import POSES  # noqa: E402
@@ -285,8 +285,10 @@ def camera_path(frames, G_keys, Z_keys):
     d = tgt - pos
     look_yaw = np.unwrap(np.arctan2(d[:, 1], d[:, 0]))
     look_pit = np.arctan2(d[:, 2], np.hypot(d[:, 0], d[:, 1]))
+    # Hook: Blick 5° höher (mehr Felsnadeln/Himmel, weniger dunkles Nahwasser); Steigflug: 12° höher (Kante, Himmel)
     pos_f, quats, info = fpv.fpv_orient(pos, FPS, look_pitch=-3.0, pitch_follow=0.45, bank_gain=1.0, max_bank=32,
-                                        micro=1.0, seed=13, look=(w, look_yaw, look_pit))
+                                        micro=1.0, seed=13, look=(w, look_yaw, look_pit),
+                                        pitch_overrides=[(-1.5, 2.2, 5.0), (5.4, 7.5, 12.0)])
     choreo.camera_shakes(pos_f, quats, t, SHAKES, FPS, seed=78)
     info.update(v=v, t=t, look_w=w, tgt=tgt, G=a, Z=b)
     return pos_f, quats, info
@@ -329,8 +331,8 @@ def F(t):
 def fight_fx(G, Z, shots, rock, ground_mat, mesa):
     """Treffer, Krater mit Bruchstücken, Todesstrahlen mit glühenden Kratern, Kamehameha-Duell, Explosion."""
     sc = bpy.context.scene
-    vfx.aura("GokuAura", G.base, GOLD, F(9.4), F(20.5), height=1.95, width=0.95, light_w=700.0, opacity=0.4,
-             edge_w=0.25, strength=0.7)
+    vfx.aura("GokuAura", G.base, GOLD, F(9.4), F(17.8), height=1.95, width=0.95, light_w=250.0, opacity=0.25,
+             edge_w=0.1, strength=0.6)                                   # nach dem Durchbruch: Aura erlischt
     # Teaser-Blitze (fern, Glühkern gut sichtbar)
     for k, (t, c) in enumerate(((2.3, (-6, 262, 70)), (4.6, (6, 280, 66)), (7.6, (-2, 300, 62)), (8.8, (4, 294, 58)))):
         vfx.burst(f"Teaser{k}", c, F(t) - 1, (1.0, 0.8, 0.45), r_max=11.0, dur=12, light_w=90000.0, ring=False,
@@ -402,7 +404,7 @@ def fight_fx(G, Z, shots, rock, ground_mat, mesa):
                    seed=88 + k, ground=p.z - 0.1)
     # ---- Kamehameha gegen Todesstrahl
     vfx.energy_ball("KameCharge", G.J["wrist.R"], (-0.07, 0.06, -0.13), KAME, 0.34, F(14.45), F(14.95), F(15.1),
-                    light_w=1500.0)
+                    light_w=600.0)
     vfx.energy_ball("DeathCharge", Z.J["wrist.R"], (0, 0, -0.17), DEATH, 0.22, F(14.4), F(14.95), F(15.05),
                     light_w=500.0, swirl=False)
     sc.frame_set(F(15.05))
@@ -416,7 +418,7 @@ def fight_fx(G, Z, shots, rock, ground_mat, mesa):
     wob = [(0.0, 0.01), (0.25, Lc), (0.45, Lc - 3.0), (0.6, Lc + 2.0), (0.75, Lc - 1.5), (T_CLIMAX - t0, L)]
     kl = [(F(t0 + dt), v) for dt, v in wob]
     zl = [(F(t0), 0.01)] + [(F(t0 + dt), L - v) for dt, v in wob[1:-1]] + [(F(T_CLIMAX) - 1, 0.3)]
-    vfx.beam("Kamehameha", o, dk, kl, 0.95, KAME, F(t0), F(t0 + 0.25), F(T_CLIMAX + 0.5), light_w=26000.0,
+    vfx.beam("Kamehameha", o, dk, kl, 0.95, KAME, F(t0), F(t0 + 0.25), F(T_CLIMAX + 0.5), light_w=9000.0,
              wobble=(F(t0 + 0.25), F(T_CLIMAX + 0.4), 0.12), core_s=5.0, whiten=0.35, glow_s=3.0, core_r=0.3)
     vfx.beam("DeathBeamDuel", oz, -dk, zl, 0.55, DEATH, F(t0), F(t0 + 0.25), F(T_CLIMAX), light_w=12000.0,
              wobble=(F(t0 + 0.25), F(T_CLIMAX - 0.1), 0.15), core_s=5.0, whiten=0.35, glow_s=2.6)
@@ -493,7 +495,7 @@ def namek_rock():
                                 wet_line=1.6, algae=(0.03, 0.06, 0.05), moss=(0.02, 0.10, 0.28), moss_amount=0.22,
                                 strata_scale=2.2, bump=1.0, crack_w=0.15, scale=1.5, lichen=0.12,
                                 moss_tex=os.path.join(fpv.ASSETS, "grasslight-big.jpg"), moss_tex_scale=4.0,
-                                variation=0.6, bedding=0.35, bed_h=2.2, streak=0.5)
+                                variation=0.6, bedding=0.45, bed_h=2.2, streak=0.5)
 
 
 def namek_cliff():
@@ -502,7 +504,7 @@ def namek_cliff():
     return nature.rock_material("NamekCliff", c1=(0.15, 0.10, 0.10), c2=(0.60, 0.42, 0.29), c3=(0.45, 0.32, 0.25),
                                 wet_line=1.6, algae=(0.03, 0.06, 0.05), moss=(0.03, 0.08, 0.16), moss_amount=0.04,
                                 strata_scale=2.2, bump=1.0, crack_w=0.15, scale=1.5, lichen=0.1, variation=0.4,
-                                bedding=0.3, bed_h=2.2, streak=0.55)
+                                bedding=0.55, bed_h=2.2, streak=0.6)
 
 
 def plateau_ground():
@@ -576,8 +578,7 @@ def build(args):
     shore_img, shore_map = ocean.shore_distance_image(spires + [wall], -200, -100, 200, 420, cell=0.5,
                                                       name="NamekShore")
     wmat = ocean.water_material("NamekSea", deep=(0.004, 0.032, 0.030), shallow=(0.025, 0.14, 0.11),
-                                wake_fn=foam_builder(shore_img, shore_map), foam_amount=0.4, view_dark=0.5, micro=0.6,
-                                color_fn=shallow_tint(shore_img, shore_map, color=(0.02, 0.11, 0.09)))
+                                wake_fn=foam_builder(shore_img, shore_map), foam_amount=0.4, view_dark=0.5, micro=0.6)
     frames_all = frames
     ocean.animate_time_value(wmat, FPS, frames_all)
     tile = 100.0

@@ -937,7 +937,7 @@ def volume_blast(name, center, f0, r_fire=9.0, r_smoke=15.0, rise=16.0, dur=100,
     _key_value(fm, "Dens", [(f0 - 1, 0.0), (f0, 1.0), (f0 + 12, 1.6), (f0 + 48, 1.4), (f0 + dur, 0.5)])
     _key_value(fm, "Fire", [(f0 - 1, 0.0), (f0, fire * 1.6), (f0 + 6, fire), (f0 + 30, fire * 0.5), (f0 + 60, fire * 0.2),
                             (f0 + dur, fire * 0.08)])
-    sm = _volume_material(name + "SmokeMat", (0.20, 0.19, 0.18), 1.2, fire * 0.25, seed + 5, noise_scale=4.5,
+    sm = _volume_material(name + "SmokeMat", (0.32, 0.31, 0.30), 0.9, fire * 0.25, seed + 5, noise_scale=4.5,
                           cool=1.4)
     sb = _volume_body(name + "Smoke", sm, seed + 5)
     for f, s, dz in ((f0 + 7, 0.001, 0.0), (f0 + 8, 0.5, 1.0), (f0 + 20, 0.8, 3.5), (f0 + 48, 1.0, rise * 0.55),
@@ -947,7 +947,7 @@ def volume_blast(name, center, f0, r_fire=9.0, r_smoke=15.0, rise=16.0, dur=100,
         sb.location = c + Vector((0, 0, dz + r_smoke * 0.15 * s))
         sb.keyframe_insert("location", frame=f)
     _key_value(sm, "Age", [(f0, 0.0), (f0 + dur, dur / fps)])
-    _key_value(sm, "Dens", [(f0 + 8, 0.0), (f0 + 16, 1.2), (f0 + 60, 1.0), (f0 + dur, 0.55)])
+    _key_value(sm, "Dens", [(f0 + 8, 0.0), (f0 + 16, 0.9), (f0 + 60, 0.75), (f0 + dur, 0.4)])
     _key_value(sm, "Fire", [(f0 + 3, fire * 0.4), (f0 + 30, fire * 0.1), (f0 + 60, 0.0)])
     for ob in (fb, sb):
         for f, hid in ((1, True), (f0 - 2, True), (f0 - 1, False)):

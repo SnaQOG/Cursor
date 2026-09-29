@@ -78,6 +78,16 @@ def composite(path, P):
     # Dunst: Transmission + Einstreuung
     L = P["haze_dist"]
     T = np.exp(-np.maximum(dist - P.get("haze_start", 0.0), 0) / L)
+    # Volumen (Explosion, Rauch) schreiben keinen Mist: vor dem Himmel steht dort Mist = 1 bei Alpha > 0.
+    # Solche Pixel nicht wie kilometerweit entfernt eindunsten (echte Flächen am Horizont liegen weit unter 1).
+    T = np.where((mist >= 0.998) & (a > 0.02), 1.0, T)
+    # Halbtransparente Volumen mischen Mist = 1 in den Pass (Rand der Rauchwolke -> falscher Dunstschleier):
+    # im Zeitfenster der Explosion Dunst abblenden (P['haze_fade'] = [(t, Faktor), ...]).
+    hf = P.get("haze_fade")
+    t = frame_time(path)
+    if hf and t is not None:
+        k = float(np.interp(t, [x for x, _ in hf], [y for _, y in hf]))
+        T = 1.0 - k * (1.0 - T)
     haze = np.array(P["haze_color"], np.float32)
     if P.get("haze_sky"):
         haze = sky_haze(env, alpha, haze)[None, :, :]

@@ -57,7 +57,7 @@ def _trail_taper(name):
     return ob
 
 
-def ki_trail(name, fig, t0, t1, color, radius=0.2, tail_s=0.16, fps=24, center_z=0.95, strength=9.0, core=True):
+def ki_trail(name, fig, t0, t1, color, radius=0.2, tail_s=0.16, fps=24, center_z=0.95, strength=6.0, core=True):
     """Leuchtschweif hinter der Figur für ihre Bewegung zwischen t0 und t1 (Sekunden, Echtzeit der Szene)."""
     sub = 4
     f0, f1 = (t0 * fps + 1), (t1 * fps + 1)
@@ -73,7 +73,7 @@ def ki_trail(name, fig, t0, t1, color, radius=0.2, tail_s=0.16, fps=24, center_z
     layers = [(name + "Glow", radius, vfx.glow_material(name + "GlowMat", color, strength, falloff=1.3, alpha=0.9))]
     if core:
         layers.append((name + "Core", radius * 0.32,
-                       vfx.glow_material(name + "CoreMat", tuple(0.55 + 0.45 * c for c in color), strength * 1.6,
+                       vfx.glow_material(name + "CoreMat", tuple(0.35 + 0.65 * c for c in color), strength * 1.4,
                                          kind="core")))
     for nm, r, mat in layers:
         cu = bpy.data.curves.new(nm, "CURVE")
@@ -188,7 +188,7 @@ def afterimage(name, objs, f_snap, f_show, flicker, cache=None):
         if ob.type != "MESH" or ob.hide_render:
             continue
         ev = ob.evaluated_get(dg)
-        me = bpy.data.meshes.new_from_object(ev, preserve_all_data_layers=False, depsgraph=dg)
+        me = bpy.data.meshes.new_from_object(ev, preserve_all_data_layers=True, depsgraph=dg)   # UVs für die Textur
         if len(me.vertices) == 0:
             bpy.data.meshes.remove(me)
             continue
@@ -217,7 +217,7 @@ def afterimage(name, objs, f_snap, f_show, flicker, cache=None):
 
 def pop_ring(name, loc, f0, axis=(0, 0, 1), r_max=1.8, color=(1.0, 0.95, 0.8)):
     """Kleiner Luftring beim Auftauchen/Verschwinden (kurz, dünn)."""
-    ob = vfx.shockwave(name, loc, f0, r_max=r_max, dur=6, color=color, thick=0.05, glow=1.2)
+    ob = vfx.shockwave(name, loc, f0, r_max=r_max, dur=6, color=color, thick=0.05, glow=1.2, ior=1.0)
     ob.rotation_mode = "QUATERNION"
     ob.rotation_quaternion = Vector(axis).normalized().to_track_quat("Z", "Y")
     return ob

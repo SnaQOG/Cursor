@@ -499,8 +499,8 @@ def F(t):
 
 # ------------------------------------------------------------------------------------------------ Schritt 3.5 – FX
 HIT_FX = {  # Art: (Radius, Licht W, Funken, Luftring-Radius)
-    "clash": (3.2, 9000.0, 110, 0.0), "flurry": (0.9, 1500.0, 40, 1.6), "whip": (1.6, 3000.0, 60, 2.2),
-    "knee": (2.4, 6000.0, 110, 4.0), "axe": (2.4, 6000.0, 110, 3.0)}
+    "clash": (3.2, 9000.0, 110, 0.0), "flurry": (0.9, 1500.0, 40, 1.6), "whip": (1.4, 3000.0, 60, 2.2),
+    "knee": (1.6, 6000.0, 110, 4.0), "axe": (1.6, 6000.0, 110, 3.0)}
 
 
 def motion_fx(G, Z, ev):
@@ -537,7 +537,7 @@ def fight_fx(G, Z, shots, rock, ground_mat, mesa, ev):
         r, lw, ns, ring = HIT_FX[kind]
         vfx.burst(f"Hit{k}", c, F(t), (1.0, 0.78, 0.35), r_max=r, dur=9 if r > 1 else 6, light_w=lw, bolts=False,
                   ring=r > 1, seed=20 + k, core_s=8.0, glow_s=2.0, glow_alpha=0.25, ring_s=2.5,
-                  core_color=(1.0, 0.95, 0.8))
+                  core_color=(1.0, 0.95, 0.8), core_k=1.0 if kind == "clash" else 0.5)
         vfx.sparks_gn(f"HitSparks{k}", c, t, n=ns, speed=(6, 14), life=(0.15, 0.45), color=(1.0, 0.8, 0.45),
                       strength=60.0, seed=40 + k)
         if ring:

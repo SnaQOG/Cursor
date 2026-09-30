@@ -238,16 +238,18 @@ def lightning(name, parent, offset, color, f_on, f_off, radius=0.7, n_bolts=7, v
 
 
 def burst(name, loc, f0, color, r_max=6.0, dur=24, light_w=60000.0, ring=True, bolts=True, seed=5, ring_dz=0.0,
-          core_s=25.0, glow_s=9.0, glow_alpha=0.32, ring_s=6.0, core_color=(0.9, 0.95, 1.0)):
-    """Aufprall-Explosion: weißer Blitz, expandierende Glühkugel, Druckwellenring, Blitzbögen, Lichtspitze."""
+          core_s=25.0, glow_s=9.0, glow_alpha=0.32, ring_s=6.0, core_color=(0.9, 0.95, 1.0), core_k=1.0):
+    """Aufprall-Explosion: weißer Blitz, expandierende Glühkugel, Druckwellenring, Blitzbögen, Lichtspitze.
+    core_k < 1: kürzerer, kleinerer Blitzkern (Nahkampftreffer: 3–5 Frames)."""
     root = bpy.data.objects.new(name, None)
     fpv.link(root)
     root.location = loc
     core_m = glow_material(name + "CoreMat", core_color, core_s, kind="core")
     core = _sphere(name + "Core", 1.0, core_m)
     core.parent = root
-    key_scale(core, [(f0 - 1, 0.001), (f0, r_max * 0.12), (f0 + 3, r_max * 0.35), (f0 + 7, r_max * 0.18),
-                     (f0 + 10, 0.001)])
+    c = r_max * core_k
+    key_scale(core, [(f0 - 1, 0.001), (f0, c * 0.12), (f0 + max(1, round(3 * core_k)), c * 0.35),
+                     (f0 + max(2, round(7 * core_k)), c * 0.18), (f0 + max(3, round(10 * core_k)), 0.001)])
     gm = glow_material(name + "GlowMat", color, glow_s, falloff=1.9, alpha=glow_alpha)
     glow = _sphere(name + "Glow", 1.0, gm)
     glow.parent = root
@@ -275,7 +277,23 @@ def burst(name, loc, f0, color, r_max=6.0, dur=24, light_w=60000.0, ring=True, b
     lt = point_light(name + "Light", color, 0.0, r_max * 0.3)
     lt.parent = root
     key_energy(lt, [(f0 - 1, 0.0), (f0, light_w), (f0 + 4, light_w * 0.6), (f0 + dur, 0.0)])
+    # vor und nach dem Blitz ganz ausblenden: ausgeblendete, aber vorhandene transparente Hüllen summieren sich
+    # sonst zu mehr Transparenz-Schichten, als Cycles durchläuft (-> schwarze Flecken), und kosten Renderzeit
+    for o in [c for c in root.children_recursive if c.type == "MESH"]:
+        key_hidden(o, [(0, True), (f0 - 1, False), (f0 + dur + 2, True)])
     return root
+
+
+def key_hidden(ob, frames_values):
+    """hide_render je Frame setzen: [(Frame, versteckt?), ...], stufig (nur diese F-Kurve)."""
+    for f, h in frames_values:
+        ob.hide_render = h
+        ob.keyframe_insert("hide_render", frame=f)
+    ad = ob.animation_data
+    for fc in (_fcurves(ad.action) if ad and ad.action else []):
+        if fc.data_path == "hide_render":
+            for kp in fc.keyframe_points:
+                kp.interpolation = "CONSTANT"
 
 
 def beam(name, origin, direction, length, radius, color, f_start, f_full, f_end, light_w=8000.0, wobble=None,

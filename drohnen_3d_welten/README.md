@@ -26,9 +26,19 @@ Wow-Motiv hinter einer Verdeckung, stabilisierte Weitwinkel-Action-Cam (kein Fis
 | `dbz.py` | Super-Saiyajin Goku (orange-blauer Gi, goldenes Stachelhaar) und Freezer (Endform, weiß mit lila Panzerteilen, Schwanz) |
 | `crew.py` | die Strohhutbande (Ruffy, Zorro, Nami, Lysop, Sanji, Chopper, Robin, Franky, Brook, Jinbei) in Kanon-Größen mit Posen/Animationen und Platz an Bord |
 | `vfx.py` | Energie-Effekte: Rasengan/Kamehameha-Ladung (Wirbelkugel), Chidori (flackernde Blitzvarianten), Strahlen mit Längenverlauf fürs Strahlenduell, Explosionen mit Druckwellenring, Ki-Kugeln, Super-Saiyajin-Aura, Staubwolken, Gesteinsbrocken (ballistisch) – alles über Keyframes gesteuert und mit Punktlichtern, die die Umgebung beleuchten |
+| `tripo_chars.py` | Tripo-3D-Modelle (Goku SSJ, Freezer Endform) als animierbare Figuren: Gelenkpunkte aus der Mittellinie des voxelisierten Modells, Armature in der Modellpose mit Copy Transforms von den Rig-Empties (kein Zurückbiegen in eine Grundpose), Gewichte über Abstände entlang der Mesh-Oberfläche, Freezers Schwanz als Knochenkette, Toon-Material aus der Farbtextur + Kontur |
+| `dbz_fx.py` | Dragon-Ball-Bewegungseffekte: Ki-Spuren hinter schnellen Vorstößen, Zanzoken (Verschwinden, flackerndes Nachbild, Luftring beim Auftauchen) |
+| `anime_chars.py` | selbst gebaute Anime-Figuren (Fallback, `NIDO_CHARS=anime`): Toon-Shading, Konturen, Gesichtsausdrücke als Shape Keys |
 | `namek.py` | Namek: Lehm-Kuppelhäuser (Boolean + Normalen-Transfer), schlanke Ajisa-Bäume mit blauen Kugelkronen, blaue Grashalme, Sandflecken, rote Pilze, Dragon Balls, Friezas Raumschiff |
 | `world_*.py` | die drei Welten inkl. Flugroute |
 | `params/*.py` | Farbkorrektur/Dunst je Welt |
+
+## Figuren-Modelle (nicht im Repo)
+
+Die Tripo-Modelle liegen nicht im (öffentlichen) Repo. Für den Namek-Kampf gehören sie nach
+`assets/models/dragonball/`:
+- `goku2/dragon+ball+goku+3d+model.fbx` + `.fbm/…_basecolor.jpg` (Goku, zweite Fassung)
+- `freezer/frieza+character+3d+model.fbx` + `.fbm/…_basecolor.jpg`
 
 ## Vorlagen aus dem Internet
 

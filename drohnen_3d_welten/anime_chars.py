@@ -859,9 +859,11 @@ def _fc_eval(ob, path, n, default):
     return out
 
 
-def tail_follow(fig, n, fps=24, sway_deg=9.0, seed=3):
+def tail_follow(fig, n, fps=24, sway_deg=9.0, seed=3, whips=(), warp=None):
     """Sekundärbewegung des Schwanzes: jedes Glied folgt Bewegung und Drehung der Figur verzögert (gedämpft, vom
-    Ansatz zur Spitze zunehmend) plus leichtes Pendeln; als Keyframes auf die Schwanzknochen gebacken."""
+    Ansatz zur Spitze zunehmend) plus leichtes Pendeln; als Keyframes auf die Schwanzknochen gebacken.
+    whips = [(t, Grad)]: Peitschenhieb (kurz ausholen, zur Spitze hin verzögert durchschlagen, nachschwingen);
+    warp(t) -> Szenenzeit mit Hit-Stop (die Hiebe frieren mit ein)."""
     import crew
     arm = fig.rig
     t = (np.arange(n) - 1) / fps
@@ -882,4 +884,10 @@ def tail_follow(fig, n, fps=24, sway_deg=9.0, seed=3):
         rx = np.clip(vf * 0.8 - vel[:, 2] * 0.9, -30, 30) * w * 0.6 + sway_deg * 0.4 * np.sin(2 * np.pi * 0.7 * t + ph[0] - i * 0.55)
         rz = np.clip(-om * 5.0 + vs * 1.4, -35, 35) * w * 0.6 + sway_deg * np.sin(2 * np.pi * 0.45 * t + ph[1] - i * 0.5)
         R = np.stack([crew._zero_phase(rx, lag, fps), np.zeros(n), crew._zero_phase(rz, lag, fps)], 1)
+        tw = warp(t) if warp is not None else t
+        for (th, amp) in whips:
+            tau = tw - th + 0.018 * i                    # Spitze schlägt etwas später durch
+            prof = np.interp(tau, [-0.2, -0.07, 0.0, 0.05, 0.16, 0.34], [0.0, -0.45, 0.85, 1.0, -0.18, 0.0])
+            R[:, 2] += amp * prof * (0.45 + 0.55 * w)
+            R[:, 0] += 0.25 * abs(amp) * np.interp(tau, [-0.1, 0.0, 0.12, 0.3], [0, 0.6, 0.2, 0]) * w
         crew._bake(arm, f'pose.bones["{bn}"].rotation_euler', np.radians(R))

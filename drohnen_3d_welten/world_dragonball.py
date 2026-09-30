@@ -27,15 +27,17 @@ import bpy  # noqa: E402
 import bmesh  # noqa: E402,I100
 import numpy as np  # noqa: E402
 
+import anime_chars as AC  # noqa: E402
 import choreo  # noqa: E402
-import dbz  # noqa: E402
+import dbz_fx  # noqa: E402
+import tripo_chars as TC  # noqa: E402
 import fpv  # noqa: E402
 import namek  # noqa: E402
 import nature  # noqa: E402
 from world_onepiece import foam_builder  # noqa: E402
 import ocean  # noqa: E402
 import vfx  # noqa: E402
-from figures import POSES  # noqa: E402
+from figures import POSES, mirror  # noqa: E402
 from mathutils import Vector  # noqa: E402
 
 FPS = 24
@@ -120,7 +122,7 @@ CAM_KEYS = [
     (10.60, over(6.5, 256.5, 4.2)),  # Schlagabtausch 12–17 m voraus
     (11.30, over(7.5, 263.5, 4.8)),
     (12.10, over(8.0, 266.5, 5.2)),  # Krater 13 m voraus
-    (12.90, over(8.0, 268.5, 5.5)),
+    (12.90, over(9.5, 266.0, 6.0)),   # etwas zurück: Freezer, Goku und Einschlag im Bild
     (13.60, over(7.0, 281.0, 6.2)),  # folgt den Kämpfern nach Norden
     (14.40, over(4.8, 301.0, 6.8)),
     (15.10, over(2.8, 314.0, 7.2)),  # hinter Goku am Nordrand, Freezer über dem Meer
@@ -135,6 +137,26 @@ P_CRATER = (3.0, 278.5)
 G_RIM = Vector((-0.5, 323.2, 43.9))    # Goku am Nordrand (Brust)
 Z_SEA = Vector((0.5, 369.0, 36.0))     # Freezer über dem Meer (Brust)
 
+# ---- Kampf-Zeitplan (Dragon-Ball-Tempo: Vorstöße 40–130 m/s, Schläge in 2 Frames, Hit-Stops)
+TEASERS = [(2.3, (-6, 262, 70), (1, 0.2, 0)), (4.6, (6, 280, 66), (-1, 0.3, 0.1)),
+           (7.6, (-2, 300, 62), (1, -0.2, -0.1)), (8.8, (4, 294, 58), (1, -0.15, 0.1))]
+RG, RZ = Vector((-9.0, 282.0, 53.0)), Vector((13.5, 284.0, 52.0))   # Start des großen Vorstoßes (Brust)
+T_RUSH, T_CLASH = 9.62, 10.0
+C0 = Vector((1.0, 273.0, 45.5))        # Zusammenprall
+C1 = Vector((1.6, 275.2, 45.8))        # Mitte am Ende des Schlaghagels
+FLURRY = [(10.28, "G", "d_punch_R"), (10.42, "Z", "d_punch_R"), (10.56, "G", "d_kick_R"),
+          (10.70, "Z", "d_kick_L"), (10.84, "G", "d_punch_L"), (10.98, "Z", "d_punch_L")]
+T_WHIP = 11.11                         # Freezers Schwanzhieb (Mitte der 360°-Drehung)
+T_KNEE = 11.47                         # Gokus Knie in den Magen
+ZAN1 = (11.53, 11.75)                  # Zanzoken (Zeit der Kämpfer, mit Hit-Stop): weg / wieder da über Freezer
+T_AXE, T_SLAM = 11.95, 12.15
+ZAN2 = (13.15, 13.27)                  # Zanzoken: Todesstrahl 1 trifft nur Gokus Nachbild
+# Todesstrahlen senkrecht gestaffelt (Hochformat): Freezer schräg über Goku, der Strahl fährt steil an Goku vorbei
+# bzw. durch sein Nachbild in den Boden direkt hinter ihm – Freezer, Goku und Einschlag passen zusammen ins Bild
+GB1, GB2 = Vector((-2.5, 272.5, 42.3)), Vector((-6.0, 274.5, 45.2))  # Goku vor / nach dem Ausweichen (Brust)
+A1, A2 = Vector((-1.3, 276.0, 48.8)), Vector((-1.0, 276.3, 49.2))    # Freezer beim Feuern (Brust)
+GOLD_TRAIL, PURPLE_TRAIL = (1.0, 0.78, 0.25), (0.78, 0.32, 1.0)
+
 POSES.update({
     "axe_up": {"spine": (18, 0, 0), "head": (-10, 0, 0), "shoulder.R": (165, -8, 18), "elbow.R": (15, 0, 0),
                "shoulder.L": (165, 8, -18), "elbow.L": (15, 0, 0), "hip.R": (35, 0, 0), "knee.R": (-70, 0, 0),
@@ -148,12 +170,52 @@ POSES.update({
     "slam": {"spine": (35, 0, 0), "head": (-25, 0, 0), "shoulder.R": (120, -60, 0), "elbow.R": (20, 0, 0),
              "shoulder.L": (120, 60, 0), "elbow.L": (20, 0, 0), "hip.R": (-20, 0, 0), "knee.R": (-30, 0, 0),
              "hip.L": (10, 0, 0), "knee.L": (-50, 0, 0)},
+    # Nahkampf mit Körpergewicht: Ausholen dreht Hüfte (Wurzel) und Rumpf gegen die Schlagrichtung, der Schlag
+    # dreht sie durch; der Kopf dreht gegen, damit der Blick am Gegner bleibt
+    "d_wind_R": {"root": (0, 0, -14), "spine": (-6, 0, -22), "head": (0, 0, 22), "shoulder.R": (-35, -25, 0),
+                 "elbow.R": (115, 0, 0), "shoulder.L": (60, 20, -20), "elbow.L": (100, 0, 0), "hip.R": (10, 0, 0),
+                 "knee.R": (-40, 0, 0), "hip.L": (25, 0, 0), "knee.L": (-50, 0, 0)},
+    "d_punch_R": {"root": (0, 0, 16), "spine": (-12, 0, 24), "head": (6, 0, -26), "shoulder.R": (88, -6, 0),
+                  "elbow.R": (4, 0, 0), "shoulder.L": (35, 30, -35), "elbow.L": (118, 0, 0), "hip.R": (-18, 0, 0),
+                  "knee.R": (-22, 0, 0), "hip.L": (45, 0, 0), "knee.L": (-60, 0, 0)},
+    "d_kick_wind_R": {"root": (0, 0, -22), "spine": (-4, 0, 14), "head": (0, 0, 10), "hip.R": (62, 0, 0),
+                      "knee.R": (-115, 0, 0), "ankle.R": (25, 0, 0), "hip.L": (0, 0, 0), "knee.L": (-30, 0, 0),
+                      "shoulder.R": (30, -40, 0), "elbow.R": (85, 0, 0), "shoulder.L": (55, 30, 0),
+                      "elbow.L": (100, 0, 0)},
+    "d_kick_R": {"root": (0, 0, 38), "spine": (16, 0, -22), "head": (-8, 0, -18), "hip.R": (70, -50, 0),
+                 "knee.R": (-8, 0, 0), "ankle.R": (30, 0, 0), "hip.L": (-12, 0, 0), "knee.L": (-28, 0, 0),
+                 "shoulder.R": (15, -65, 0), "elbow.R": (45, 0, 0), "shoulder.L": (45, 40, 0), "elbow.L": (95, 0, 0)},
+    "block": {"spine": (8, 0, 0), "head": (-6, 0, 0), "shoulder.R": (78, 0, 36), "elbow.R": (122, 0, 0),
+              "shoulder.L": (78, 0, -36), "elbow.L": (122, 0, 0), "hip.R": (32, 0, 0), "knee.R": (-58, 0, 0),
+              "hip.L": (10, 0, 0), "knee.L": (-36, 0, 0)},
+    "dash": {"spine": (-22, 0, -10), "head": (22, 0, 8), "shoulder.R": (-45, -15, 0), "elbow.R": (105, 0, 0),
+             "shoulder.L": (55, 15, -15), "elbow.L": (95, 0, 0), "hip.R": (22, 0, 0), "knee.R": (-72, 0, 0),
+             "hip.L": (-25, 0, 0), "knee.L": (-45, 0, 0)},
+    "knee_R": {"root": (0, 0, 8), "spine": (-26, 0, 8), "head": (18, 0, 0), "hip.R": (112, 0, 0),
+               "knee.R": (-125, 0, 0), "ankle.R": (30, 0, 0), "hip.L": (-18, 0, 0), "knee.L": (-12, 0, 0),
+               "shoulder.R": (72, -12, 18), "elbow.R": (92, 0, 0), "shoulder.L": (72, 12, -18),
+               "elbow.L": (92, 0, 0)},
+    "gut_hit": {"spine": (-42, 0, 0), "neck": (12, 0, 0), "head": (22, 0, 0), "shoulder.R": (45, -35, 0),
+                "elbow.R": (45, 0, 0), "shoulder.L": (45, 35, 0), "elbow.L": (45, 0, 0), "hip.R": (62, 0, 0),
+                "knee.R": (-85, 0, 0), "hip.L": (50, 0, 0), "knee.L": (-95, 0, 0)},
+    "tail_whip": {"spine": (8, 0, 0), "shoulder.R": (10, -72, 0), "elbow.R": (20, 0, 0), "shoulder.L": (10, 72, 0),
+                  "elbow.L": (20, 0, 0), "hip.R": (22, 0, 0), "knee.R": (-42, 0, 0), "hip.L": (-10, 0, 0),
+                  "knee.L": (-30, 0, 0)},
 })
+for _n in ("d_wind", "d_punch", "d_kick_wind", "d_kick", "knee"):
+    POSES[_n + "_L"] = mirror(POSES[_n + "_R"])
 
 
-def _key(t, pose, chest, look, lean=0.0, roll=0.0, rot=None, air=True):
+def _key(t, pose, chest, look, lean=0.0, roll=0.0, rot=None, air=True, ease=None, spin=0.0, style=None):
     c = Vector(chest)
-    return (t, pose, c - Vector((0, 0, CH)) if air else c, Vector(look), air, {"lean": lean, "roll": roll, "rot": rot})
+    o = {"lean": lean, "roll": roll, "rot": rot}
+    if ease:
+        o["ease"] = ease
+    if spin:
+        o["spin"] = spin
+    if style:
+        o["style"] = style
+    return (t, pose, c - Vector((0, 0, CH)) if air else c, Vector(look), air, o)
 
 
 def _aim_rot(frm, to, both=False):
@@ -164,67 +226,141 @@ def _aim_rot(frm, to, both=False):
     return {"shoulder.R": (90 + aim, -5, 0)}
 
 
-BEAM_HITS = [(13.15, (4.0, 283.5, 53.0), (-5.5, 268.5)), (13.4, (4.2, 283.8, 53.4), (-9.5, 272.0))]
+def _ax(u):
+    """Kampfachse Goku -> Freezer während des Schlaghagels (u = 0..1): das Paar dreht sich umeinander."""
+    a = math.radians(8.5 + 41.5 * u)
+    return Vector((math.cos(a), math.sin(a), 0.1 * math.sin(u * 7.0))).normalized()
 
 
-def beam_hits():
-    """Todesstrahlen: (Zeit, Ursprung ~Hand, Einschlag am Boden). Freezer zielt knapp unter Goku, der ausweicht;
-    der Strahl schlägt hinter ihm ins Plateau."""
-    return [(t, a, (x, y, gz(x, y))) for (t, a, (x, y)) in BEAM_HITS]
+def ground_hit(a, through):
+    """Einschlag eines Strahls von a durch den Punkt `through` im Boden (Plateau)."""
+    a, d = Vector(a), Vector(through) - Vector(a)
+    lo, hi = 1.0, 6.0
+    for _ in range(60):
+        m = (lo + hi) / 2
+        p = a + d * m
+        if p.z > gz(p.x, p.y):
+            lo = m
+        else:
+            hi = m
+    p = a + d * hi
+    return (p.x, p.y, gz(p.x, p.y))
 
 
 def fight_plan():
-    """Blocking Goku (G) / Freezer (Z): Listen (t, Pose, Ort, Blickziel, in der Luft, opts) in Welt-Metern."""
+    """Blocking Goku (G) / Freezer (Z): Listen (t, Pose, Ort, Blickziel, in der Luft, opts) in Welt-Metern.
+    Zusätzlich die Ereignisse für die Effekte: Treffer, Ki-Spuren, Zanzoken."""
     G, Z = [], []
-    # ---- ferne Zusammenstöße hoch über dem Plateau (Teaser während des Anflugs)
-    teas = [(2.3, (-6, 262, 70), (1, 0.2, 0)), (4.6, (6, 280, 66), (-1, 0.3, 0.1)),
-            (7.6, (-2, 300, 62), (1, -0.2, -0.1)), (8.8, (4, 294, 58), (-1, 0.1, 0.2))]
-    for (t, c, ax) in teas:
+    ev = {"hits": [], "trails": [], "zan": []}
+    up = Vector((0, 0, 1))
+    # ---- ferne Zusammenstöße hoch über dem Plateau (Teaser während des Anflugs): aus 25 m aufeinander zu,
+    # Kontakt, Rückprall – aus der Ferne zwei Lichtspuren, die sich treffen
+    for k, (t, c, ax) in enumerate(TEASERS):
         c, ax = Vector(c), Vector(ax).normalized()
-        G += [_key(t - 0.3, "fly", c - ax * 3.0, c, lean=-55), _key(t, "punch_R", c - ax * 0.55, c + ax),
-              _key(t + 0.2, "recoil", c - ax * 2.6, c, lean=15), _key(t + 0.6, "hover", c - ax * 3.2, c)]
-        Z += [_key(t - 0.3, "fly", c + ax * 3.0, c, lean=-40), _key(t, "punch_L", c + ax * 0.5, c - ax),
-              _key(t + 0.2, "recoil", c + ax * 2.8, c, lean=15), _key(t + 0.6, "hover", c + ax * 3.4, c)]
-    # ---- Nahkampf: (Zeit, Treffpunkt, Achse G->Z, G-Pose, Z-Pose)
-    melee = [(10.0, (1.0, 273.0, 45.5), (1, 0.15, 0.0), "punch_R", "punch_L"),
-             (10.5, (1.6, 274.3, 45.1), (1, -0.2, -0.15), "kick_R", "guard"),
-             (10.95, (0.8, 275.4, 45.4), (1, 0.25, 0.1), "guard", "kick_L"),
-             (11.4, (1.8, 276.4, 45.7), (1, 0.0, 0.2), "punch_L", "recoil")]
-    for k, (t, c, ax, gp, zp) in enumerate(melee):
-        c, ax = Vector(c), Vector(ax).normalized()
-        G += [_key(t - 0.22, "fly", c - ax * 2.2, c + ax, lean=-45), _key(t, gp, c - ax * 0.55, c + ax)]
-        Z += [_key(t - 0.22, "fly", c + ax * 2.2, c - ax, lean=-30),
-              _key(t, zp, c + ax * (0.9 if zp == "recoil" else 0.5), c - ax, lean=25 if zp == "recoil" else 0)]
-        if k < len(melee) - 1:
-            G += [_key(t + 0.14, "recoil", c - ax * 2.0, c + ax, lean=10)]
-            Z += [_key(t + 0.14, "recoil", c + ax * 2.3, c - ax, lean=15)]
-    # ---- Doppelfaust von oben, Freezer schlägt in den Boden
-    zc = Vector((3.0, 277.9, 45.6))
-    G += [_key(11.75, "axe_up", (2.2, 277.4, 48.4), zc), _key(11.95, "axe_down", (2.6, 277.9, 47.2), zc)]
+        perp = ax.cross(up).normalized() * (3.0 if k % 2 else -3.0)
+        G += [_key(t - 0.32, "dash", c - ax * 12 + perp, c, lean=-50),
+              _key(t, "d_punch_R", c - ax * 0.5, c + ax, ease="lin")]
+        Z += [_key(t - 0.32, "dash", c + ax * 12 - perp, c, lean=-45),
+              _key(t, "d_punch_L", c + ax * 0.5, c - ax, ease="lin")]
+        if k < len(TEASERS) - 1:
+            G += [_key(t + 0.22, "recoil", c - ax * 6.0 + up * 1.0, c, lean=15, ease="out"),
+                  _key(t + 0.55, "hover", c - ax * 6.8 + up * 1.2, c)]
+            Z += [_key(t + 0.22, "recoil", c + ax * 6.5 - up * 0.8, c, lean=15, ease="out"),
+                  _key(t + 0.55, "hover", c + ax * 7.2 - up * 0.9, c)]
+        else:                          # letzter Teaser: Rückprall zu den Startpunkten des großen Vorstoßes
+            G += [_key(t + 0.22, "recoil", c + Vector((-7.0, -3.0, -1.5)), c, lean=15, ease="out"),
+                  _key(9.45, "hover", RG + Vector((0.8, 1.5, 0.4)), C0),
+                  _key(T_RUSH, "dash", RG, C0, lean=-30)]
+            Z += [_key(t + 0.22, "recoil", c + Vector((7.5, -2.0, -2.0)), c, lean=15, ease="out"),
+                  _key(9.45, "hover", RZ + Vector((-0.8, 1.2, 0.3)), C0),
+                  _key(T_RUSH, "dash", RZ, C0, lean=-30)]
+        ev["trails"] += [("G", t - 0.33, t + 0.25, 0.45), ("Z", t - 0.33, t + 0.25, 0.45)]
+    # ---- großer Vorstoß (~45 m/s) und Zusammenprall Faust auf Faust
+    ax0 = _ax(0.0)
+    G += [_key(T_CLASH, "d_punch_R", C0 - ax0 * 0.5, C0 + ax0, lean=-10, ease="lin"),
+          _key(T_CLASH + 0.1, "recoil", C0 - ax0 * 1.5 + up * 0.2, C0 + ax0, lean=12, ease="out")]
+    Z += [_key(T_CLASH, "d_punch_L", C0 + ax0 * 0.5, C0 - ax0, lean=-10, ease="lin"),
+          _key(T_CLASH + 0.1, "recoil", C0 + ax0 * 1.6 - up * 0.1, C0 - ax0, lean=12, ease="out")]
+    ev["trails"] += [("G", T_RUSH - 0.02, T_CLASH + 0.02, 0.22), ("Z", T_RUSH - 0.02, T_CLASH + 0.02, 0.22)]
+    ev["hits"].append((T_CLASH, tuple(C0), "clash", tuple(ax0)))
+    # ---- Schlaghagel: 6 Wechsel in 0,84 s, das Paar dreht sich umeinander und driftet nach Norden
+    for i, (t, who, pose) in enumerate(FLURRY):
+        u = (i + 1) / len(FLURRY)
+        c, ax = C0.lerp(C1, u), _ax(u)
+        wind = pose.replace("d_kick", "d_kick_wind") if "kick" in pose else pose.replace("d_punch", "d_wind")
+        reach = 0.85 if "kick" in pose else 0.5
+        if who == "G":
+            G += [_key(t - 0.07, wind, c - ax * (reach + 0.25), c + ax),
+                  _key(t, pose, c - ax * reach, c + ax, ease="lin")]
+            Z += [_key(t, "block", c + ax * 0.62, c - ax, lean=8)]
+            hit = c + ax * 0.22
+        else:
+            Z += [_key(t - 0.07, wind, c + ax * (reach + 0.25), c - ax),
+                  _key(t, pose, c + ax * reach, c - ax, ease="lin")]
+            G += [_key(t, "block", c - ax * 0.62, c + ax, lean=8)]
+            hit = c - ax * 0.22
+        ev["hits"].append((t, tuple(hit + up * 0.28), "flurry", tuple(ax)))
+    # ---- Freezer dreht sich einmal um sich selbst, der Schwanz peitscht Goku weg
+    c6, ax6 = C1, _ax(1.0)
+    zw = c6 + ax6 * 0.55 + up * 0.1
+    Z += [_key(11.02, "tail_whip", zw, c6 - ax6),
+          _key(11.20, "tail_whip", zw + up * 0.1, c6 - ax6, spin=360.0),
+          _key(11.34, "arms_crossed", zw + up * 0.15, c6 - ax6 * 4)]
+    G += [_key(T_WHIP, "recoil", c6 - ax6 * 0.7, c6 + ax6, lean=10),
+          _key(11.27, "recoil", c6 - ax6 * 4.2 - up * 0.5, c6 + ax6, lean=28, ease="out")]
+    ev["hits"].append((T_WHIP, tuple(c6 - ax6 * 0.45 - up * 0.15), "whip", tuple(ax6)))
+    ev["trails"] += [("G", T_WHIP + 0.01, 11.32, 0.2)]
+    # ---- Goku schießt zurück: Knie in den Magen, Freezer fliegt weg
+    gk = zw - ax6 * 0.55 + up * 0.25
+    ZK = zw + ax6 * 3.6 + up * 1.4                   # Freezer nach dem Rückstoß (Brust)
+    G += [_key(11.33, "dash", c6 - ax6 * 4.1 - up * 0.45, zw, lean=-25),
+          _key(T_KNEE, "knee_R", gk, zw + ax6, ease="lin")]
+    Z += [_key(T_KNEE, "gut_hit", zw + up * 0.15, gk),
+          _key(11.62, "gut_hit", ZK, gk, lean=30, ease="out")]
+    ev["hits"].append((T_KNEE, tuple(zw + up * 0.05 - ax6 * 0.12), "knee", tuple(ax6)))
+    ev["trails"] += [("G", 11.3, 11.49, 0.2), ("Z", 11.57, 11.72, 0.2)]
+    # ---- Zanzoken: Goku verschwindet (Nachbild bleibt), taucht über Freezer auf -> Doppelfaust in den Boden
+    top = ZK - ax6 * 0.35 + up * 2.3
+    G += [_key(ZAN1[0], "knee_R", gk + ax6 * 0.1, zw + ax6),
+          _key(ZAN1[0] + 0.06, "axe_up", top, ZK, ease="lin"),           # unsichtbar umgesetzt
+          _key(T_AXE - 0.08, "axe_up", top + up * 0.1, ZK),
+          _key(T_AXE, "axe_down", top - up * 0.9 + ax6 * 0.15, ZK - up)]
+    ev["zan"].append(("G", ZAN1, tuple(gk), tuple(top)))
     g0 = gz(*P_CRATER)
-    Z += [_key(11.75, "recoil", zc, (2.2, 277.4, 48.4), lean=25), _key(11.95, "recoil", (3.0, 278.2, 45.1), (0, 273, 48), lean=40),
-          _key(12.15, "slam", (P_CRATER[0], P_CRATER[1], g0 + 0.3), (0, 273, 48), lean=75),
+    Z += [_key(11.78, "hover", ZK + up * 0.1, gk),
+          _key(11.87, "guard", ZK + up * 0.05, top, rot={"neck": (18, 0, 0), "head": (22, 0, 0)}),
+          _key(T_AXE, "recoil", ZK - up * 0.3, top, lean=40),
+          _key(T_SLAM, "slam", (P_CRATER[0], P_CRATER[1], g0 + 0.3), (0, 273, 48), lean=75, ease="in"),
           _key(12.3, "land", (P_CRATER[0], P_CRATER[1], g0 - 1.1), (0, 273, 46), air=False),
-          _key(12.75, "land", (P_CRATER[0] + 0.1, P_CRATER[1], g0 - 1.1), (0, 273, 46), air=False),
-          _key(12.95, "fly", (3.5, 281.0, g0 + 5.0), (-2.5, 272.5, 46.5), lean=10),
-          _key(13.08, "point_R", (4.0, 283.5, 53.0 + CH - 1.2), (-2.5, 272.5, 45.6))]
-    G += [_key(12.2, "guard", (1.6, 276.3, 46.8), (3, 278.5, g0)), _key(12.8, "guard", (-1.5, 273.8, 46.2), (3, 279, g0 + 2)),
-          _key(13.08, "guard", (-2.5, 272.5, 45.6), (4, 283.5, 53))]
-    # Todesstrahlen, Goku weicht aus
-    shots = beam_hits()
+          _key(12.78, "land", (P_CRATER[0] + 0.1, P_CRATER[1], g0 - 1.1), (0, 273, 46), air=False),
+          _key(12.97, "fly", A1 - up * 0.4, GB1, lean=10, ease="lin"),
+          _key(13.08, "point_R", A1, GB1)]
+    ev["hits"].append((T_AXE, tuple(ZK + up * 0.35), "axe", (0.0, 0.0, -1.0)))
+    ev["trails"] += [("Z", 12.05, 12.17, 0.24), ("Z", 12.8, 13.0, 0.26)]
+    G += [_key(12.25, "hover", top - up * 1.2 - ax6 * 0.8, (P_CRATER[0], P_CRATER[1], g0)),
+          _key(12.8, "guard", (-1.5, 273.8, 46.2), (3, 279, g0 + 2)),
+          _key(13.08, "guard", GB1, A1)]
+    # ---- Todesstrahlen: Strahl 1 durchschlägt Gokus Nachbild (Zanzoken), Strahl 2 knapp unter ihm durch
+    shots = [(13.15, tuple(A1), ground_hit(A1, GB1)), (13.4, tuple(A2), ground_hit(A2, GB2 - up * 2.2))]
     for (t, a, p) in shots:
         Z += [_key(t - 0.05, "point_R", a, p, rot=_aim_rot(a, p)),
               _key(t + 0.08, "point_R", a, p, rot=_aim_rot(a, (p[0], p[1], p[2] + 3)))]
-    G += [_key(13.28, "fly", (-6.0, 274.5, 47.8), (4, 283.5, 53), lean=-20, roll=35),
-          _key(13.5, "fly", (-5.0, 276.5, 50.2), (4, 284, 53.4), lean=-15, roll=-20)]
-    # ---- Trennung: Freezer übers Meer, Goku an den Nordrand
-    Z += [_key(13.6, "recoil", (5.5, 288.0, 54.5), (-5, 276.5, 50), lean=-10),
-          _key(13.95, "fly", (3.0, 335.0, 45.0), G_RIM, lean=20),
-          _key(14.3, "point_R", Z_SEA, G_RIM, rot=_aim_rot(Z_SEA, G_RIM))]
-    G += [_key(13.9, "fly", (-2.5, 300.0, 47.0), Z_SEA, lean=-65),
-          _key(14.25, "hover", G_RIM + Vector((0.2, -0.6, 0.4)), Z_SEA),
+    G += [_key(ZAN2[0] - 0.01, "guard", GB1 + up * 0.02, A1),
+          _key(ZAN2[0] + 0.04, "guard", GB2, A2, ease="lin"),             # unsichtbar umgesetzt
+          _key(13.36, "guard", GB2 + up * 0.05, A2),
+          _key(13.46, "fly", GB2 + Vector((0.5, 1.2, 1.8)), A2, roll=40, ease="out"),
+          _key(13.56, "fly", (-5.0, 276.5, 50.2), (4, 284, 53.4), lean=-15, roll=-20)]
+    ev["zan"].append(("G", ZAN2, tuple(GB1), tuple(GB2)))
+    ev["trails"] += [("G", 13.36, 13.5, 0.18)]
+    # ---- Trennung: Freezer übers Meer, Goku an den Nordrand (70–130 m/s)
+    Z += [_key(13.6, "fly", (3.0, 290.0, 53.0), (-5, 276.5, 50), lean=-10),
+          _key(13.95, "fly", (3.0, 335.0, 45.0), G_RIM, lean=20, ease="lin"),
+          _key(14.3, "point_R", Z_SEA, G_RIM, rot=_aim_rot(Z_SEA, G_RIM), ease="out")]
+    G += [_key(13.9, "fly", (-2.5, 300.0, 47.0), Z_SEA, lean=-65, ease="lin"),
+          _key(14.25, "hover", G_RIM + Vector((0.2, -0.6, 0.4)), Z_SEA, ease="out"),
           _key(14.45, "kame_charge", G_RIM, Z_SEA),
           _key(14.95, "kame_charge", G_RIM + Vector((0, 0.05, -0.05)), Z_SEA)]
+    ev["trails"] += [("Z", 13.58, 14.34, 0.28), ("G", 13.54, 14.3, 0.24)]
     fire = _aim_rot(G_RIM, Z_SEA, both=True)
     G += [_key(15.05, "kame_fire", G_RIM, Z_SEA, rot=fire),
           _key(T_CLIMAX + 0.5, "kame_fire", G_RIM + Vector((0, -0.35, 0.05)), Z_SEA, rot=fire),
@@ -233,14 +369,15 @@ def fight_plan():
     Z += [_key(15.0, "point_R", Z_SEA, G_RIM, rot=_aim_rot(Z_SEA, G_RIM)),
           _key(T_CLIMAX - 0.1, "point_R", Z_SEA + Vector((0, 0.8, 0)), G_RIM, rot=_aim_rot(Z_SEA, G_RIM)),
           _key(T_CLIMAX + 0.05, "recoil", Z_SEA + Vector((0, 1.5, 0.3)), G_RIM, lean=40)]
-    # vor dem ersten Schlüssel: dort, wo der erste Teaser beginnt
-    return G, Z, shots
+    return G, Z, shots, ev
 
 
-HITS = [(10.0, 3), (10.5, 2), (10.95, 2), (11.4, 3), (11.95, 3), (12.15, 4), (T_CLIMAX, 4)]
-SHAKES = [(10.0, 1.2, 6), (11.4, 0.8, 5), (11.95, 1.0, 6), (12.15, 2.4, 9), (13.2, 1.0, 6), (13.45, 1.0, 6),
-          (15.05, 0.7, 8), (T_CLIMAX, 3.6, 12), (16.35, 1.3, 10)]
-CAM_HOLDS = [(12.15, 3), (T_CLIMAX, 3)]
+HITS = [(T_CLASH, 3)] + [(t, 1) for t, _, _ in FLURRY] + [(T_WHIP, 2), (T_KNEE, 3), (T_AXE, 3), (T_SLAM, 4),
+                                                          (T_CLIMAX, 4)]
+SHAKES = [(T_CLASH, 1.2, 6)] + [(t, 0.35, 3) for t, _, _ in FLURRY] + [
+    (T_WHIP, 0.7, 5), (T_KNEE, 1.1, 6), (T_AXE, 1.0, 6), (T_SLAM, 2.4, 9), (13.2, 1.0, 6), (13.45, 1.0, 6),
+    (15.05, 0.7, 8), (T_CLIMAX, 3.6, 12), (16.35, 1.3, 10)]
+CAM_HOLDS = [(T_SLAM, 3), (T_CLIMAX, 3)]
 
 
 def camera_positions(frames):
@@ -248,18 +385,27 @@ def camera_positions(frames):
 
 
 def hit_warp(t):
-    return choreo.time_warp(t, HITS, FPS)
+    return choreo.time_warp(np.asarray(t, float), HITS, FPS)
 
 
-def camera_path(frames, G_keys, Z_keys):
+def frame_at(tau):
+    """Erster Frame, in dem die Kämpfer-Zeit (mit Hit-Stop) tau erreicht."""
+    f = np.arange(1, FPS * (SECONDS + 1))
+    return int(f[np.argmax(hit_warp((f - 1.0) / FPS) >= tau - 1e-6)])
+
+
+def camera_path(frames, G_keys, Z_keys, shots):
     """Positionen (Speed-Ramp) + Blickführung: Flug geradeaus (leicht zum Tafelberg), ab dem Anflug auf das
-    Kämpferpaar, beim Einschlag auf den Krater, beim Strahlenduell zwischen Goku und Freezer, am Ende auf Goku
-    und die Rauchsäule."""
+    Kämpferpaar (Kämpferbahnen geglättet: die Kamera folgt schnellen Haken und Teleports ohne Reißen), beim
+    Einschlag auf den Krater, bei den Todesstrahlen auf Goku und die Einschläge, beim Strahlenduell zwischen
+    Goku und Freezer, am Ende auf Goku und die Rauchsäule."""
     t, pos, v = camera_positions(frames)
     tw = choreo.time_warp(t, CAM_HOLDS, FPS)
     pos = np.stack([np.interp(tw, t, pos[:, k]) for k in range(3)], axis=1)
     a = choreo.track(G_keys, hit_warp(t)) + np.array([0, 0, CH])
     b = choreo.track(Z_keys, hit_warp(t)) + np.array([0, 0, CH])
+    a = np.stack([fpv._gauss_smooth(a[:, k], 0.12 * FPS) for k in range(3)], axis=1)
+    b = np.stack([fpv._gauss_smooth(b[:, k], 0.12 * FPS) for k in range(3)], axis=1)
     sm = choreo.smooth
 
     def between(p, q, wq):
@@ -273,9 +419,9 @@ def camera_path(frames, G_keys, Z_keys):
     tgt = pair.copy()
     wc = sm(12.0, 12.25, t) * (1 - sm(12.8, 13.0, t))                        # Einschlag: auf den Krater
     tgt = tgt * (1 - wc[:, None]) + between(a, np.tile(crater, (len(t), 1)), 0.62) * wc[:, None]
-    hits = np.array([[x, y, gz(x, y)] for (_, _, (x, y)) in BEAM_HITS]).mean(axis=0)
-    wb = sm(12.85, 13.05, t) * (1 - sm(13.5, 13.75, t))                      # Todesstrahlen: Goku + Einschläge
-    tgt = tgt * (1 - wb[:, None]) + between(a, np.tile(hits, (len(t), 1)), 0.35) * wb[:, None]
+    hits = np.array([p for (_, _, p) in shots]).mean(axis=0)
+    wb = sm(12.85, 13.05, t) * (1 - sm(13.5, 13.75, t))              # Todesstrahlen: Freezer, Goku, Einschläge
+    tgt = tgt * (1 - wb[:, None]) + between(between(a, b, 0.42), np.tile(hits, (len(t), 1)), 0.3) * wb[:, None]
     wd = sm(13.6, 14.3, t)                                                    # Duell: Goku vorn links, Freezer
     tgt = tgt * (1 - wd[:, None]) + between(a, b, 0.5) * wd[:, None]
     smoke = np.tile(np.array([Z_SEA.x, Z_SEA.y, Z_SEA.z + 7.0]), (len(t), 1))
@@ -303,20 +449,43 @@ def sound_markers(info):
         return float(t[idx[0]]) if len(idx) else None
     m = [("AMBIENCE", 0.0), ("WHOOSH", when(pos[:, 1] > 50.0)), ("WHOOSH", when(pos[:, 1] > 70.0)),
          ("WHOOSH", 5.7), ("WHOOSH", when(pos[:, 2] > 41.0)), ("WHOOSH", when(pos[:, 1] > 231.0))]
+    m += [("WHOOSH", T_RUSH), ("ZANZOKEN", (frame_at(ZAN1[0]) - 1) / FPS), ("ZANZOKEN", ZAN2[0]),
+          ("WHOOSH", 13.6)]
     m += [("IMPACT", h) for h, _ in HITS[:-1]] + [("IMPACT", 13.15), ("IMPACT", 13.4)]
     m += [("BEAT_DROP", T_CLIMAX), ("AMBIENCE", 17.0)]
-    return [(nm, tt) for nm, tt in m if tt is not None]
+    return sorted([(nm, tt) for nm, tt in m if tt is not None], key=lambda x: x[1])
 
 
 # ------------------------------------------------------------------------------------------------ Schritt 3.4
+def _expr(fig, seq):
+    """Mimik-Zeitplan [(t, {Shape Key: Wert})]: jeder Eintrag setzt alle Ausdrücke der Figur (übrige = 0)."""
+    names = sorted({k for _, d in seq for k in d})
+    AC.set_expression(fig, [(F(t), {n: d.get(n, 0.0) for n in names}) for t, d in seq])
+
+
 def stage_fight(G_keys, Z_keys, n, cam_pos):
-    G = dbz.goku((0, 0, 0), 0.0)
-    Z = dbz.freezer((0, 0, 0), 0.0)
-    for fig in (G, Z):
-        for o in [fig.base] + list(fig.J.values()):
-            o.animation_data_clear()
-    choreo.bake_fighter(G, G_keys, n, FPS, HITS, cam_pos=cam_pos, look_win=(17.0, 21.0), seed=3)
-    choreo.bake_fighter(Z, Z_keys, n, FPS, HITS, seed=4)
+    """Goku (SSJ) und Freezer aus den Tripo-Modellen (tripo_chars, Toon-Look mit Kontur; NIDO_CHARS=anime nimmt
+    die selbst gebauten Figuren aus anime_chars), gebacken im Dragon-Ball-Timing; Freezers Schwanz schwingt
+    nach und peitscht beim Hieb; Mimik (nur anime_chars) passend zum Kampfverlauf."""
+    AC.set_light(fpv.sun_dir(SUN_ELEV, SUN_AZIM), fpv.sun_dir(RIM["elev"], RIM["azim"]))
+    if os.environ.get("NIDO_CHARS", "tripo") == "anime":
+        G, Z = AC.goku(), AC.freezer()
+    else:
+        G, Z = TC.goku(), TC.freezer()
+    kw = dict(style=choreo.dbz_style, lag_scale=0.35, lean_tau=0.04)
+    choreo.bake_fighter(G, G_keys, n, FPS, HITS, cam_pos=cam_pos, look_win=(17.0, 21.0), seed=3, **kw)
+    choreo.bake_fighter(Z, Z_keys, n, FPS, HITS, seed=4, **kw)
+    AC.tail_follow(Z, n, FPS, whips=[(T_WHIP, 60.0)], warp=hit_warp)
+    _expr(G, [(9.2, {}), (9.45, {"Clench": 1}), (11.42, {"Clench": 1}), (11.47, {"Shout": 0.8}),
+              (11.6, {"Clench": 1}), (11.88, {"Clench": 1}), (11.93, {"Shout": 1}), (12.1, {"Shout": 1}),
+              (12.25, {"Clench": 1}), (14.95, {"Clench": 1}), (15.03, {"Shout": 1}), (16.25, {"Shout": 1}),
+              (16.7, {"Calm": 1})])
+    _expr(Z, [(9.2, {"Smirk": 1}), (9.95, {"Smirk": 1}), (10.02, {"Angry": 1}), (11.0, {"Angry": 1}),
+              (11.07, {"Smirk": 1}), (11.44, {"Smirk": 1}), (11.49, {"Shock": 1}), (11.72, {"Shock": 0.7}),
+              (11.8, {"Angry": 0.6, "Shock": 0.4}), (11.86, {"Shock": 1}), (12.3, {"Shock": 1}),
+              (12.55, {"Angry": 1}), (15.55, {"Angry": 1}), (15.62, {"Shock": 1})])
+    G.render_objs = dbz_fx.render_objects(G.base)
+    Z.render_objs = dbz_fx.render_objects(Z.base)
     # Freezer verschwindet im Feuerball
     for f, s in ((F(T_CLIMAX) + 1, 1.0), (F(T_CLIMAX) + 2, 0.001)):
         Z.base.scale = (s, s, s)
@@ -329,27 +498,54 @@ def F(t):
 
 
 # ------------------------------------------------------------------------------------------------ Schritt 3.5 – FX
-def fight_fx(G, Z, shots, rock, ground_mat, mesa):
-    """Treffer, Krater mit Bruchstücken, Todesstrahlen mit glühenden Kratern, Kamehameha-Duell, Explosion."""
+HIT_FX = {  # Art: (Radius, Licht W, Funken, Luftring-Radius)
+    "clash": (3.2, 9000.0, 110, 0.0), "flurry": (0.9, 1500.0, 40, 1.6), "whip": (1.6, 3000.0, 60, 2.2),
+    "knee": (2.4, 6000.0, 110, 4.0), "axe": (2.4, 6000.0, 110, 3.0)}
+
+
+def motion_fx(G, Z, ev):
+    """Ki-Spuren hinter allen schnellen Vorstößen, Zanzoken (Verschwinden, flackerndes Nachbild, Auftauchen)."""
+    figs = {"G": (G, GOLD_TRAIL), "Z": (Z, PURPLE_TRAIL)}
+    for k, (who, t0, t1, r) in enumerate(ev["trails"]):
+        fig, col = figs[who]
+        dbz_fx.ki_trail(f"KiTrail{who}{k}", fig, t0, t1, col, radius=r, fps=FPS)
+    spans = []
+    for k, (who, (tau_out, tau_in), p_out, p_in) in enumerate(ev["zan"]):
+        fig, col = figs[who]
+        f_out, f_in = frame_at(tau_out), frame_at(tau_in)
+        dbz_fx.afterimage(f"Zanzoken{k}", fig.render_objs, f_out - 1, f_out, dbz_fx.FLICKER)
+        dbz_fx.pop_ring(f"ZanOut{k}", p_out, f_out, axis=(0, 0, 1), r_max=1.4, color=col)
+        dbz_fx.pop_ring(f"ZanIn{k}", p_in, f_in, axis=(0, 0, 1), r_max=1.8, color=col)
+        spans.append((f_out, f_in))
+        print(f"Zanzoken {k}: weg Frame {f_out}, wieder da Frame {f_in}", flush=True)
+    dbz_fx.vanish(dbz_fx.render_objects(G.base), spans)
+
+
+def fight_fx(G, Z, shots, rock, ground_mat, mesa, ev):
+    """Treffer, Ki-Spuren, Zanzoken, Krater mit Bruchstücken, Todesstrahlen mit glühenden Kratern,
+    Kamehameha-Duell, Explosion."""
     sc = bpy.context.scene
     vfx.aura("GokuAura", G.base, GOLD, F(9.4), F(17.8), height=1.95, width=0.95, light_w=250.0, opacity=0.25,
              edge_w=0.1, strength=0.6)                                   # nach dem Durchbruch: Aura erlischt
+    motion_fx(G, Z, ev)                                                   # (Aura verschwindet beim Zanzoken mit)
     # Teaser-Blitze (fern, Glühkern gut sichtbar)
-    for k, (t, c) in enumerate(((2.3, (-6, 262, 70)), (4.6, (6, 280, 66)), (7.6, (-2, 300, 62)), (8.8, (4, 294, 58)))):
+    for k, (t, c, _) in enumerate(TEASERS):
         vfx.burst(f"Teaser{k}", c, F(t) - 1, (1.0, 0.8, 0.45), r_max=11.0, dur=12, light_w=90000.0, ring=False,
                   bolts=False, seed=30 + k, core_s=25.0, glow_s=6.0, glow_alpha=0.35, core_color=(1.0, 0.95, 0.85))
-    # Nahkampf-Treffer
-    for k, (t, c, r, lw) in enumerate(((10.0, (1.0, 273.0, 45.5), 3.2, 9000.0), (10.5, (1.6, 274.3, 45.1), 1.6, 3000.0),
-                                       (10.95, (0.8, 275.4, 45.4), 1.6, 3000.0), (11.4, (1.8, 276.4, 45.7), 2.2, 5000.0),
-                                       (11.95, (2.9, 278.0, 46.0), 2.4, 6000.0))):
-        vfx.burst(f"Hit{k}", c, F(t), (1.0, 0.78, 0.35), r_max=r, dur=9, light_w=lw, bolts=False, seed=20 + k,
-                  core_s=8.0, glow_s=2.0, glow_alpha=0.25, ring_s=2.5, core_color=(1.0, 0.95, 0.8))
-        vfx.sparks_gn(f"HitSparks{k}", c, t, n=110, speed=(6, 14), life=(0.15, 0.45), color=(1.0, 0.8, 0.45),
+    # Nahkampf-Treffer: Blitz, Funken, Luftring quer zur Schlagachse
+    for k, (t, c, kind, ax) in enumerate(ev["hits"]):
+        r, lw, ns, ring = HIT_FX[kind]
+        vfx.burst(f"Hit{k}", c, F(t), (1.0, 0.78, 0.35), r_max=r, dur=9 if r > 1 else 6, light_w=lw, bolts=False,
+                  ring=r > 1, seed=20 + k, core_s=8.0, glow_s=2.0, glow_alpha=0.25, ring_s=2.5,
+                  core_color=(1.0, 0.95, 0.8))
+        vfx.sparks_gn(f"HitSparks{k}", c, t, n=ns, speed=(6, 14), life=(0.15, 0.45), color=(1.0, 0.8, 0.45),
                       strength=60.0, seed=40 + k)
-    vfx.shockwave("ClashWave0", (1.0, 273.0, 45.5), F(10.0) + 1, r_max=9.0, dur=10, color=(1.0, 0.9, 0.7), thick=0.12,
+        if ring:
+            dbz_fx.pop_ring(f"HitRing{k}", c, F(t) + 1, axis=ax, r_max=ring, color=(1.0, 0.92, 0.75))
+    vfx.shockwave("ClashWave0", tuple(C0), F(T_CLASH) + 1, r_max=9.0, dur=10, color=(1.0, 0.9, 0.7), thick=0.12,
                   glow=2.0)
     # ---- Einschlag im Boden (12,15 s): Krater, Bruchstücke (Voronoi + Rigid Body), Staub, Druckwelle
-    t_c = 12.15
+    t_c = T_SLAM
     cx, cy = P_CRATER
     g0 = gz(cx, cy)
     craters = [(cx, cy, 3.2, t_c, 71)]
@@ -369,6 +565,10 @@ def fight_fx(G, Z, shots, rock, ground_mat, mesa):
                 size=(0.03, 0.09), seed=62)
     vfx.sparks_gn("SlamSparks", (cx, cy, g0 + 0.5), t_c, n=200, speed=(8, 18), life=(0.3, 0.8), color=(1.0, 0.7, 0.35),
                   strength=50.0, seed=63)
+    # Freezer bricht aus dem Krater: Staubstoß und Luftring
+    vfx.dust_gn("ExitDust", (cx, cy, g0 + 0.2), 12.8, n=500, r_max=5.0, rise=3.0, life=1.4, color=(0.4, 0.38, 0.35),
+                size=(0.03, 0.08), seed=65)
+    dbz_fx.pop_ring("ExitRing", (cx, cy, g0 + 0.6), F(12.8), r_max=4.0, color=PURPLE_TRAIL)
     # Bruchstücke: Bodenplatte über dem Krater zerlegt, von unten weggesprengt
     bm = bmesh.new()
     bmesh.ops.create_cone(bm, cap_ends=True, segments=24, radius1=2.3, radius2=2.2, depth=0.45)
@@ -621,12 +821,12 @@ def build(args):
     namek.spaceship(mats, SHIP_C[0], SHIP_C[1], top_z(*SHIP_C) + 1.5)
 
     # Kamera + Kämpfer (Schritt 3.1/3.4)
-    G_keys, Z_keys, shots = fight_plan()
+    G_keys, Z_keys, shots, ev = fight_plan()
     cam_t, cam_p, _ = camera_positions(frames)
     G, Z = stage_fight(G_keys, Z_keys, frames + 2, cam_p)
     fpv.rim_light([G.base, Z.base], RIM["elev"], RIM["azim"], strength=RIM["strength"], kelvin=RIM["kelvin"],
                   angle=RIM["angle"])
-    pos, quats, info = camera_path(frames, G_keys, Z_keys)
+    pos, quats, info = camera_path(frames, G_keys, Z_keys, shots)
     info["pos"] = pos
     path_xy = pos[:, :2]
 
@@ -725,8 +925,8 @@ def build(args):
     grass = namek.grass_field("NamekGrass", mesa_height, path_xy, namek.grass_blade_material(), rng, ymin=176,
                               ymax=330, exclude=excl, mask_fn=on_top, clump=0.6, max_blades=2_200_000,
                               height=(0.1, 0.42))
-    craters = fight_fx(G, Z, shots, rock, ground, mesa)
-    shocks = [(1.0, 273.0, 10.0, 45.0, 0.35, 1.5), (P_CRATER[0], P_CRATER[1], 12.15, 38.0, 0.9, 2.0)]
+    craters = fight_fx(G, Z, shots, rock, ground, mesa, ev)
+    shocks = [(C0.x, C0.y, T_CLASH, 45.0, 0.35, 1.5), (P_CRATER[0], P_CRATER[1], 12.15, 38.0, 0.9, 2.0)]
     shocks += [(x, y, t, 30.0, 0.55, 1.5) for (x, y, r, t, _) in craters[1:]]
     shocks += [(Z_SEA.x, Z_SEA.y, T_CLIMAX, 75.0, 1.0, 4.0)]
     namek.grass_motion(grass, shocks=shocks, burns=[(x, y, r * 1.15, t) for (x, y, r, t, _) in craters])

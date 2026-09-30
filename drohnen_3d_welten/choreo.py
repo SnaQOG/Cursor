@@ -92,6 +92,39 @@ def default_style(pose):
     return 0.32, 0.06, 0.07
 
 
+def dbz_style(pose):
+    """Dragon-Ball-Timing (sehr schnell): Schläge/Tritte in gut 2 Frames mit kräftigem Überschwingen (das Ausholen
+    kommt über eigene Ausholposen *_wind davor), Treffer-Reaktionen in 1–2 Frames, Block schnell, Flugposen knapp,
+    Aufladen/Halteposen etwas weicher."""
+    name = pose if isinstance(pose, str) else ""
+    if name in ATTACKS or name.startswith(("d_punch", "d_kick", "knee", "axe_down", "tail_whip")):
+        return 0.09, 0.0, 0.22
+    if name.endswith("_wind") or name == "axe_up":
+        return 0.11, 0.0, 0.1
+    if name in ("recoil", "gut_hit", "slam", "land"):
+        return 0.07, 0.0, 0.25
+    if name in ("guard", "block"):
+        return 0.08, 0.0, 0.18
+    if name in ("fly", "dash"):
+        return 0.12, 0.0, 0.06
+    if name.startswith("kame") or name.startswith("crouch_charge"):
+        return 0.3, 0.1, 0.06
+    return 0.2, 0.0, 0.08
+
+
+def ease(u, kind):
+    """Bahnprofil eines Abschnitts (0..1): 'lin' volle Fahrt ohne Bremsen (Vorstoß bis zum Kontakt), 'in' aus dem
+    Stand beschleunigen und schnell ankommen, 'out' mit voller Wucht losfliegen und auslaufen (Rückstoß)."""
+    u = np.clip(u, 0.0, 1.0)
+    if kind == "lin":
+        return u
+    if kind == "in":
+        return u ** 2.2
+    if kind == "out":
+        return 1.0 - (1.0 - u) ** 2.6
+    return u * u * (3 - 2 * u)
+
+
 def dedup_keys(keys):
     ks = []
     for k in sorted(keys, key=lambda k: k[0]):
@@ -102,9 +135,13 @@ def dedup_keys(keys):
     return ks
 
 
-def bake_fighter(fig, keys, n, fps, hits, style=default_style, cam_pos=None, look_win=None, seed=0):
+def bake_fighter(fig, keys, n, fps, hits, style=default_style, cam_pos=None, look_win=None, seed=0, lag_scale=1.0,
+                 lean_tau=0.08):
     """Blocking -> gebackene Animation. keys = [(t, Pose, Ort, Blickziel, in der Luft[, opts]), ...];
-    opts (optional): {"lean": Grad vor/zurück, "roll": Grad seitlich, "rot": {Gelenk: (x, y, z)} zusätzlich}.
+    opts (optional): {"lean": Grad vor/zurück, "roll": Grad seitlich, "rot": {Gelenk: (x, y, z)} zusätzlich,
+    "ease": 'lin' | 'in' | 'out' (Bahnprofil des Abschnitts *zu* diesem Schlüssel, gerade Strecke statt weicher
+    Kurve), "spin": Grad (Drehung um die Hochachse, aufsummiert, während des Abschnitts zu diesem Schlüssel),
+    "style": (Dauer, Ausholen, Überschwingen) statt style(Pose)}.
     Posenwechsel mit Ausholen/Überschwingen (crew._prog), Nachziehen von Unterarm/Hand/Kopf, Atmen/Mikrobewegung,
     Hit-Stop an Treffern, weiche Bahn (monoton-kubisch) mit Bodenkontakt über Vorwärtskinematik, Blick zur
     Kamera im Fenster look_win."""
@@ -124,11 +161,13 @@ def bake_fighter(fig, keys, n, fps, hits, style=default_style, cam_pos=None, loo
     sched = [(0.0, pose_of(ks[0]), 1.0, 0.0, 0.0)]
     for k in range(1, len(ks)):
         dur, a, o = style(ks[k][1])
+        if len(ks[k]) > 5 and ks[k][5] and ks[k][5].get("style"):
+            dur, a, o = ks[k][5]["style"]
         d = min(dur, max(tk[k] - tk[k - 1], 1.0 / fps))
         sched.append((tk[k] - d, pose_of(ks[k]), d, a, o))
     R = {}
     for j in fig.J:
-        lag = crew.LAG.get(j.split(".")[0], 0.0)
+        lag = crew.LAG.get(j.split(".")[0], 0.0) * lag_scale
         R[j] = crew._eval_schedule(sched, j, tw - lag)
     rng = np.random.default_rng(seed)
     ph = rng.uniform(0, 6.28, 4)
@@ -151,9 +190,21 @@ def bake_fighter(fig, keys, n, fps, hits, style=default_style, cam_pos=None, loo
         gz = P[seg[f], 2] * (1 - u) + P[seg[f] + 1, 2] * u
         L[f, 2] = gz - fig.foot_drop({j: tuple(R[j][f]) for j in ("root", "hip.R", "knee.R", "ankle.R",
                                                                   "hip.L", "knee.L", "ankle.L")})
+    # gerade Abschnitte mit eigenem Tempo-Profil (Vorstoß, Rückstoß): überschreiben die weiche Kurve
+    kinds = [((k[5] or {}).get("ease") if len(k) > 5 else None) for k in ks]
+    for k in range(1, len(ks)):
+        if kinds[k]:
+            m = (tw >= tk[k - 1]) & (tw <= tk[k])
+            u = ease((tw[m] - tk[k - 1]) / max(tk[k] - tk[k - 1], 1e-6), kinds[k])
+            a, b = np.array([P[k - 1, 0], P[k - 1, 1], bz[k - 1]]), np.array([P[k, 0], P[k, 1], bz[k]])
+            L[m] = a + (b - a) * u[:, None]
     # Blickrichtung (Yaw) je Schlüssel, stetig; Neigung/Rollen (Flug) je Schlüssel
     yaw_k = np.unwrap(np.array([math.atan2(-(k[3] - k[2]).x, (k[3] - k[2]).y) for k in ks]))
     yaw = pchip(tk, yaw_k, tc)
+    for k in range(1, len(ks)):
+        sp = (ks[k][5] or {}).get("spin", 0.0) if len(ks[k]) > 5 else 0.0
+        if sp:
+            yaw = yaw + math.radians(sp) * smooth(tk[k - 1], tk[k], tw)
     opt = lambda k, name: math.radians((k[5] or {}).get(name, 0.0)) if len(k) > 5 else 0.0
     lean_k = np.array([opt(k, "lean") for k in ks])
     roll_k = np.array([opt(k, "roll") for k in ks])
@@ -161,7 +212,7 @@ def bake_fighter(fig, keys, n, fps, hits, style=default_style, cam_pos=None, loo
     roll = np.interp(tc, tk, roll_k) if roll_k.any() else np.zeros(n)
     if lean_k.any() or roll_k.any():
         import crew as _c
-        lean, roll = _c._zero_phase(lean, 0.08, fps), _c._zero_phase(roll, 0.08, fps)
+        lean, roll = _c._zero_phase(lean, lean_tau, fps), _c._zero_phase(roll, lean_tau, fps)
     # Blick zur Kamera (Hals/Kopf), weich ein- und ausgeblendet
     if cam_pos is not None and look_win:
         w = smooth(look_win[0], look_win[0] + 0.6, t) * (1 - smooth(look_win[1] - 0.4, look_win[1], t))

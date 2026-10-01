@@ -37,8 +37,11 @@ Wow-Motiv hinter einer Verdeckung, stabilisierte Weitwinkel-Action-Cam (kein Fis
 
 Die Tripo-Modelle liegen nicht im (öffentlichen) Repo. Für den Namek-Kampf gehören sie nach
 `assets/models/dragonball/`:
-- `goku2/dragon+ball+goku+3d+model.fbx` + `.fbm/…_basecolor.jpg` (Goku, zweite Fassung)
-- `freezer/frieza+character+3d+model.fbx` + `.fbm/…_basecolor.jpg`
+- `goku5/gokuactionfigure3dmodel_repariert.glb`: Goku SSJ, Standpose, Mixamo-Rig, Textur. Die gelieferte GLB war
+  ein unvollständiger Download (72 %); Mesh, Farb- und Normal-Map waren vollständig, die Bind-Matrizen wurden aus
+  dem Skelett neu berechnet und die abgeschnittene Metallic-Map entfernt.
+- `freezer4/friezafinalform3dmodel.glb`: Freezer Endform, Standpose, Mixamo-Rig, Textur
+- ältere Fassungen (Fallback): `goku2/…fbx` (SSJ, Sprungpose), `freezer/…fbx` (erste Fassung)
 
 ## Vorlagen aus dem Internet
 

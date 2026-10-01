@@ -471,7 +471,7 @@ def stage_fight(G_keys, Z_keys, n, cam_pos):
     if os.environ.get("NIDO_CHARS", "tripo") == "anime":
         G, Z = AC.goku(), AC.freezer()
     else:
-        G, Z = TC.goku(), TC.freezer4()
+        G, Z = TC.goku5(), TC.freezer4()
     kw = dict(style=choreo.dbz_style, lag_scale=0.35, lean_tau=0.04)
     choreo.bake_fighter(G, G_keys, n, FPS, HITS, cam_pos=cam_pos, look_win=(17.0, 21.0), seed=3, **kw)
     choreo.bake_fighter(Z, Z_keys, n, FPS, HITS, seed=4, **kw)

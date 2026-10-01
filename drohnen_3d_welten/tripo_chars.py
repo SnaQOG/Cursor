@@ -447,3 +447,10 @@ def freezer4():
     return rig_model("Freezer", os.path.join(MODELS, "freezer4", "friezafinalform3dmodel.glb"), 1.50,
                      tail=FREEZER3_TAIL, n_tail=10, mat_kw=dict(sat=1.05, shade=(0.58, 0.55, 0.74), rim=(0.92, 0.88, 1.0)),
                      outline=0.004)
+
+
+def goku5():
+    """Son Goku, Super-Saiyajin (GLB-Fassung mit Textur, Standpose, Mixamo-Rig), 1,75 m. Die GLB-Datei war ein
+    unvollständiger Download; die reparierte Fassung hat neu berechnete Bind-Matrizen und keine Metallic-Map."""
+    return rig_model("Goku", os.path.join(MODELS, "goku5", "gokuactionfigure3dmodel_repariert.glb"), 1.75,
+                     mat_kw=dict(sat=1.12, value=1.04, shade=(0.52, 0.48, 0.64), hair_glow=0.25), outline=0.004)

@@ -158,14 +158,16 @@ class Figure:
         def R(j):
             return Euler(tuple(math.radians(v) for v in rot.get(j, (0, 0, 0))), "XYZ").to_matrix().to_4x4()
         low = 1e9
+        # Ferse/Ballen relativ zum Sprunggelenk (Tripo-Figuren setzen foot_offs aus dem Modell)
+        offs = getattr(self, "foot_offs", None) or [Vector(o) * self.s for o in ((0, -0.05, -0.1), (0, 0.12, -0.08))]
         for sd in ("R", "L"):
             M = Matrix.Translation(self.rest["root"]) @ R("root")
             prev = "root"
             for j in (f"hip.{sd}", f"knee.{sd}", f"ankle.{sd}"):
                 M = M @ Matrix.Translation(self.rest[j] - self.rest[prev]) @ R(j)
                 prev = j
-            for off in ((0, -0.05, -0.1), (0, 0.12, -0.08)):
-                low = min(low, (M @ (Vector(off) * self.s)).z)
+            for off in offs:
+                low = min(low, (M @ off).z)
         return low
 
     def pose(self, frame, rot=None, loc=None, yaw=None, base_rot=None, ground=None):

@@ -26,7 +26,9 @@ Wow-Motiv hinter einer Verdeckung, stabilisierte Weitwinkel-Action-Cam (kein Fis
 | `dbz.py` | Super-Saiyajin Goku (orange-blauer Gi, goldenes Stachelhaar) und Freezer (Endform, weiß mit lila Panzerteilen, Schwanz) |
 | `crew.py` | die Strohhutbande (Ruffy, Zorro, Nami, Lysop, Sanji, Chopper, Robin, Franky, Brook, Jinbei) in Kanon-Größen mit Posen/Animationen und Platz an Bord |
 | `vfx.py` | Energie-Effekte: Rasengan/Kamehameha-Ladung (Wirbelkugel), Chidori (flackernde Blitzvarianten), Strahlen mit Längenverlauf fürs Strahlenduell, Explosionen mit Druckwellenring, Ki-Kugeln, Super-Saiyajin-Aura, Staubwolken, Gesteinsbrocken (ballistisch) – alles über Keyframes gesteuert und mit Punktlichtern, die die Umgebung beleuchten |
-| `tripo_chars.py` | Tripo-3D-Modelle (Goku SSJ, Freezer Endform) als animierbare Figuren: Gelenkpunkte aus der Mittellinie des voxelisierten Modells, Armature in der Modellpose mit Copy Transforms von den Rig-Empties (kein Zurückbiegen in eine Grundpose), Gewichte über Abstände entlang der Mesh-Oberfläche, Freezers Schwanz als Knochenkette, Toon-Material aus der Farbtextur + Kontur |
+| `tripo_chars.py` | Tripo-3D-Modelle (Goku SSJ, Freezer Endform) als animierbare Figuren: Gelenkpunkte aus der Mittellinie des voxelisierten Modells, Armature in der Modellpose mit Copy Transforms von den Rig-Empties (kein Zurückbiegen in eine Grundpose), Gewichte über Abstände entlang der Mesh-Oberfläche, Freezers Schwanz als Knochenkette, Toon-Material aus der Farbtextur + Kontur. GLB-Meshes sind an den UV-Nähten aufgetrennt; für die Gewichte werden die Nähte zusammengelegt (sonst reißt Kleidung) |
+| `tripo_crew.py` | die Strohhutbande aus Tripo-GLB-Modellen für die Thousand Sunny (Standard, `NIDO_CREW=proc` = selbst gebaute Figuren aus `crew.py`): Mixamo-Gelenke, Franky von Hand vermessen, figurenspezifische Posen (`POSE_MAP`), Robins Buch |
+| `repair_glb.py` | repariert unvollständige GLB-Downloads (`.glb.download`): Binärteil auffüllen, Bind-Matrizen aus der Knochenhierarchie neu berechnen, abgeschnittene Bilder entfernen |
 | `dbz_fx.py` | Dragon-Ball-Bewegungseffekte: Ki-Spuren hinter schnellen Vorstößen, Zanzoken (Verschwinden, flackerndes Nachbild, Luftring beim Auftauchen) |
 | `anime_chars.py` | selbst gebaute Anime-Figuren (Fallback, `NIDO_CHARS=anime`): Toon-Shading, Konturen, Gesichtsausdrücke als Shape Keys |
 | `namek.py` | Namek: Lehm-Kuppelhäuser (Boolean + Normalen-Transfer), schlanke Ajisa-Bäume mit blauen Kugelkronen, blaue Grashalme, Sandflecken, rote Pilze, Dragon Balls, Friezas Raumschiff |
@@ -42,6 +44,13 @@ Die Tripo-Modelle liegen nicht im (öffentlichen) Repo. Für den Namek-Kampf geh
   dem Skelett neu berechnet und die abgeschnittene Metallic-Map entfernt.
 - `freezer4/friezafinalform3dmodel.glb`: Freezer Endform, Standpose, Mixamo-Rig, Textur
 - ältere Fassungen (Fallback): `goku2/…fbx` (SSJ, Sprungpose), `freezer/…fbx` (erste Fassung)
+
+Für die Crew auf der Thousand Sunny nach `assets/models/onepiece/<figur>/` (`tripo_crew.SPEC`):
+`luffy/luffycharacter3dmodel.glb`, `zoro/zorofigure3dmodel_rig_repariert.glb` (unvollständiger Download, mit
+`repair_glb.py` repariert), `nami/animegirlfigure3dmodel.glb`, `usopp/piratecharacter3dmodel.glb`,
+`sanji/sanjifigure3dmodel.glb`, `chopper/choppertoy3dmodel.glb`, `robin/femalecharacter3dmodel.glb`,
+`franky/muscularactionfigure3dmodel.glb` (ohne Rig), `brook/skeletonclown3dmodel.glb`,
+`jinbe/fantasyogre3dmodel.glb`.
 
 ## Vorlagen aus dem Internet
 

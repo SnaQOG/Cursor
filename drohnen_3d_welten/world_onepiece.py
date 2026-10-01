@@ -38,6 +38,8 @@ RIM_FADE = (15.5, 17.0)                                                      # R
 # Homogenes Dunst-Volumen: getestet (0.0012/m: +33 % Renderzeit, aber bei 16 Samples extrem verrauscht) -> aus;
 # Tiefendunst kommt aus post.py (haze_sky). Mit GPU und 128+ Samples über NIDO_ATMO einschaltbar.
 ATMO_DENSITY = float(os.environ.get("NIDO_ATMO", "0.0"))
+# Crew: "tripo" = Strohhüte aus den Tripo-GLB-Modellen (tripo_crew.py), "proc" = selbst gebaute Figuren (crew.py)
+CREW = os.environ.get("NIDO_CREW", "tripo")
 
 # ---- Schiff: fährt nach Osten (+X); Steuerbord zeigt nach Süden, zur anfliegenden Kamera
 SHIP_HEADING = 0.0
@@ -325,7 +327,13 @@ def build(args):
     root, body, _ = sunny.build()
     sunny.animate(root, body, heading, tuple(start), SHIP_SPEED, FPS, frames)
     sunny.flag_cloth(frames, CACHE_DIR or args.out.rstrip("/") + "_cache", heading_deg=heading)
-    crew.place_crew(body, frames, sunny, cam_pos=pos)
+    chars = None
+    if CREW == "tripo":
+        import anime_chars
+        import tripo_crew
+        anime_chars.set_light(fpv.sun_dir(SUN_ELEV, SUN_AZIM), fpv.sun_dir(RIM["elev"], RIM["azim"]))
+        chars = tripo_crew.chars()
+    crew.place_crew(body, frames, sunny, cam_pos=pos, chars=chars)
     add_rim_light(root)
     if ATMO_DENSITY > 0:
         add_atmosphere(ATMO_DENSITY)

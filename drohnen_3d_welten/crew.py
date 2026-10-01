@@ -12,11 +12,10 @@ import numpy as np
 from mathutils import Euler, Matrix, Vector
 
 import fpv
-from figures import POSES, REST, Figure
+from figures import POSES, Figure
 from ninja import cloth_material, ellipsoid, hair_material, skin_material, spikes, tube
 
 SKIN = (0.72, 0.45, 0.30)
-REST_ROOT = REST["root"][1][2]
 
 # zusätzliche Posen für die Crew
 POSES.update({
@@ -25,8 +24,8 @@ POSES.update({
             "knee.R": (-8, 0, 0), "knee.L": (-20, 0, 0), "shoulder.R": (45, 0, 30), "elbow.R": (125, 0, 0),
             "shoulder.L": (45, 0, -30), "elbow.L": (125, 0, 0)},
     # Franky: SUPER! (beide Arme hoch, Unterarme über dem Kopf zusammen)
-    "super": {"spine": (6, 0, 0), "head": (8, 0, 0), "shoulder.R": (0, -168, 0), "elbow.R": (0, 62, 0),
-              "shoulder.L": (0, 168, 0), "elbow.L": (0, -62, 0), "hip.R": (0, -8, 0), "hip.L": (0, 8, 0)},
+    "super": {"spine": (6, 0, 0), "head": (8, 0, 0), "shoulder.R": (0, -168, 0), "elbow.R": (0, -62, 0),
+              "shoulder.L": (0, 168, 0), "elbow.L": (0, 62, 0), "hip.R": (0, -8, 0), "hip.L": (0, 8, 0)},
     # Brook: Geige spielen (links am Kinn, rechts streicht)
     "violin": {"head": (-8, 0, -18), "shoulder.L": (75, 35, -35), "elbow.L": (115, 0, 0),
                "shoulder.R": (55, -30, 25), "elbow.R": (80, 0, 0)},
@@ -35,6 +34,8 @@ POSES.update({
     # Jinbei am Steuerrad
     "helm": {"spine": (-6, 0, 0), "shoulder.R": (62, -12, 8), "elbow.R": (48, 0, 0), "shoulder.L": (62, 12, -8),
              "elbow.L": (48, 0, 0)},
+    "helm_turn": {"spine": (-6, 0, -5), "shoulder.R": (68, -12, 8), "elbow.R": (48, 0, 0), "shoulder.L": (56, 12, -8),
+                  "elbow.L": (48, 0, 0)},
     # Robin liest (sitzend, Buch vor der Brust)
     "read": {"spine": (-4, 0, 0), "head": (-18, 0, 0), "hip.R": (90, 0, 0), "knee.R": (-90, 0, 0),
              "hip.L": (90, 0, 0), "knee.L": (-90, 0, 0), "shoulder.R": (38, -8, 25), "elbow.R": (95, 0, 0),
@@ -585,12 +586,15 @@ def act(fig, sched, n, loc, yaw, body_M=None, cam=None, ground=None, seat_z=None
     fig.base.rotation_euler = (0, 0, math.radians(yaw))
 
 
-def place_crew(body, frames, sunny, cam_pos=None):
+def place_crew(body, frames, sunny, cam_pos=None, chars=None):
     """Crew an Bord: an 'body' (Schiffskörper mit Stampfen/Rollen) gehängt, Koordinaten im Schiffssystem
     (+X Bug, +Y Backbord). Blickrichtungen überwiegend nach Steuerbord (-Y), wo die Kamera vorbeifliegt.
     Figuren-Yaw: 0 = Blick +Y, -90 = Blick +X (Bug), 180 = Blick -Y (Steuerbord).
     Animation (Schritt 3.4): pro Figur eine Posenfolge mit Ausholen/Überschwingen, versetzte Phasen,
-    Atmen/Schwanken, Blick zur vorbeifliegenden Kamera (cam_pos je Frame, Weltkoordinaten)."""
+    Atmen/Schwanken, Blick zur vorbeifliegenden Kamera (cam_pos je Frame, Weltkoordinaten).
+    chars = {name: fn(loc, yaw) -> Figure} ersetzt die selbst gebauten Figuren (z. B. tripo_crew.chars())."""
+    C = {"luffy": luffy, "zoro": zoro, "nami": nami, "usopp": usopp, "sanji": sanji, "chopper": chopper,
+         "robin": robin, "franky": franky, "brook": brook, "jinbe": jinbe, **(chars or {})}
     Z_DECK, Z_FORE, Z_ROOF = sunny.Z_DECK, sunny.Z_FORE, sunny.Z_ROOF
     SB, BOW = 180.0, -90.0
     n = frames + 2
@@ -599,9 +603,11 @@ def place_crew(body, frames, sunny, cam_pos=None):
 
     def put(fig, loc, yaw, sched, ground=None, seat=None, **kw):
         fig.base.parent = body
+        pm = getattr(fig, "pose_map", {})          # figurenspezifische Posen (Tripo-Modelle)
+        sched = [(e[0], pm.get(e[1], e[1]) if isinstance(e[1], str) else e[1], *e[2:]) for e in sched]
         seat_z = None
         if seat is not None:            # sitzend: Gesäß (≈ Wurzel − 9 cm) auf Sitzhöhe
-            seat_z = seat - (REST_ROOT - 0.09) * fig.s
+            seat_z = seat - (fig.rest["root"].z - 0.09 * fig.s)
         loc3 = (loc[0], loc[1], seat_z if seat_z is not None else (ground or 0.0))
         act(fig, sched, n, loc3, yaw, body_M=body_M, cam=cam_pos, ground=ground, seat_z=seat_z, **kw)
         crew.append(fig)
@@ -611,42 +617,41 @@ def place_crew(body, frames, sunny, cam_pos=None):
         return [(0.0, pose, 1.0, 0, 0)]
 
     # Ruffy sitzt auf der Steuerbord-Reling am Bug und winkt die ganze Zeit (Phase versetzt)
-    put(luffy((0, 0, 0), 0), (7.9, -4.3, 0), SB,
+    put(C["luffy"]((0, 0, 0), 0), (7.9, -4.3, 0), SB,
         [(0.0, "sit_wave", 1, 0, 0)] + wave_loop(0.1, 20.5, "sit_wave", "sit_wave2", 0.3, o=0.1), seat=9.5,
         seed=1, sway=0.6)
     # Jinbei am Steuer: kleine Korrekturen am Rad, Blick zur Kamera
-    put(jinbe((0, 0, 0), 0), (6.75, 0.0, 0), BOW,
-        [(0.0, "helm", 1, 0, 0), (6.0, {**POSES["helm"], "shoulder.R": (68, -12, 8), "shoulder.L": (56, 12, -8),
-                                        "spine": (-6, 0, -5)}, 1.2, 0.05, 0.08),
-         (12.5, "helm", 1.2, 0.05, 0.08)], ground=Z_FORE, seed=2, look=0.8)
-    put(brook((0, 0, 0), 0), (8.9, -1.5, 0), SB - 25,
+    put(C["jinbe"]((0, 0, 0), 0), (6.75, 0.0, 0), BOW,
+        [(0.0, "helm", 1, 0, 0), (6.0, "helm_turn", 1.2, 0.05, 0.08), (12.5, "helm", 1.2, 0.05, 0.08)],
+        ground=Z_FORE, seed=2, look=0.8)
+    put(C["brook"]((0, 0, 0), 0), (8.9, -1.5, 0), SB - 25,
         [(0.0, "violin", 1, 0, 0)] + wave_loop(0.2, 20.5, "violin", "violin_b", 0.34, o=0.05),
         ground=Z_FORE, seed=3, look=0.5)
     # Lysop und Chopper auf dem Rasen: stehen, holen aus und winken, sobald die Drohne kommt
-    put(usopp((0, 0, 0), 0), (-2.0, -1.0, 0), SB,
+    put(C["usopp"]((0, 0, 0), 0), (-2.0, -1.0, 0), SB,
         [(0.0, "stand", 1, 0, 0), (9.3, "wave_up", 0.55, 0.15, 0.12)]
         + wave_loop(9.9, 15.0, "wave_up", "wave_up2", 0.3, o=0.1) + [(15.1, "stand", 0.7, 0.05, 0.08)],
         ground=Z_DECK, seed=4)
-    put(chopper((0, 0, 0), 0), (-0.7, -0.8, 0), SB + 10,
+    put(C["chopper"]((0, 0, 0), 0), (-0.7, -0.8, 0), SB + 10,
         [(0.0, "stand", 1, 0, 0), (9.1, "wave_up", 0.5, 0.15, 0.12)]
         + wave_loop(9.65, 10.35, "wave_up", "wave_up2", 0.25, o=0.1)
         + [(10.35, "squat", 0.27, 0.0, 0.05), (10.62, "stand", 0.08, 0.0, 0.0), (10.72, "tuck", 0.12, 0.0, 0.0),
            (11.18, "squat", 0.14, 0.0, 0.1), (11.4, "wave_up", 0.35, 0.0, 0.12)]
         + wave_loop(11.8, 15.0, "wave_up", "wave_up2", 0.25, o=0.1) + [(15.1, "stand", 0.6, 0.05, 0.08)],
         ground=Z_DECK, seed=5, jump=(10.66, 11.22, 0.45))
-    put(nami((0, 0, 0), 0), (0.6, 0.6, 0), SB - 25,
+    put(C["nami"]((0, 0, 0), 0), (0.6, 0.6, 0), SB - 25,
         [(0.0, "hands_hips", 1, 0, 0), (9.6, "wave_R", 0.5, 0.12, 0.12)]
         + wave_loop(10.15, 14.2, "wave_R", "wave_R2", 0.36, o=0.1) + [(14.3, "hands_hips_r", 0.6, 0.0, 0.08)],
         ground=Z_DECK, seed=6)
     # Zorro schläft: tiefes Atmen, kein Blick
-    put(zoro((0, 0, 0), 0), (2.95, -0.62, 0), SB, hold("nap"), ground=Z_DECK, seed=7, look=0.0, breathe=2.4,
+    put(C["zoro"]((0, 0, 0), 0), (2.95, -0.62, 0), SB, hold("nap"), ground=Z_DECK, seed=7, look=0.0, breathe=2.4,
         sway=0.15)
     # Sanji: Hände in den Taschen, führt die Zigarette zum Mund, schaut der Drohne nach
-    put(sanji((0, 0, 0), 0), (-3.2, 0.6, 0), SB - 40,
+    put(C["sanji"]((0, 0, 0), 0), (-3.2, 0.6, 0), SB - 40,
         [(0.0, "pockets", 1, 0, 0), (11.4, "smoke", 0.5, 0.1, 0.08), (13.2, "pockets", 0.6, 0.05, 0.06)],
         ground=Z_DECK, seed=8)
     # Robin liest, blättert um und blickt kurz auf
-    put(robin((0, 0, 0), 0), (-2.95, 2.3, 0), SB + 30,
+    put(C["robin"]((0, 0, 0), 0), (-2.95, 2.3, 0), SB + 30,
         [(0.0, "read", 1, 0, 0), (12.0, "read_turn", 0.35, 0.08, 0.1), (12.45, "read", 0.4, 0.0, 0.06)],
         seat=Z_DECK + 0.45, seed=9, look=0.6, sway=0.4)
     chair = fpv.simple_mat("DeckChair", (0.75, 0.70, 0.62), rough=0.6)
@@ -655,7 +660,7 @@ def place_crew(body, frames, sunny, cam_pos=None):
         ob = sunny.box(nm, a, b, chair, bevel=0.02)
         ob.parent = body
     # Franky auf dem Kastelldach: holt aus und reißt genau beim Vorbeiflug die SUPER-Pose hoch
-    put(franky((0, 0, 0), 0), (-6.2, -2.6, 0), SB - 15,
+    put(C["franky"]((0, 0, 0), 0), (-6.2, -2.6, 0), SB - 15,
         [(0.0, "hands_hips", 1, 0, 0), (12.95, "super_prep", 0.35, 0.0, 0.0), (13.3, "super", 0.4, 0.0, 0.15),
          (16.2, "hands_hips", 0.7, 0.05, 0.08)],
         ground=Z_ROOF + 0.18, seed=10, look=0.7, shake=(13.7, 15.6, 1.2))

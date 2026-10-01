@@ -135,6 +135,50 @@ def _image_of(ob, prefer=("color", "basecolor", "base_color", "diffuse", "albedo
     return im
 
 
+def _normal_of(ob):
+    for m in ob.data.materials:
+        if m and m.node_tree:
+            for n in m.node_tree.nodes:
+                if n.type == "TEX_IMAGE" and n.image and n.image.size[0] > 0 and "normal" in n.image.name.lower():
+                    return n.image
+    return None
+
+
+def _shrink(im, size):
+    """Textur auf size × size verkleinern (Speicher: 10 Figuren × 4K wären über 1 GB) und eingebettet halten."""
+    if im is None or not size or im.size[0] <= size:
+        return im
+    im.scale(size, size)
+    im.pack()
+    return im
+
+
+def real_tex_material(name, image, normal=None, rough=0.55, sat=1.05, value=1.0, normal_strength=0.6, sheen=0.25):
+    """Physikalisches Material aus der Tripo-Textur (Figurenlook im echten Licht der Szene): Farbtextur,
+    Normal-Map, matte Oberfläche mit etwas Sheen (Stoff)."""
+    mat, nb, out = fpv.new_material(name)
+    tex = nb.node("ShaderNodeTexImage")
+    tex.image = image
+    tex.interpolation = "Cubic"
+    hs = nb.node("ShaderNodeHueSaturation")
+    hs.inputs["Saturation"].default_value = sat
+    hs.inputs["Value"].default_value = value
+    nb.link(tex.outputs["Color"], hs.inputs["Color"])
+    bs = fpv.principled(nb, Base_Color=hs.outputs["Color"], Roughness=rough)
+    bs.inputs["Specular IOR Level"].default_value = 0.35
+    bs.inputs["Sheen Weight"].default_value = sheen
+    if normal is not None:
+        normal.colorspace_settings.name = "Non-Color"
+        nt = nb.node("ShaderNodeTexImage")
+        nt.image = normal
+        nm = nb.node("ShaderNodeNormalMap")
+        nm.inputs["Strength"].default_value = normal_strength
+        nb.link(nt.outputs["Color"], nm.inputs["Color"])
+        nb.link(nm.outputs["Normal"], bs.inputs["Normal"])
+    nb.link(bs.outputs[0], out.inputs[0])
+    return mat
+
+
 # ------------------------------------------------------------------------------------------------ Material
 def toon_tex_material(name, image, lit=1.0, mid=0.8, shade=(0.52, 0.5, 0.66), bands=(-0.1, 0.35),
                       tint_lit=(1.0, 0.96, 0.9), rim=(1.0, 0.97, 0.9), rim_w=0.4, sat=1.15, value=1.0,
@@ -218,10 +262,10 @@ def _geodesic_weights(V, E, segs, rads, spans, power=4.0):
     """Gewichte über Abstände entlang der Oberfläche: je Knochen Saatpunkte = Mesh-Punkte, die klar auf seinem
     Glied liegen (nächster Knochen nach Abstand/Dicke, Abstand < 1,5 Dicken, Projektion im Innenteil `spans`
     der Strecke); dann kürzester Weg über die Mesh-Kanten zu jeder Saat. So bleiben Finger an der Hand,
-    Krallen am Fuß und sich berührende Glieder (Oberschenkel, Schwanz am Bein) getrennt. Punkte ohne Weg
-    (lose Teile) bekommen die Abstandsgewichte."""
+    Krallen am Fuß und sich berührende Glieder (Oberschenkel, Schwanz am Bein) getrennt. Lose Teile ohne Weg zu
+    einer Saat bekommen die über das ganze Teil gemittelten Abstandsgewichte und bewegen sich damit starr."""
     from scipy.sparse import coo_matrix
-    from scipy.sparse.csgraph import dijkstra
+    from scipy.sparse.csgraph import connected_components, dijkstra
     n, nb = len(V), len(segs)
     lens = np.linalg.norm(V[E[:, 0]] - V[E[:, 1]], axis=1) + 1e-9
     G = coo_matrix((lens, (E[:, 0], E[:, 1])), shape=(n, n)).tocsr()
@@ -245,17 +289,25 @@ def _geodesic_weights(V, E, segs, rads, spans, power=4.0):
     lost = ~np.isfinite(geo).any(axis=1)
     W[~np.isfinite(W)] = 0.0
     if lost.any():
-        W[lost] = 1.0 / (D[lost] + 0.08) ** 6
+        _, lab = connected_components(G, directed=False)
+        for c in np.unique(lab[lost]):
+            m = lab == c
+            wl = 1.0 / (D[m] + 0.08) ** 6
+            W[m] = (wl / wl.sum(1, keepdims=True)).mean(0)
     return W
 
 
-def rig_model(name, path, height, joints=None, radii=None, tail=None, n_tail=10, mat_kw=None, outline=0.007):
+def rig_model(name, path, height, joints=None, radii=None, tail=None, n_tail=10, mat_kw=None, outline=0.007,
+              look="toon", tex_size=None, smooth=3):
     """Figur aus einem Tripo-Modell: siehe Moduldoku. Rückgabe: figures.Figure mit .rig, .body_parts,
-    .face_objs (leer), .tail_bones (falls Schwanz), .mats."""
+    .face_objs (leer), .tail_bones (falls Schwanz), .mats. look = "toon" (Cel-Shading + Kontur) oder "real"
+    (Textur im echten Szenenlicht, ohne Kontur); tex_size verkleinert die Texturen; smooth = Glättungsdurchgänge der
+    Gewichte (mehr für weite Kleidung wie Kimono-Ärmel)."""
     fig = Figure(name, height)
     ob, mixamo = import_mesh(path, name + "Body")
     joints = joints or mixamo
-    img = _image_of(ob)
+    img = _shrink(_image_of(ob), tex_size)
+    nrm = _shrink(_normal_of(ob), tex_size) if look == "real" else None
     c = joints["root"]
     zs = np.zeros(len(ob.data.vertices) * 3)
     ob.data.vertices.foreach_get("co", zs)
@@ -289,6 +341,11 @@ def rig_model(name, path, height, joints=None, radii=None, tail=None, n_tail=10,
         fig.rest[j] = Jr[j].copy()
         par = REST[j][0]
         fig.J[j].location = Jr[j] - (Jr[par] if par else Vector())
+    # Ferse und Ballen relativ zum Sprunggelenk (für den Bodenkontakt in figures.foot_drop): Sohle in der Höhe,
+    # die das Gelenk im Modell über dem Boden liegt, Ballen bei der Zehenspitze
+    az = min(Jm["ankle.R"].z, Jm["ankle.L"].z)
+    foot = max((Jm["toe.R"] - Jm["ankle.R"]).to_2d().length, 0.05 * height)
+    fig.foot_offs = [Vector((0, -0.25 * foot, -az)), Vector((0, 0.8 * foot, -az))]
     # ---- Ruhelage der Knochen = Modellpose (Rumpf mit Querachse, Glieder minimal gedreht)
     B = {}
     side_axis = {"root": ("hip.R", "hip.L"), "spine": ("shoulder.R", "shoulder.L"), "neck": ("shoulder.R", "shoulder.L"),
@@ -332,7 +389,16 @@ def rig_model(name, path, height, joints=None, radii=None, tail=None, n_tail=10,
             "ankle.R": (0.15, 4.0), "ankle.L": (0.15, 4.0)}
     if names[-1].startswith("tail"):
         span[names[-1]] = (0.15, 3.0)
-    W = _geodesic_weights(V, E, segs, rads, [span.get(nm, (0.15, 0.85)) for nm in names])
+    # Nähte schließen: GLB-Meshes sind an den UV-Nähten aufgetrennt (über 1000 Inseln). Für Oberflächenabstände
+    # und Glättung werden Punkte an gleicher Stelle zusammengelegt, die Gewichte danach auf alle Kopien verteilt –
+    # sonst springen die Gewichte an jeder Naht und Kleidung reißt auf.
+    _, rep, inv = np.unique(np.round(V / (1e-5 * height)).astype(np.int64), axis=0, return_index=True,
+                            return_inverse=True)
+    inv = inv.ravel()
+    Vw = V[rep]
+    Ew = inv[E]
+    Ew = np.unique(np.sort(Ew[Ew[:, 0] != Ew[:, 1]], axis=1), axis=0)
+    W = _geodesic_weights(Vw, Ew, segs, rads, [span.get(nm, (0.15, 0.85)) for nm in names])
 
     def top3(W):
         top = np.argsort(-W, axis=1)[:, :3]
@@ -342,13 +408,13 @@ def rig_model(name, path, height, joints=None, radii=None, tail=None, n_tail=10,
         np.put_along_axis(out, top, Wt, 1)
         return out
     W = top3(W)
-    cnt = np.bincount(E.ravel(), minlength=len(V)).astype(float)[:, None]
-    for _ in range(3):
+    cnt = np.bincount(Ew.ravel(), minlength=len(Vw)).astype(float)[:, None]
+    for _ in range(smooth):
         acc = np.zeros_like(W)
-        np.add.at(acc, E[:, 0], W[E[:, 1]])
-        np.add.at(acc, E[:, 1], W[E[:, 0]])
+        np.add.at(acc, Ew[:, 0], W[Ew[:, 1]])
+        np.add.at(acc, Ew[:, 1], W[Ew[:, 0]])
         W = 0.5 * W + 0.5 * acc / np.maximum(cnt, 1)
-    W = top3(W)
+    W = top3(W)[inv]
     for bi, nm in enumerate(names):
         vg = ob.vertex_groups.new(name=nm)
         sel = np.where(W[:, bi] > 1e-4)[0]
@@ -392,11 +458,15 @@ def rig_model(name, path, height, joints=None, radii=None, tail=None, n_tail=10,
     mod = ob.modifiers.new("Rig", "ARMATURE")
     mod.object = arm
     # ---- Look
-    mat = toon_tex_material(name + "Toon", img, **(mat_kw or {}))
+    if look == "real":
+        mat = real_tex_material(name + "Mat", img, nrm, **(mat_kw or {}))
+    else:
+        mat = toon_tex_material(name + "Toon", img, **(mat_kw or {}))
     ob.data.materials.clear()
     ob.data.materials.append(mat)
     line = outline_material(name + "Line", (0.02, 0.012, 0.02))
-    add_outline(ob, outline * height, line)
+    if look != "real" and outline:
+        add_outline(ob, outline * height, line)
     fig.rig = arm
     fig.body_parts = [ob]
     fig.face_objs = []

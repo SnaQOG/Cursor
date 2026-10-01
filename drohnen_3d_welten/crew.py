@@ -512,12 +512,21 @@ def _zero_phase(x, tau, fps=FPS):
 
 
 def act(fig, sched, n, loc, yaw, body_M=None, cam=None, ground=None, seat_z=None, look=1.0, breathe=1.0,
-        sway=1.0, seed=0, jump=None, shake=None):
+        sway=1.0, seed=0, jump=None, shake=None, turn=None):
     """Ganze Figur backen: Posenfolge mit Ausholen/Überschwingen, Nachziehen von Unterarm/Hand/Kopf,
     Atmen, Gewichtsverlagerung, Kopf-Mikrobewegung, Blick zur Kamera (Hals/Kopf) und Bodenkontakt.
-    jump = (t0, t1, höhe): Parabel auf die Basis; shake = (t0, t1, grad): Zittern (Kraftpose halten)."""
+    jump = (t0, t1, höhe): Parabel auf die Basis; shake = (t0, t1, grad): Zittern (Kraftpose halten);
+    turn = [(t, yaw), ...]: Körper dreht sich (weich zwischen den Schlüsseln), z. B. der Drohne hinterher."""
     rng = np.random.default_rng(seed)
     t = (np.arange(n) - 1.0) / FPS
+    yaw_f = np.full(n, float(yaw))
+    if turn:
+        kt = [k[0] for k in turn]
+        ky = [float(k[1]) for k in turn]
+        yaw_f[:] = ky[0]
+        for a in range(len(kt) - 1):
+            m = t >= kt[a]
+            yaw_f[m] = ky[a] + (ky[a + 1] - ky[a]) * _ss((t[m] - kt[a]) / (kt[a + 1] - kt[a]))
     R = {}
     for j in fig.J:
         lag = LAG.get(j.split(".")[0], 0.0)
@@ -544,12 +553,11 @@ def act(fig, sched, n, loc, yaw, body_M=None, cam=None, ground=None, seat_z=None
     # Blick zur Kamera
     if look > 0 and body_M is not None and cam is not None:
         neck = fig.rest["neck"]
-        yaw_r = math.radians(yaw)
-        Mb = Matrix.Translation(loc) @ Euler((0, 0, yaw_r), "XYZ").to_matrix().to_4x4()
         ly = np.zeros(n)
         lp = np.zeros(n)
         w = np.zeros(n)
         for f in range(n):
+            Mb = Matrix.Translation(loc) @ Euler((0, 0, math.radians(yaw_f[f])), "XYZ").to_matrix().to_4x4()
             M = body_M[f] @ Mb
             hp = M @ neck
             d = M.to_3x3().inverted() @ (Vector(cam[f]) - hp)
@@ -583,7 +591,10 @@ def act(fig, sched, n, loc, yaw, body_M=None, cam=None, ground=None, seat_z=None
         u = np.clip((t - j0) / (j1 - j0), 0, 1)
         L[:, 2] += np.where((t > j0) & (t < j1), 4 * hgt * u * (1 - u), 0.0)
     _bake(fig.base, "location", L)
-    fig.base.rotation_euler = (0, 0, math.radians(yaw))
+    if turn:
+        _bake(fig.base, "rotation_euler", np.stack([np.zeros(n), np.zeros(n), np.radians(yaw_f)], axis=1))
+    else:
+        fig.base.rotation_euler = (0, 0, math.radians(yaw))
 
 
 def place_crew(body, frames, sunny, cam_pos=None, chars=None):
@@ -659,9 +670,11 @@ def place_crew(body, frames, sunny, cam_pos=None, chars=None):
                      ("ChairBack", (-3.5, 2.5, Z_DECK + 0.4), (-2.4, 2.75, Z_DECK + 1.15))):
         ob = sunny.box(nm, a, b, chair, bevel=0.02)
         ob.parent = body
-    # Franky auf dem Kastelldach: holt aus und reißt genau beim Vorbeiflug die SUPER-Pose hoch
+    # Franky auf dem Kastelldach: dreht sich mit der über ihn hinweg nach Backbord fliegenden Drohne mit, holt aus
+    # und reißt die SUPER-Pose frontal zur Kamera hoch (vorher stand er beim Vorbeiflug mit dem Rücken zu ihr)
     put(C["franky"]((0, 0, 0), 0), (-6.2, -2.6, 0), SB - 15,
         [(0.0, "hands_hips", 1, 0, 0), (12.95, "super_prep", 0.35, 0.0, 0.0), (13.3, "super", 0.4, 0.0, 0.15),
          (16.2, "hands_hips", 0.7, 0.05, 0.08)],
-        ground=Z_ROOF + 0.18, seed=10, look=0.7, shake=(13.7, 15.6, 1.2))
+        ground=Z_ROOF + 0.18, seed=10, look=0.7, shake=(13.7, 15.6, 1.2),
+        turn=[(0.0, SB - 15), (11.4, SB + 5), (12.9, SB + 120), (13.7, SB + 145), (15.5, SB + 155)])
     return crew

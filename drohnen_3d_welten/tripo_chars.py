@@ -73,15 +73,40 @@ FREEZER_RADII = {"root": 0.06, "spine": 0.06, "neck": 0.035, "head": 0.08, "shou
 
 
 # ------------------------------------------------------------------------------------------------ Import
+MIXAMO = {"root": ("Hips", "head"), "spine": ("Spine1", "head"), "neck": ("Neck", "head"), "head": ("Head", "head"),
+          "head_top": ("HeadTop_End", "head")}
+for _s, _m in (("R", "Right"), ("L", "Left")):
+    MIXAMO.update({f"shoulder.{_s}": (f"{_m}Arm", "head"), f"elbow.{_s}": (f"{_m}ForeArm", "head"),
+                   f"wrist.{_s}": (f"{_m}Hand", "head"), f"hand.{_s}": (f"{_m}HandMiddle4", "tail"),
+                   f"hip.{_s}": (f"{_m}UpLeg", "head"), f"knee.{_s}": (f"{_m}Leg", "head"),
+                   f"ankle.{_s}": (f"{_m}Foot", "head"), f"toe.{_s}": (f"{_m}Toe_End", "head")})
+
+
 def import_mesh(path, name):
-    """FBX importieren, alle Transformationen ins Mesh übernehmen, nur das Mesh behalten."""
+    """FBX/GLB importieren, alle Transformationen ins Mesh übernehmen, nur das Mesh behalten. Hat das Modell ein
+    Mixamo-Skelett (Tripo-Auto-Rig), werden dessen Gelenke als Gelenkpunkte zurückgegeben (sonst None)."""
     before = set(bpy.data.objects)
-    bpy.ops.import_scene.fbx(filepath=path)
+    if path.lower().endswith((".glb", ".gltf")):
+        bpy.ops.import_scene.gltf(filepath=path)
+    else:
+        bpy.ops.import_scene.fbx(filepath=path)
     new = [o for o in bpy.data.objects if o not in before]
-    meshes = [o for o in new if o.type == "MESH"]
-    ob = meshes[0]
+    ob = max((o for o in new if o.type == "MESH"), key=lambda o: len(o.data.vertices))   # GLB: ohne Hilfskugel
+    joints = None
+    arms = [o for o in new if o.type == "ARMATURE"]
+    if arms:
+        arm = arms[0]
+        bones = {b.name.split(":")[-1]: b for b in arm.data.bones}
+        if all(m in bones for m, _ in MIXAMO.values()):
+            M = arm.matrix_world
+            joints = {j: tuple(M @ (bones[m].head_local if end == "head" else bones[m].tail_local))
+                      for j, (m, end) in MIXAMO.items()}
+    M = ob.matrix_world.copy()
     ob.parent = None
-    ob.data.transform(ob.matrix_world)
+    for md in list(ob.modifiers):
+        ob.modifiers.remove(md)
+    ob.vertex_groups.clear()
+    ob.data.transform(M)
     ob.matrix_world = Matrix.Identity(4)
     for o in new:
         if o is not ob:
@@ -89,16 +114,25 @@ def import_mesh(path, name):
     ob.name = ob.data.name = name
     for p in ob.data.polygons:
         p.use_smooth = True
-    return ob
+    return ob, joints
 
 
-def _image_of(ob):
-    for m in ob.data.materials:
-        if m and m.node_tree:
-            for n in m.node_tree.nodes:
-                if n.type == "TEX_IMAGE" and n.image:
-                    return n.image
-    return None
+def _image_of(ob, prefer=("color", "basecolor", "base_color", "diffuse", "albedo")):
+    """Farbtextur des Modells (bei mehreren Bildern die mit 'Color' im Namen); fehlt sie (nicht mitgeliefert),
+    ein graues Ersatzbild."""
+    imgs = [n.image for m in ob.data.materials if m and m.node_tree for n in m.node_tree.nodes
+            if n.type == "TEX_IMAGE" and n.image]
+    ok = [im for im in imgs if im.size[0] > 0]
+    for im in ok:
+        nm = (im.name + " " + os.path.basename(im.filepath)).lower()
+        if any(k in nm for k in prefer) and "normal" not in nm:
+            return im
+    if ok:
+        return ok[0]
+    im = bpy.data.images.new("MissingColor", 4, 4)
+    im.pixels = [0.7, 0.7, 0.7, 1.0] * 16
+    print("WARNUNG: Farbtextur fehlt – graues Ersatzbild", flush=True)
+    return im
 
 
 # ------------------------------------------------------------------------------------------------ Material
@@ -161,10 +195,23 @@ def _frame(primary, secondary):
     return Matrix((x, y, z)).transposed()
 
 
-def _seg_dist(P, a, b):
-    ab = b - a
-    t = np.clip(((P - a) @ ab) / max(ab @ ab, 1e-12), 0, 1)
-    return np.linalg.norm(P - (a + t[:, None] * ab), axis=1)
+def _auto_radii(V, segs, height):
+    """Dicke je Glied aus dem Mesh: Punkte, die (absolut) am nächsten an dieser Knochenstrecke liegen und auf
+    ihrem mittleren Teil, davon das 40-%-Quantil des Abstands."""
+    D = np.zeros((len(V), len(segs)))
+    T = np.zeros_like(D)
+    for b, (a, c) in enumerate(segs):
+        ab = c - a
+        t = ((V - a) @ ab) / max(ab @ ab, 1e-12)
+        D[:, b] = np.linalg.norm(V - (a + np.clip(t, 0, 1)[:, None] * ab), axis=1)
+        T[:, b] = t
+    own = np.argmin(D, axis=1)
+    out = []
+    for b in range(len(segs)):
+        m = (own == b) & (T[:, b] > 0.25) & (T[:, b] < 0.75)
+        r = float(np.quantile(D[m, b], 0.4)) if m.sum() > 8 else 0.03 * height
+        out.append(max(r, 0.012 * height))
+    return out
 
 
 def _geodesic_weights(V, E, segs, rads, spans, power=4.0):
@@ -202,15 +249,18 @@ def _geodesic_weights(V, E, segs, rads, spans, power=4.0):
     return W
 
 
-def rig_model(name, path, height, joints, radii, tail=None, n_tail=10, mat_kw=None, outline=0.007):
+def rig_model(name, path, height, joints=None, radii=None, tail=None, n_tail=10, mat_kw=None, outline=0.007):
     """Figur aus einem Tripo-Modell: siehe Moduldoku. Rückgabe: figures.Figure mit .rig, .body_parts,
     .face_objs (leer), .tail_bones (falls Schwanz), .mats."""
     fig = Figure(name, height)
-    ob = import_mesh(path, name + "Body")
+    ob, mixamo = import_mesh(path, name + "Body")
+    joints = joints or mixamo
     img = _image_of(ob)
     c = joints["root"]
-    T = Matrix.Diagonal((height, height, height, 1.0)) @ Matrix.Rotation(math.pi, 4, "Z") @ \
-        Matrix.Translation((-c[0], -c[1], 0.0))
+    zs = np.zeros(len(ob.data.vertices) * 3)
+    ob.data.vertices.foreach_get("co", zs)
+    k = height / float(zs[2::3].max())                 # Modellhöhe (Tripo: ~1) -> Zielhöhe
+    T = Matrix.Diagonal((k, k, k, 1.0)) @ Matrix.Rotation(math.pi, 4, "Z") @ Matrix.Translation((-c[0], -c[1], 0.0))
     ob.data.transform(T)
     Jm = {j: T @ Vector(p) for j, p in joints.items()}
     # ---- Ruhelage mit Modellproportionen, Standardrichtungen (symmetrisch gemittelt)
@@ -255,7 +305,7 @@ def rig_model(name, path, height, joints, radii, tail=None, n_tail=10, mat_kw=No
     tail_pts, tail_r = [], []
     if tail:
         P = np.array([T @ Vector(p[:3]) for p in tail])
-        R = np.array([p[3] for p in tail]) * height
+        R = np.array([p[3] for p in tail]) * k
         s = np.concatenate([[0], np.cumsum(np.linalg.norm(np.diff(P, axis=0), axis=1))])
         u = np.linspace(0, s[-1], n_tail + 1)
         tail_pts = [Vector([np.interp(v, s, P[:, k]) for k in range(3)]) for v in u]
@@ -268,7 +318,9 @@ def rig_model(name, path, height, joints, radii, tail=None, n_tail=10, mat_kw=No
     for j in ORDER:
         names.append(j)
         segs.append((np.array(Jm[j]), np.array(Jm[CHILD[j]])))
-        rads.append(radii[j.split(".")[0]] * height)
+        rads.append(radii[j.split(".")[0]] * k if radii else None)
+    if not radii:
+        rads = _auto_radii(V, segs, height)
     for i in range(len(tail_pts) - 1):
         names.append(f"tail{i}")
         segs.append((np.array(tail_pts[i]), np.array(tail_pts[i + 1])))
@@ -367,3 +419,31 @@ def goku():
     return rig_model("Goku", os.path.join(MODELS, "goku2", "dragon+ball+goku+3d+model.fbx"), 1.75,
                      GOKU_JOINTS, GOKU_RADII,
                      mat_kw=dict(sat=1.2, value=1.08, shade=(0.5, 0.46, 0.62), hair_glow=0.35))
+
+
+# ---- dritte Fassung (Tripo mit Auto-Rig, neutrale Standpose, fein): Gelenke aus dem Mixamo-Skelett
+FREEZER3_TAIL = [
+    (0.038, -0.002, 0.5, 0.029), (0.022, 0.03, 0.452, 0.027), (-0.002, 0.062, 0.408, 0.026),
+    (-0.03, 0.098, 0.38, 0.026), (-0.07, 0.142, 0.356, 0.025), (-0.118, 0.166, 0.34, 0.024), (-0.17, 0.178, 0.332, 0.02),
+    (-0.222, 0.186, 0.312, 0.017), (-0.25, 0.178, 0.264, 0.013), (-0.238, 0.142, 0.22, 0.013),
+    (-0.21, 0.102, 0.196, 0.009), (-0.178, 0.058, 0.18, 0.008)]
+
+
+def goku3():
+    """Son Goku, dritte Tripo-Fassung (Standpose, Mixamo-Rig), 1,75 m."""
+    return rig_model("Goku", os.path.join(MODELS, "goku3", "tripo_convert_9e9f1b26-4f9f-49cc-9e4c-e02278354760.fbx"),
+                     1.75, mat_kw=dict(sat=1.2, value=1.08, shade=(0.5, 0.46, 0.62), hair_glow=0.35))
+
+
+def freezer3():
+    """Freezer, dritte Tripo-Fassung (Standpose, Mixamo-Rig), 1,50 m, Schwanz als 10-gliedrige Kette."""
+    return rig_model("Freezer", os.path.join(MODELS, "freezer3", "tripo_convert_c3ef3e3b-3cd4-4b30-87dd-28ba80182580.fbx"),
+                     1.50, tail=FREEZER3_TAIL, n_tail=10,
+                     mat_kw=dict(sat=1.1, shade=(0.55, 0.52, 0.72), rim=(0.92, 0.88, 1.0)))
+
+
+def freezer4():
+    """Freezer, GLB-Fassung (wie die dritte, aber mit eingebetteter Textur): Standpose, Mixamo-Rig, 1,50 m."""
+    return rig_model("Freezer", os.path.join(MODELS, "freezer4", "friezafinalform3dmodel.glb"), 1.50,
+                     tail=FREEZER3_TAIL, n_tail=10, mat_kw=dict(sat=1.05, shade=(0.58, 0.55, 0.74), rim=(0.92, 0.88, 1.0)),
+                     outline=0.004)

@@ -471,7 +471,7 @@ def stage_fight(G_keys, Z_keys, n, cam_pos):
     if os.environ.get("NIDO_CHARS", "tripo") == "anime":
         G, Z = AC.goku(), AC.freezer()
     else:
-        G, Z = TC.goku(), TC.freezer()
+        G, Z = TC.goku(), TC.freezer4()
     kw = dict(style=choreo.dbz_style, lag_scale=0.35, lean_tau=0.04)
     choreo.bake_fighter(G, G_keys, n, FPS, HITS, cam_pos=cam_pos, look_win=(17.0, 21.0), seed=3, **kw)
     choreo.bake_fighter(Z, Z_keys, n, FPS, HITS, seed=4, **kw)
@@ -840,6 +840,12 @@ def build(args):
     pts, scl = [], []
     avoid = [(x, y, r + 3) for (x, y, r) in houses] + [(DB_C[0], DB_C[1], 5), (SHIP_C[0], SHIP_C[1], 22)]
     avoid += [(P_CRATER[0], P_CRATER[1], 12)] + [(p[0], p[1], 8) for (_, _, p) in shots]
+    # Nahkampf 9,8–13,7 s: keine Bäume in der Sichtlinie Kamera -> Kämpfer (Kronen würden Treffer verdecken)
+    for i in np.where((info["t"] > 9.8) & (info["t"] < 13.7))[0][::3]:
+        mid = (info["G"][i] + info["Z"][i]) / 2
+        for u in np.linspace(0.15, 1.0, 7):
+            q = pos[i] + (mid - pos[i]) * u
+            avoid.append((float(q[0]), float(q[1]), 4.5))
     groves = [(-56, 205, 9, 8), (50, 210, 8, 6), (-6, 270, 6, 4), (-52, 312, 10, 8), (38, 322, 9, 7),
               (62, 240, 7, 5), (-66, 264, 8, 6), (20, 186, 6, 4), (-28, 184, 6, 5), (-4, 334, 6, 4),
               (24, 250, 5, 3), (-16, 226, 4, 3), (26, 286, 6, 4), (-24, 312, 5, 4), (18, 316, 4, 3)]

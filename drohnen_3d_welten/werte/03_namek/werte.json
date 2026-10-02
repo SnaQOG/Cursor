@@ -1,0 +1,2895 @@
+{
+ "video": {
+  "nr": 3,
+  "name": "Dragon Ball – Namek (Goku gegen Freezer)",
+  "datum_final": "2026-10-02",
+  "code_commit": "ef59ba2 (Branch claude/eloquent-archimedes-og1asl)",
+  "welt_modul": "world_dragonball",
+  "datei_master": "drohnen_3d_welten/videos/03_DragonBall_Namek.mp4"
+ },
+ "format.dauer": 20.0,
+ "format.fps": 24,
+ "format.frames": 480,
+ "format.seitenverhaeltnis": "9:16",
+ "format.ausgabe_aufloesung": [
+  1080,
+  1920
+ ],
+ "ablauf.abschnitte": [
+  [
+   0,
+   2.7,
+   "Hook tief über dem Meer, Slalom an zwei Felsnadeln",
+   "26–29"
+  ],
+  [
+   2.7,
+   5.2,
+   "offenes Wasser, ferne Lichtspur-Zusammenstöße über der Kante",
+   "29–31"
+  ],
+  [
+   5.2,
+   7.8,
+   "Steigflug an der Steilwand, über die Kante: Reveal Plateau",
+   "30→10"
+  ],
+  [
+   7.8,
+   10.0,
+   "tief über blaues Gras, Kuppelhäuser, Dragon Balls",
+   "25–32"
+  ],
+  [
+   10.0,
+   13.6,
+   "Nahkampf 12–40 m voraus",
+   "27→1,7"
+  ],
+  [
+   13.6,
+   15.8,
+   "Trennung, Aufladen, Strahlenduell",
+   "26→3"
+  ],
+  [
+   15.8,
+   16.0,
+   "Klimax Explosion über dem Meer",
+   "3"
+  ],
+  [
+   16.0,
+   20.0,
+   "Nachglühen, Rauchsäule, Kamera zieht zurück und steigt",
+   "3,0–3,1"
+  ]
+ ],
+ "ablauf.koordinaten": "+Y Hauptflugrichtung (Süd→Nord), Z oben, Meter",
+ "licht.hauptsonne.hoehe": 19.0,
+ "licht.hauptsonne.azimut": 225.0,
+ "licht.hauptsonne.staerke": 5.0,
+ "licht.hauptsonne.kelvin": 4300,
+ "licht.hauptsonne.winkel": 1.2,
+ "licht.zusatzsonnen": [
+  {
+   "hoehe": 36.0,
+   "azimut": 140.0,
+   "staerke": 1.3,
+   "kelvin": 5600,
+   "winkel": 2.5
+  },
+  {
+   "hoehe": 7.0,
+   "azimut": 16.0,
+   "staerke": 0.7,
+   "kelvin": 4700,
+   "winkel": 1.5
+  }
+ ],
+ "licht.sonnenscheiben": [
+  {
+   "sonne": 1,
+   "radius": 0.9,
+   "staerke": 900.0,
+   "farbe": [
+    1.0,
+    0.95,
+    0.85
+   ]
+  },
+  {
+   "sonne": 2,
+   "radius": 0.6,
+   "staerke": 455.0,
+   "farbe": [
+    1.0,
+    0.96,
+    0.9
+   ]
+  },
+  {
+   "sonne": 3,
+   "radius": 0.6,
+   "staerke": 245.0,
+   "farbe": [
+    1.0,
+    0.96,
+    0.9
+   ]
+  }
+ ],
+ "licht.randlicht": {
+  "hoehe": 18,
+  "azimut": 10,
+  "staerke": 2.6,
+  "kelvin": 7800,
+  "winkel": 3
+ },
+ "licht.toon_richtung": {
+  "sonne": "sun_dir(19, 225)",
+  "rand": "sun_dir(18, 10)"
+ },
+ "himmel.verlauf": [
+  [
+   0.0,
+   [
+    0.8,
+    0.89,
+    0.56
+   ]
+  ],
+  [
+   0.07,
+   [
+    0.5,
+    0.75,
+    0.33
+   ]
+  ],
+  [
+   0.3,
+   [
+    0.19,
+    0.5,
+    0.19
+   ]
+  ],
+  [
+   1.0,
+   [
+    0.06,
+    0.3,
+    0.12
+   ]
+  ]
+ ],
+ "himmel.unter_horizont": [
+  0.52,
+  0.64,
+  0.5
+ ],
+ "himmel.sonnenleuchten": {
+  "exp8": 0.55,
+  "exp64": 1.6,
+  "farbe": [
+   1.0,
+   0.93,
+   0.78
+  ],
+  "sonnen": [
+   1,
+   3
+  ]
+ },
+ "himmel.entsaettigung_diffus": 0.6,
+ "himmel.staerke": 0.8,
+ "wolken.bedeckung": 0.22,
+ "wolken.ref": 1.1,
+ "wolken.farbe": [
+  1.0,
+  1.0,
+  0.86
+ ],
+ "wolken.skala": 1.3,
+ "atmosphaere.dichte": 0.0,
+ "gelaende.hauptform": {
+  "art": "Tafelberg",
+  "mitte": [
+   0.0,
+   250.0
+  ],
+  "radius": 74.0
+ },
+ "gelaende.umriss": "R·(1 + 0,08 sin(3a+1) + 0,05 sin(7a+2) + 0,06 fbm(cos·3, sin·3, 3, seed 21))",
+ "gelaende.plateau": "39,0 + 2,0·fbm(x/40, y/40, 4, seed 22) + 0,4·fbm(x/6, y/6, 3, seed 23)",
+ "gelaende.kante": {
+  "abfall_von": 2.5,
+  "abfall_bis": 6.5,
+  "schuttfuss": "((R+18−r)/18)²·7 − 3"
+ },
+ "gelaende.heightfield": {
+  "groesse": 208.0,
+  "punkte": 400,
+  "fels_unter_z": 30.0
+ },
+ "gelaende.steilwand": {
+  "n_ang": 1500,
+  "n_z": 150,
+  "seed": 5,
+  "lip": [
+   2.0,
+   4.0,
+   6.8
+  ],
+  "base_z": -3.0
+ },
+ "gelaende.felsnadeln": [
+  [
+   -15,
+   52,
+   7.0,
+   46,
+   1,
+   4,
+   -3
+  ],
+  [
+   16,
+   72,
+   8.0,
+   58,
+   2,
+   -3,
+   5
+  ],
+  [
+   -48,
+   20,
+   6.0,
+   30,
+   3,
+   6,
+   2
+  ],
+  [
+   42,
+   18,
+   5.0,
+   24,
+   4,
+   -5,
+   -4
+  ],
+  [
+   -42,
+   110,
+   10.0,
+   52,
+   5,
+   2,
+   6
+  ],
+  [
+   55,
+   128,
+   9.0,
+   40,
+   6,
+   -4,
+   3
+  ],
+  [
+   -95,
+   170,
+   14.0,
+   70,
+   7,
+   3,
+   -2
+  ],
+  [
+   110,
+   200,
+   12.0,
+   60,
+   8,
+   -2,
+   4
+  ],
+  [
+   -150,
+   60,
+   16.0,
+   55,
+   9,
+   5,
+   1
+  ],
+  [
+   140,
+   40,
+   10.0,
+   48,
+   10,
+   -6,
+   -2
+  ],
+  [
+   25,
+   120,
+   4.0,
+   14,
+   11,
+   8,
+   -5
+  ],
+  [
+   -22,
+   150,
+   5.0,
+   20,
+   12,
+   -7,
+   4
+  ]
+ ],
+ "gelaende.felsnadel_mesh": {
+  "hoehe_plus": 4,
+  "seed_plus": 50,
+  "detail": 6,
+  "taper": -0.35,
+  "base_z": -4.0,
+  "lumpy": 0.22,
+  "strata": 0.6,
+  "flute": 0.06,
+  "ledges": 0.03,
+  "bed": [
+   1.8,
+   4.0
+  ],
+  "drehung_z": "seed·2,1 rad"
+ },
+ "gelaende.ferne_felsen": [
+  [
+   -160,
+   470,
+   26,
+   95
+  ],
+  [
+   120,
+   520,
+   20,
+   70
+  ],
+  [
+   -60,
+   640,
+   34,
+   120
+  ],
+  [
+   260,
+   700,
+   30,
+   85
+  ],
+  [
+   -330,
+   820,
+   45,
+   140
+  ],
+  [
+   40,
+   980,
+   55,
+   150
+  ],
+  [
+   420,
+   1050,
+   50,
+   120
+  ],
+  [
+   -620,
+   1150,
+   70,
+   170
+  ]
+ ],
+ "gelaende.inseln": [
+  [
+   -900,
+   1400,
+   260,
+   150
+  ],
+  [
+   800,
+   1700,
+   300,
+   170
+  ]
+ ],
+ "material.fels": {
+  "c1": [
+   0.15,
+   0.1,
+   0.1
+  ],
+  "c2": [
+   0.58,
+   0.4,
+   0.28
+  ],
+  "c3": [
+   0.44,
+   0.31,
+   0.25
+  ],
+  "wet_line": 1.6,
+  "algae": [
+   0.03,
+   0.06,
+   0.05
+  ],
+  "moss": [
+   0.02,
+   0.1,
+   0.28
+  ],
+  "moss_amount": 0.22,
+  "strata_scale": 2.2,
+  "bump": 1.0,
+  "crack_w": 0.15,
+  "scale": 1.5,
+  "lichen": 0.12,
+  "moss_tex": "grasslight-big.jpg",
+  "moss_tex_scale": 4.0,
+  "variation": 0.6,
+  "bedding": 0.45,
+  "bed_h": 2.2,
+  "streak": 0.5
+ },
+ "material.steilwand": {
+  "c2": [
+   0.6,
+   0.42,
+   0.29
+  ],
+  "c3": [
+   0.45,
+   0.32,
+   0.25
+  ],
+  "moss": [
+   0.03,
+   0.08,
+   0.16
+  ],
+  "moss_amount": 0.04,
+  "lichen": 0.1,
+  "variation": 0.4,
+  "bedding": 0.35,
+  "streak": 0.3
+ },
+ "material.boden": {
+  "erde": [
+   [
+    0.08,
+    0.065,
+    0.05
+   ],
+   [
+    0.16,
+    0.13,
+    0.1
+   ]
+  ],
+  "moos": [
+   0.03,
+   0.08,
+   0.16
+  ],
+  "moos_ab": 0.55,
+  "roughness": 0.85,
+  "bump": 0.3
+ },
+ "objekte.haeuser": {
+  "liste": [
+   [
+    -20,
+    204,
+    6.5
+   ],
+   [
+    -36,
+    224,
+    8.0
+   ],
+   [
+    -22,
+    252,
+    5.5
+   ],
+   [
+    -46,
+    252,
+    6.0
+   ],
+   [
+    -28,
+    276,
+    7.5
+   ],
+   [
+    26,
+    204,
+    6.0
+   ],
+   [
+    30,
+    228,
+    5.0
+   ],
+   [
+    -17,
+    300,
+    6.0
+   ],
+   [
+    -44,
+    290,
+    5.0
+   ],
+   [
+    27,
+    300,
+    6.5
+   ]
+  ],
+  "lehm": [
+   0.78,
+   0.79,
+   0.74
+  ],
+  "lehm_dunkel": [
+   0.62,
+   0.64,
+   0.58
+  ],
+  "glas": [
+   0.015,
+   0.03,
+   0.03
+  ],
+  "tuer": [
+   0.03,
+   0.05,
+   0.045
+  ]
+ },
+ "objekte.dragonballs": {
+  "mitte": [
+   1.0,
+   232.0
+  ],
+  "sockel_r": [
+   1.7,
+   1.5
+  ],
+  "kugel_r": 0.2,
+  "ring": 0.8
+ },
+ "objekte.raumschiff": {
+  "ort": [
+   42.0,
+   262.0
+  ],
+  "hoehe_ueber_plateau": 1.5,
+  "radius": 16.0,
+  "rumpf": [
+   0.56,
+   0.53,
+   0.48
+  ],
+  "rumpf_dunkel": [
+   0.3,
+   0.29,
+   0.28
+  ],
+  "rand_streifen": 48,
+  "fenster_emission": [
+   [
+    1.0,
+    0.3,
+    0.2
+   ],
+   1.2
+  ]
+ },
+ "wasser.kacheln": {
+  "start": [
+   -140.0,
+   -40.0
+  ],
+  "nx": 3,
+  "ny": 5,
+  "kachel": 100.0
+ },
+ "wasser.wellen": {
+  "res": 13,
+  "wind": 6.5,
+  "wave_scale": 0.7,
+  "chop": 1.1,
+  "richtung": 60,
+  "alignment": 0.3,
+  "foam_coverage": 0.1
+ },
+ "wasser.material": {
+  "deep": [
+   0.004,
+   0.032,
+   0.03
+  ],
+  "shallow": [
+   0.025,
+   0.14,
+   0.11
+  ],
+  "foam_amount": 0.4,
+  "view_dark": 0.5,
+  "micro": 0.6
+ },
+ "wasser.brandung": {
+  "bereich": [
+   -200,
+   -100,
+   200,
+   420
+  ],
+  "zelle": 0.5
+ },
+ "baum.varianten": [
+  [
+   12.0,
+   2.8,
+   0.8
+  ],
+  [
+   15.0,
+   3.3,
+   1.0
+  ],
+  [
+   9.0,
+   2.3,
+   0.6
+  ],
+  [
+   17.0,
+   3.6,
+   1.1
+  ]
+ ],
+ "baum.material": {
+  "blatt_c1": [
+   0.004,
+   0.045,
+   0.3
+  ],
+  "blatt_c2": [
+   0.03,
+   0.12,
+   0.5
+  ],
+  "trans": 0.3,
+  "rinde": [
+   0.42,
+   0.33,
+   0.18
+  ],
+  "leaf_size": 0.36,
+  "leaves": "900·cr²/4"
+ },
+ "baum.haine": [
+  [
+   -56,
+   205,
+   9,
+   8
+  ],
+  [
+   50,
+   210,
+   8,
+   6
+  ],
+  [
+   -6,
+   270,
+   6,
+   4
+  ],
+  [
+   -52,
+   312,
+   10,
+   8
+  ],
+  [
+   38,
+   322,
+   9,
+   7
+  ],
+  [
+   62,
+   240,
+   7,
+   5
+  ],
+  [
+   -66,
+   264,
+   8,
+   6
+  ],
+  [
+   20,
+   186,
+   6,
+   4
+  ],
+  [
+   -28,
+   184,
+   6,
+   5
+  ],
+  [
+   -4,
+   334,
+   6,
+   4
+  ],
+  [
+   24,
+   250,
+   5,
+   3
+  ],
+  [
+   -16,
+   226,
+   4,
+   3
+  ],
+  [
+   26,
+   286,
+   6,
+   4
+  ],
+  [
+   -24,
+   312,
+   5,
+   4
+  ],
+  [
+   18,
+   316,
+   4,
+   3
+  ]
+ ],
+ "baum.abstaende": {
+  "haus": "r+3",
+  "dragonballs": 5,
+  "schiff": 22,
+  "krater": 12,
+  "strahlkrater": 8,
+  "weg": 9,
+  "kante": 9
+ },
+ "baum.sichtlinie": {
+  "von": 9.8,
+  "bis": 13.7,
+  "radius": 8.5,
+  "jeder_n_frame": 3,
+  "punkte": 7
+ },
+ "findlinge": {
+  "versuche": 45,
+  "r": [
+   0.6,
+   2.4
+  ],
+  "abstand_weg": 5,
+  "abstand_kante": 8
+ },
+ "sandflecken": {
+  "anzahl": 30,
+  "rx": [
+   1.5,
+   6.0
+  ],
+  "ry_faktor": [
+   0.45,
+   0.9
+  ],
+  "kantenabstand": "rx+8"
+ },
+ "pilze": {
+  "gruppen": 50,
+  "seitlich": [
+   2.5,
+   14
+  ],
+  "y_bereich": [
+   190,
+   318
+  ]
+ },
+ "gras.feld": {
+  "y": [
+   176,
+   330
+  ],
+  "kante_min": 7.5,
+  "dichte": [
+   360.0,
+   170.0,
+   8.0
+  ],
+  "band": 30.0,
+  "clump": 0.6,
+  "max_halme": 2200000,
+  "hoehe": [
+   0.1,
+   0.42
+  ]
+ },
+ "gras.farben": {
+  "basis": [
+   [
+    0.008,
+    0.035,
+    0.13
+   ],
+   [
+    0.014,
+    0.055,
+    0.19
+   ]
+  ],
+  "spitze": [
+   [
+    0.035,
+    0.16,
+    0.44
+   ],
+   [
+    0.07,
+    0.25,
+    0.56
+   ]
+  ],
+  "bueschel": [
+   [
+    0.05,
+    0.22,
+    0.4
+   ],
+   [
+    0.1,
+    0.2,
+    0.52
+   ]
+  ]
+ },
+ "gras.aussparungen": {
+  "haus": "r·0,95",
+  "dragonballs": 1.7,
+  "schiff": 17.5,
+  "findlinge": "r·1,2",
+  "sand": "min(rx,ry)·0,7"
+ },
+ "gras.bewegung": {
+  "wind": 0.35,
+  "boeen": [
+   0.9,
+   0.35
+  ],
+  "sway": 0.28
+ },
+ "gras.druckwellen": [
+  [
+   1.0,
+   273.0,
+   10.0,
+   45.0,
+   0.35,
+   1.5
+  ],
+  [
+   3.0,
+   278.5,
+   12.15,
+   38.0,
+   0.9,
+   2.0
+  ],
+  [
+   "Strahlkrater",
+   null,
+   null,
+   30.0,
+   0.55,
+   1.5
+  ],
+  [
+   0.5,
+   369.0,
+   15.8,
+   75.0,
+   1.0,
+   4.0
+  ]
+ ],
+ "gras.brennen": 1.15,
+ "kamera.brennweite": 28.0,
+ "kamera.sensor": {
+  "fit": "VERTICAL",
+  "hoehe_mm": 36.0
+ },
+ "kamera.wegpunkte": [
+  {
+   "t": 0.0,
+   "pos": [
+    -2.0,
+    0.0,
+    3.4
+   ]
+  },
+  {
+   "t": 1.0,
+   "pos": [
+    -3.0,
+    26.0,
+    2.8
+   ]
+  },
+  {
+   "t": 1.9,
+   "pos": [
+    -4.2,
+    50.0,
+    2.6
+   ]
+  },
+  {
+   "t": 2.65,
+   "pos": [
+    3.4,
+    70.0,
+    3.0
+   ]
+  },
+  {
+   "t": 3.5,
+   "pos": [
+    2.0,
+    95.0,
+    3.4
+   ]
+  },
+  {
+   "t": 4.45,
+   "pos": [
+    -2.0,
+    124.0,
+    4.0
+   ]
+  },
+  {
+   "t": 5.15,
+   "pos": [
+    -3.0,
+    143.0,
+    5.0
+   ]
+  },
+  {
+   "t": 5.7,
+   "pos": [
+    -3.5,
+    155.5,
+    12.5
+   ]
+  },
+  {
+   "t": 6.25,
+   "pos": [
+    -3.5,
+    162.5,
+    26.5
+   ]
+  },
+  {
+   "t": 6.8,
+   "pos": [
+    -3.5,
+    166.5,
+    37.5
+   ]
+  },
+  {
+   "t": 7.3,
+   "pos": [
+    -3.3,
+    173.0,
+    43.52
+   ]
+  },
+  {
+   "t": 7.85,
+   "pos": [
+    -3.0,
+    179.5,
+    42.8
+   ]
+  },
+  {
+   "t": 8.45,
+   "pos": [
+    0.0,
+    195.5,
+    42.09
+   ]
+  },
+  {
+   "t": 9.05,
+   "pos": [
+    3.5,
+    213.0,
+    41.97
+   ]
+  },
+  {
+   "t": 9.55,
+   "pos": [
+    4.6,
+    229.0,
+    42.58
+   ]
+  },
+  {
+   "t": 10.0,
+   "pos": [
+    5.5,
+    242.5,
+    42.64
+   ]
+  },
+  {
+   "t": 10.6,
+   "pos": [
+    6.5,
+    256.5,
+    43.63
+   ]
+  },
+  {
+   "t": 11.3,
+   "pos": [
+    7.5,
+    263.5,
+    44.18
+   ]
+  },
+  {
+   "t": 12.1,
+   "pos": [
+    8.0,
+    266.5,
+    44.63
+   ]
+  },
+  {
+   "t": 12.9,
+   "pos": [
+    9.5,
+    266.0,
+    45.48
+   ]
+  },
+  {
+   "t": 13.6,
+   "pos": [
+    7.0,
+    281.0,
+    45.07
+   ]
+  },
+  {
+   "t": 14.4,
+   "pos": [
+    4.8,
+    301.0,
+    45.41
+   ]
+  },
+  {
+   "t": 15.1,
+   "pos": [
+    2.8,
+    314.0,
+    45.82
+   ]
+  },
+  {
+   "t": 15.8,
+   "pos": [
+    2.5,
+    316.8,
+    45.96
+   ]
+  },
+  {
+   "t": 16.4,
+   "pos": [
+    3.0,
+    315.2,
+    46.56
+   ]
+  },
+  {
+   "t": 20.05,
+   "pos": [
+    6.0,
+    305.5,
+    51.33
+   ]
+  }
+ ],
+ "kamera.tempo": [
+  [
+   0.0,
+   26.0
+  ],
+  [
+   0.5,
+   25.9
+  ],
+  [
+   1.0,
+   26.4
+  ],
+  [
+   1.5,
+   26.7
+  ],
+  [
+   2.0,
+   28.1
+  ],
+  [
+   2.5,
+   29.1
+  ],
+  [
+   3.0,
+   29.4
+  ],
+  [
+   3.5,
+   30.2
+  ],
+  [
+   4.0,
+   31.4
+  ],
+  [
+   4.5,
+   28.5
+  ],
+  [
+   5.0,
+   26.8
+  ],
+  [
+   5.5,
+   26.7
+  ],
+  [
+   6.0,
+   29.7
+  ],
+  [
+   6.5,
+   21.3
+  ],
+  [
+   7.0,
+   18.9
+  ],
+  [
+   7.5,
+   10.4
+  ],
+  [
+   8.0,
+   24.8
+  ],
+  [
+   8.5,
+   28.7
+  ],
+  [
+   9.0,
+   30.8
+  ],
+  [
+   9.5,
+   31.6
+  ],
+  [
+   10.0,
+   26.9
+  ],
+  [
+   10.5,
+   18.8
+  ],
+  [
+   11.0,
+   9.6
+  ],
+  [
+   11.5,
+   4.6
+  ],
+  [
+   12.0,
+   3.0
+  ],
+  [
+   12.5,
+   1.7
+  ],
+  [
+   13.0,
+   12.9
+  ],
+  [
+   13.5,
+   26.5
+  ],
+  [
+   14.0,
+   26.5
+  ],
+  [
+   14.5,
+   22.8
+  ],
+  [
+   15.0,
+   12.2
+  ],
+  [
+   15.5,
+   3.4
+  ],
+  [
+   16.0,
+   3.0
+  ],
+  [
+   16.5,
+   3.0
+  ],
+  [
+   17.0,
+   3.1
+  ],
+  [
+   17.5,
+   3.1
+  ],
+  [
+   18.0,
+   3.1
+  ],
+  [
+   18.5,
+   3.1
+  ],
+  [
+   19.0,
+   3.1
+  ],
+  [
+   19.5,
+   3.1
+  ],
+  [
+   20.0,
+   3.1
+  ]
+ ],
+ "kamera.halte": [
+  [
+   12.15,
+   3
+  ],
+  [
+   15.8,
+   3
+  ]
+ ],
+ "kamera.ausrichtung": {
+  "look_pitch": -3.0,
+  "pitch_follow": 0.45,
+  "bank_gain": 1.0,
+  "max_bank": 32,
+  "micro": 1.0,
+  "seed": 13
+ },
+ "kamera.pitch_overrides": [
+  [
+   -1.5,
+   2.2,
+   5.0
+  ],
+  [
+   5.4,
+   7.5,
+   12.0
+  ]
+ ],
+ "kamera.blickgewicht": [
+  [
+   0.0,
+   0.0
+  ],
+  [
+   5.0,
+   0.0
+  ],
+  [
+   7.3,
+   0.0
+  ],
+  [
+   8.4,
+   0.25
+  ],
+  [
+   9.4,
+   0.5
+  ],
+  [
+   10.0,
+   0.85
+  ],
+  [
+   10.4,
+   1.0
+  ],
+  [
+   21.0,
+   1.0
+  ]
+ ],
+ "kamera.blickziele": [
+  {
+   "phase": "Kämpferpaar",
+   "gewicht": 0.5,
+   "nach": "Winkel"
+  },
+  {
+   "phase": "Krater",
+   "von": [
+    12.0,
+    12.25
+   ],
+   "bis": [
+    12.8,
+    13.0
+   ],
+   "gewicht": 0.62
+  },
+  {
+   "phase": "Todesstrahlen",
+   "von": [
+    12.85,
+    13.05
+   ],
+   "bis": [
+    13.5,
+    13.75
+   ],
+   "gewicht": [
+    0.42,
+    0.3
+   ]
+  },
+  {
+   "phase": "Duell",
+   "von": [
+    13.6,
+    14.3
+   ],
+   "gewicht": 0.5
+  },
+  {
+   "phase": "Ende Goku + Rauchsäule (z+7)",
+   "von": [
+    16.2,
+    17.6
+   ],
+   "gewicht": 0.45
+  }
+ ],
+ "kamera.glaettung_ziele": 0.12,
+ "kamera.stoesse": {
+  "liste": [
+   [
+    10.0,
+    1.2,
+    6
+   ],
+   [
+    10.28,
+    0.35,
+    3
+   ],
+   [
+    10.42,
+    0.35,
+    3
+   ],
+   [
+    10.56,
+    0.35,
+    3
+   ],
+   [
+    10.7,
+    0.35,
+    3
+   ],
+   [
+    10.84,
+    0.35,
+    3
+   ],
+   [
+    10.98,
+    0.35,
+    3
+   ],
+   [
+    11.11,
+    0.7,
+    5
+   ],
+   [
+    11.47,
+    1.1,
+    6
+   ],
+   [
+    11.95,
+    1.0,
+    6
+   ],
+   [
+    12.15,
+    2.4,
+    9
+   ],
+   [
+    13.2,
+    1.0,
+    6
+   ],
+   [
+    13.45,
+    1.0,
+    6
+   ],
+   [
+    15.05,
+    0.7,
+    8
+   ],
+   [
+    15.8,
+    3.6,
+    12
+   ],
+   [
+    16.35,
+    1.3,
+    10
+   ]
+  ],
+  "seed": 78,
+  "pos_amp": 0.03
+ },
+ "figur.goku.modell": "assets/models/dragonball/goku5/gokuactionfigure3dmodel_repariert.glb (Tripo GLB, repariert)",
+ "figur.freezer.modell": "assets/models/dragonball/freezer4/friezafinalform3dmodel.glb (Tripo GLB)",
+ "figur.goku.hoehe": 1.75,
+ "figur.freezer.hoehe": 1.5,
+ "figur.goku.gelenke": "Mixamo",
+ "figur.freezer.gelenke": "Mixamo",
+ "figur.goku.schwanz": null,
+ "figur.freezer.schwanz": {
+  "mittellinie": "FREEZER3_TAIL (12 Punkte)",
+  "glieder": 10
+ },
+ "figur.goku.material": {
+  "sat": 1.12,
+  "value": 1.04,
+  "shade": [
+   0.52,
+   0.48,
+   0.64
+  ],
+  "hair_glow": 0.25,
+  "lit": 1.0,
+  "mid": 0.8,
+  "bands": [
+   -0.1,
+   0.35
+  ],
+  "tint_lit": [
+   1.0,
+   0.96,
+   0.9
+  ],
+  "rim": [
+   1.0,
+   0.97,
+   0.9
+  ],
+  "rim_w": 0.4,
+  "diffuse_mix": 0.14
+ },
+ "figur.freezer.material": {
+  "sat": 1.05,
+  "shade": [
+   0.58,
+   0.55,
+   0.74
+  ],
+  "rim": [
+   0.92,
+   0.88,
+   1.0
+  ],
+  "lit": 1.0,
+  "mid": 0.8,
+  "bands": [
+   -0.1,
+   0.35
+  ],
+  "tint_lit": [
+   1.0,
+   0.96,
+   0.9
+  ],
+  "rim_w": 0.4,
+  "diffuse_mix": 0.14
+ },
+ "figur.goku.kontur": 0.004,
+ "figur.freezer.kontur": 0.004,
+ "figur.goku.gewichte": {
+  "smooth": 3,
+  "power": 4.0,
+  "naehte_verschweisst": false
+ },
+ "figur.freezer.gewichte": {
+  "smooth": 3,
+  "power": 4.0,
+  "naehte_verschweisst": false
+ },
+ "figur.backen": {
+  "style": "dbz_style",
+  "lag_scale": 0.35,
+  "lean_tau": 0.04,
+  "seed_goku": 3,
+  "seed_freezer": 4,
+  "look_win_goku": [
+   17.0,
+   21.0
+  ]
+ },
+ "figur.schwanz_peitsche": {
+  "whips": [
+   [
+    11.11,
+    60.0
+   ]
+  ],
+  "sway": 9.0
+ },
+ "figur.aura": {
+  "farbe": [
+   1.0,
+   0.62,
+   0.1
+  ],
+  "von_s": 9.4,
+  "bis_s": 17.8,
+  "hoehe": 1.95,
+  "breite": 0.95,
+  "licht": 250.0,
+  "opacity": 0.25,
+  "edge_w": 0.1,
+  "strength": 0.6
+ },
+ "figur.verschwinden": {
+  "wer": "Freezer",
+  "frames": [
+   "F(15,8)+1: 1,0",
+   "F(15,8)+2: 0,001"
+  ]
+ },
+ "figur.mimik": "keine (Gesicht in der Tripo-Textur)",
+ "kampf.brusthoehe": 1.2,
+ "kampf.stil": {
+  "angriff": [
+   0.09,
+   0.0,
+   0.22
+  ],
+  "ausholen": [
+   0.11,
+   0.0,
+   0.1
+  ],
+  "reaktion": [
+   0.07,
+   0.0,
+   0.25
+  ],
+  "abwehr": [
+   0.08,
+   0.0,
+   0.18
+  ],
+  "flug": [
+   0.12,
+   0.0,
+   0.06
+  ],
+  "aufladen": [
+   0.3,
+   0.1,
+   0.06
+  ],
+  "sonst": [
+   0.2,
+   0.0,
+   0.08
+  ]
+ },
+ "kampf.bahnprofile": [
+  "lin",
+  "in",
+  "out"
+ ],
+ "kampf.hitstops": [
+  [
+   10.0,
+   3
+  ],
+  [
+   10.28,
+   1
+  ],
+  [
+   10.42,
+   1
+  ],
+  [
+   10.56,
+   1
+  ],
+  [
+   10.7,
+   1
+  ],
+  [
+   10.84,
+   1
+  ],
+  [
+   10.98,
+   1
+  ],
+  [
+   11.11,
+   2
+  ],
+  [
+   11.47,
+   3
+  ],
+  [
+   11.95,
+   3
+  ],
+  [
+   12.15,
+   4
+  ],
+  [
+   15.8,
+   4
+  ]
+ ],
+ "kampf.teaser": [
+  [
+   2.3,
+   [
+    -6,
+    262,
+    70
+   ],
+   [
+    1,
+    0.2,
+    0
+   ]
+  ],
+  [
+   4.6,
+   [
+    6,
+    280,
+    66
+   ],
+   [
+    -1,
+    0.3,
+    0.1
+   ]
+  ],
+  [
+   7.6,
+   [
+    -2,
+    300,
+    62
+   ],
+   [
+    1,
+    -0.2,
+    -0.1
+   ]
+  ],
+  [
+   8.8,
+   [
+    4,
+    294,
+    58
+   ],
+   [
+    1,
+    -0.15,
+    0.1
+   ]
+  ]
+ ],
+ "kampf.vorstoss": {
+  "goku": [
+   -9.0,
+   282.0,
+   53.0
+  ],
+  "freezer": [
+   13.5,
+   284.0,
+   52.0
+  ],
+  "t": 9.62,
+  "tempo_ms": 45
+ },
+ "kampf.zusammenprall": {
+  "t": 10.0,
+  "ort": [
+   1.0,
+   273.0,
+   45.5
+  ]
+ },
+ "kampf.schlaghagel": {
+  "wechsel": [
+   [
+    10.28,
+    "G",
+    "d_punch_R"
+   ],
+   [
+    10.42,
+    "Z",
+    "d_punch_R"
+   ],
+   [
+    10.56,
+    "G",
+    "d_kick_R"
+   ],
+   [
+    10.7,
+    "Z",
+    "d_kick_L"
+   ],
+   [
+    10.84,
+    "G",
+    "d_punch_L"
+   ],
+   [
+    10.98,
+    "Z",
+    "d_punch_L"
+   ]
+  ],
+  "ausholen_vorlauf": 0.07,
+  "achse_grad": [
+   8.5,
+   50.0
+  ],
+  "ende": [
+   1.6,
+   275.2,
+   45.8
+  ]
+ },
+ "kampf.aktionen": {
+  "schwanzhieb": 11.11,
+  "drehung": [
+   11.02,
+   11.2,
+   360
+  ],
+  "knie": 11.47,
+  "doppelfaust": 11.95,
+  "einschlag": 12.15,
+  "krater": [
+   3.0,
+   278.5
+  ],
+  "ausbruch": 12.8
+ },
+ "kampf.zanzoken": [
+  {
+   "wer": "G",
+   "weg_bis_wieder": [
+    11.53,
+    11.75
+   ],
+   "frame_weg": 280,
+   "frame_wieder": 283,
+   "von": [
+    1.6,
+    275.2,
+    46.15
+   ],
+   "nach": [
+    4.04,
+    278.1,
+    49.85
+   ]
+  },
+  {
+   "wer": "G",
+   "weg_bis_wieder": [
+    13.15,
+    13.27
+   ],
+   "frame_weg": 317,
+   "frame_wieder": 320,
+   "von": [
+    -2.5,
+    272.5,
+    42.3
+   ],
+   "nach": [
+    -6.0,
+    274.5,
+    45.2
+   ]
+  }
+ ],
+ "kampf.strahlen": {
+  "zeiten": [
+   13.15,
+   13.4
+  ],
+  "freezer": [
+   [
+    -1.3,
+    276.0,
+    48.8
+   ],
+   [
+    -1.0,
+    276.3,
+    49.2
+   ]
+  ],
+  "goku": [
+   [
+    -2.5,
+    272.5,
+    42.3
+   ],
+   [
+    -6.0,
+    274.5,
+    45.2
+   ]
+  ],
+  "einschlaege": [
+   {
+    "t": 13.15,
+    "von": [
+     -1.3,
+     276.0,
+     48.8
+    ],
+    "einschlag": [
+     -3.08,
+     270.8,
+     39.14
+    ]
+   },
+   {
+    "t": 13.4,
+    "von": [
+     -1.0,
+     276.3,
+     49.2
+    ],
+    "einschlag": [
+     -9.48,
+     273.25,
+     38.68
+    ]
+   }
+  ]
+ },
+ "kampf.trennung": {
+  "zeit": [
+   13.6,
+   14.3
+  ],
+  "goku": [
+   -0.5,
+   323.2,
+   43.9
+  ],
+  "freezer": [
+   0.5,
+   369.0,
+   36.0
+  ],
+  "tempo_ms": [
+   70,
+   130
+  ]
+ },
+ "kampf.duell": {
+  "aufladen": [
+   14.45,
+   14.95
+  ],
+  "start": 15.05,
+  "klimax": 15.8
+ },
+ "kampf.posen": "axe_up, axe_down, hover, slam, d_wind_R, d_punch_R, d_kick_wind_R, d_kick_R, block, dash, knee_R, gut_hit, tail_whip (+ _L); Winkel im Code",
+ "kampf.schluessel": "siehe kampfplan_und_kamera.json",
+ "fx.farben": {
+  "gold": [
+   1.0,
+   0.62,
+   0.1
+  ],
+  "kame": [
+   0.1,
+   0.36,
+   1.0
+  ],
+  "death": [
+   0.85,
+   0.25,
+   1.0
+  ],
+  "ki": [
+   1.0,
+   0.8,
+   0.28
+  ],
+  "spur_goku": [
+   1.0,
+   0.78,
+   0.25
+  ],
+  "spur_freezer": [
+   0.78,
+   0.32,
+   1.0
+  ]
+ },
+ "fx.kispur": {
+  "tail_s": 0.16,
+  "center_z": 0.95,
+  "strength": 6.0,
+  "kern": 0.32,
+  "ereignisse": [
+   {
+    "wer": "G",
+    "t0": 1.9699999999999998,
+    "t1": 2.55,
+    "radius": 0.45
+   },
+   {
+    "wer": "Z",
+    "t0": 1.9699999999999998,
+    "t1": 2.55,
+    "radius": 0.45
+   },
+   {
+    "wer": "G",
+    "t0": 4.27,
+    "t1": 4.85,
+    "radius": 0.45
+   },
+   {
+    "wer": "Z",
+    "t0": 4.27,
+    "t1": 4.85,
+    "radius": 0.45
+   },
+   {
+    "wer": "G",
+    "t0": 7.27,
+    "t1": 7.85,
+    "radius": 0.45
+   },
+   {
+    "wer": "Z",
+    "t0": 7.27,
+    "t1": 7.85,
+    "radius": 0.45
+   },
+   {
+    "wer": "G",
+    "t0": 8.47,
+    "t1": 9.05,
+    "radius": 0.45
+   },
+   {
+    "wer": "Z",
+    "t0": 8.47,
+    "t1": 9.05,
+    "radius": 0.45
+   },
+   {
+    "wer": "G",
+    "t0": 9.6,
+    "t1": 10.02,
+    "radius": 0.22
+   },
+   {
+    "wer": "Z",
+    "t0": 9.6,
+    "t1": 10.02,
+    "radius": 0.22
+   },
+   {
+    "wer": "G",
+    "t0": 11.12,
+    "t1": 11.32,
+    "radius": 0.2
+   },
+   {
+    "wer": "G",
+    "t0": 11.3,
+    "t1": 11.49,
+    "radius": 0.2
+   },
+   {
+    "wer": "Z",
+    "t0": 11.57,
+    "t1": 11.72,
+    "radius": 0.2
+   },
+   {
+    "wer": "Z",
+    "t0": 12.05,
+    "t1": 12.17,
+    "radius": 0.24
+   },
+   {
+    "wer": "Z",
+    "t0": 12.8,
+    "t1": 13.0,
+    "radius": 0.26
+   },
+   {
+    "wer": "G",
+    "t0": 13.36,
+    "t1": 13.5,
+    "radius": 0.18
+   },
+   {
+    "wer": "Z",
+    "t0": 13.58,
+    "t1": 14.34,
+    "radius": 0.28
+   },
+   {
+    "wer": "G",
+    "t0": 13.54,
+    "t1": 14.3,
+    "radius": 0.24
+   }
+  ]
+ },
+ "fx.zanzoken": {
+  "flicker": [
+   0.95,
+   0.35,
+   0.85,
+   0.2,
+   0.7,
+   0.12,
+   0.5,
+   0.06,
+   0.3,
+   0.0
+  ],
+  "ring_weg": 1.4,
+  "ring_auf": 1.8
+ },
+ "fx.treffer": {
+  "clash": [
+   3.2,
+   9000.0,
+   110,
+   0.0
+  ],
+  "flurry": [
+   0.9,
+   1500.0,
+   40,
+   1.6
+  ],
+  "whip": [
+   1.4,
+   3000.0,
+   60,
+   2.2
+  ],
+  "knee": [
+   1.6,
+   6000.0,
+   110,
+   4.0
+  ],
+  "axe": [
+   1.6,
+   6000.0,
+   110,
+   3.0
+  ],
+  "dauer": [
+   9,
+   6
+  ],
+  "core_k": [
+   1.0,
+   0.5
+  ],
+  "funken_tempo": [
+   6,
+   14
+  ],
+  "funken_leben": [
+   0.15,
+   0.45
+  ],
+  "ereignisse": [
+   {
+    "t": 10.0,
+    "ort": [
+     1.0,
+     273.0,
+     45.5
+    ],
+    "art": "clash",
+    "achse": [
+     0.989,
+     0.148,
+     0.0
+    ]
+   },
+   {
+    "t": 10.28,
+    "ort": [
+     1.31,
+     273.42,
+     45.85
+    ],
+    "art": "flurry",
+    "achse": [
+     0.96,
+     0.265,
+     0.092
+    ]
+   },
+   {
+    "t": 10.42,
+    "ort": [
+     1.0,
+     273.65,
+     45.86
+    ],
+    "art": "flurry",
+    "achse": [
+     0.923,
+     0.379,
+     0.072
+    ]
+   },
+   {
+    "t": 10.56,
+    "ort": [
+     1.49,
+     274.21,
+     45.92
+    ],
+    "art": "flurry",
+    "achse": [
+     0.872,
+     0.488,
+     -0.035
+    ]
+   },
+   {
+    "t": 10.7,
+    "ort": [
+     1.22,
+     274.34,
+     46.0
+    ],
+    "art": "flurry",
+    "achse": [
+     0.803,
+     0.587,
+     -0.099
+    ]
+   },
+   {
+    "t": 10.84,
+    "ort": [
+     1.66,
+     274.98,
+     46.02
+    ],
+    "art": "flurry",
+    "achse": [
+     0.73,
+     0.682,
+     -0.043
+    ]
+   },
+   {
+    "t": 10.98,
+    "ort": [
+     1.46,
+     275.03,
+     46.07
+    ],
+    "art": "flurry",
+    "achse": [
+     0.641,
+     0.764,
+     0.066
+    ]
+   },
+   {
+    "t": 11.11,
+    "ort": [
+     1.31,
+     274.86,
+     45.62
+    ],
+    "art": "whip",
+    "achse": [
+     0.641,
+     0.764,
+     0.066
+    ]
+   },
+   {
+    "t": 11.47,
+    "ort": [
+     1.88,
+     275.53,
+     45.98
+    ],
+    "art": "knee",
+    "achse": [
+     0.641,
+     0.764,
+     0.066
+    ]
+   },
+   {
+    "t": 11.95,
+    "ort": [
+     4.26,
+     278.37,
+     47.92
+    ],
+    "art": "axe",
+    "achse": [
+     0.0,
+     0.0,
+     -1.0
+    ]
+   }
+  ]
+ },
+ "fx.teaser_blitze": {
+  "r": 11.0,
+  "dauer": 12,
+  "licht": 90000.0,
+  "core_s": 25.0,
+  "glow_s": 6.0,
+  "glow_alpha": 0.35
+ },
+ "fx.druckwellen": {
+  "zusammenprall": [
+   9.0,
+   10,
+   0.12,
+   2.0
+  ],
+  "einschlag": [
+   16.0,
+   12,
+   0.18,
+   2.0
+  ],
+  "explosion_luft": [
+   60.0,
+   20,
+   0.5,
+   2.5
+  ],
+  "explosion_wasser": [
+   70.0,
+   26,
+   0.15,
+   0.25
+  ],
+  "ior_standard": 1.04,
+  "ior_luftringe": 1.0
+ },
+ "fx.einschlag": {
+  "krater_r": 3.2,
+  "abkuehlen_s": 3.2,
+  "strahlkrater_r": 2.1,
+  "burst": [
+   4.5,
+   14,
+   40000.0
+  ],
+  "staub": 1400,
+  "funken": 200,
+  "bruchstuecke": 16,
+  "platte": [
+   2.3,
+   0.45
+  ],
+  "sim_frames": 60,
+  "impuls": 38000.0,
+  "austritt_staub": 500,
+  "austritt_ring": 4.0
+ },
+ "fx.strahlen": {
+  "ladekugel_r": 0.09,
+  "radius": 0.18,
+  "licht": 4000.0,
+  "frames": "F(t) → +2 → +7",
+  "einschlag_burst": [
+   4.0,
+   16,
+   35000.0
+  ],
+  "staub": 900,
+  "brocken": [
+   12,
+   12.0
+  ]
+ },
+ "fx.duell": {
+  "ladung_goku": [
+   0.34,
+   600.0
+  ],
+  "ladung_freezer": [
+   0.22,
+   500.0
+  ],
+  "kame": {
+   "r": 0.95,
+   "kern": 0.3,
+   "licht": 5000.0,
+   "wobble": 0.12
+  },
+  "death": {
+   "r": 0.55,
+   "licht": 12000.0,
+   "wobble": 0.15
+  },
+  "treffpunkt": 0.55,
+  "pendel": [
+   [
+    0.25,
+    "Lc"
+   ],
+   [
+    0.45,
+    "Lc−3"
+   ],
+   [
+    0.6,
+    "Lc+2"
+   ],
+   [
+    0.75,
+    "Lc−1,5"
+   ]
+  ],
+  "kugel": [
+   2.0,
+   30000.0
+  ],
+  "boegen": [
+   10,
+   4.5
+  ],
+  "aufeinandertreffen": [
+   6.0,
+   90000.0
+  ]
+ },
+ "fx.explosion": {
+  "blitz_r": 7.0,
+  "feuer_r": 8.0,
+  "rauch_r": 9.0,
+  "steigen": 14.0,
+  "dauer_s": 4.4,
+  "fire": 14.0,
+  "licht": [
+   [
+    0,
+    900000.0
+   ],
+   [
+    4,
+    600000.0
+   ],
+   [
+    14,
+    220000.0
+   ],
+   [
+    40,
+    60000.0
+   ],
+   [
+    "20,2 s",
+    20000.0
+   ]
+  ],
+  "lichtfarbe": [
+   [
+    0,
+    [
+     1.0,
+     0.62,
+     0.3
+    ]
+   ],
+   [
+    18,
+    [
+     1.0,
+     0.7,
+     0.45
+    ]
+   ],
+   [
+    44,
+    [
+     0.72,
+     0.8,
+     1.0
+    ]
+   ]
+  ],
+  "funken": [
+   500,
+   [
+    15,
+    35
+   ]
+  ],
+  "gischt": [
+   2500,
+   30.0,
+   9.0,
+   3.2
+  ]
+ },
+ "fx.sicherheit": {
+  "burst_ausblenden": true,
+  "transparent_bounces": 16,
+  "ringe_ior": 1.0
+ },
+ "render.aufloesung": {
+  "final": [
+   720,
+   1280
+  ],
+  "vorschau": [
+   270,
+   480
+  ],
+  "standbild": [
+   540,
+   960
+  ]
+ },
+ "render.samples": {
+  "final": 32,
+  "vorschau": 6,
+  "standbild": 10
+ },
+ "render.adaptiv": 0.04,
+ "render.denoiser": "OpenImageDenoise, Albedo+Normal, ACCURATE",
+ "render.bounces": {
+  "max": 4,
+  "diffus": 2,
+  "glossy": 2,
+  "transmission": 6,
+  "volumen": 0,
+  "transparent": 16
+ },
+ "render.clamp": 6.0,
+ "render.blur_glossy": 1.0,
+ "render.light_tree": true,
+ "render.persistent": true,
+ "render.volumen": {
+  "step_rate": 2.0,
+  "max_steps": 128
+ },
+ "render.motion_blur": {
+  "an": true,
+  "shutter": 0.5
+ },
+ "render.filter": [
+  "BLACKMAN_HARRIS",
+  1.5
+ ],
+ "render.paesse": {
+  "paesse": [
+   "Combined",
+   "Mist",
+   "Environment"
+  ],
+  "mist_tiefe": 6000.0,
+  "film_transparent": true
+ },
+ "render.seed": {
+  "seed": 7,
+  "animiert": false
+ },
+ "post.dunst": {
+  "mist_depth": 6000,
+  "haze_dist": 1500,
+  "haze_start": 30,
+  "haze_color": [
+   0.66,
+   0.78,
+   0.62
+  ],
+  "haze_sky": true,
+  "haze_fade": [
+   [
+    15.6,
+    1.0
+   ],
+   [
+    16.0,
+    0.0
+   ],
+   [
+    21.0,
+    0.0
+   ]
+  ]
+ },
+ "post.look": "AgX - Medium High Contrast",
+ "post.farbe": {
+  "sat": 1.0,
+  "ev": 0.0
+ },
+ "post.autobelichtung": {
+  "ae_strength": 0.55,
+  "ae_tau": 0.45
+ },
+ "post.bloom": {
+  "bloom": 0.25,
+  "bloom_thr": 1.8,
+  "fog_glow": 0.6,
+  "bloom_clamp": 4.0
+ },
+ "post.optik": {
+  "dispersion": 0.006,
+  "vignette": 0.22,
+  "grain": 0.025
+ },
+ "post.pulse": [
+  [
+   10.0,
+   0.4,
+   0.008,
+   0.06
+  ],
+  [
+   11.11,
+   0.2,
+   0.004,
+   0.05
+  ],
+  [
+   11.47,
+   0.3,
+   0.006,
+   0.06
+  ],
+  [
+   11.95,
+   0.35,
+   0.006,
+   0.06
+  ],
+  [
+   12.15,
+   0.7,
+   0.012,
+   0.09
+  ],
+  [
+   13.25,
+   0.4,
+   0.008,
+   0.07
+  ],
+  [
+   13.5,
+   0.4,
+   0.008,
+   0.07
+  ],
+  [
+   15.05,
+   0.3,
+   0.006,
+   0.1
+  ],
+  [
+   15.8,
+   1.8,
+   0.02,
+   0.08
+  ]
+ ],
+ "post.flare": {
+  "t0": 15.75,
+  "t1": 17.2,
+  "thr": 6.0,
+  "strength": 0.6,
+  "streak": 0.5,
+  "fade_out": 0.8
+ },
+ "encode.skalierung": [
+  "Lanczos",
+  [
+   1080,
+   1920
+  ]
+ ],
+ "encode.master": {
+  "codec": "H.264 High, Zwei-Pass",
+  "soll_mbit": 18,
+  "ist_mbit": 17.9,
+  "mb": 44.9
+ },
+ "encode.web": {
+  "mbit": 10,
+  "maxrate": "11M",
+  "bufsize": "20M",
+  "ist_mbit": 9.9,
+  "mb": 24.8
+ },
+ "zeit.szene_bauen": "ca. 10–15 min",
+ "zeit.frame_mittel": 136,
+ "zeit.frame_max": 314,
+ "zeit.render_gesamt": 18.1,
+ "zeit.wanduhr": 25.8,
+ "zeit.vorschau": {
+  "kampfteil_241_frames_min": 36,
+  "flugteil_239_frames_min": 120
+ },
+ "ressourcen.ram": "4–9 GB",
+ "ressourcen.blend": 253,
+ "ressourcen.exr": "≈0,8 MB/Frame",
+ "ressourcen.neustarts": "mind. 8",
+ "sound.marker": [
+  {
+   "name": "AMBIENCE",
+   "t": 0.0,
+   "frame": 1
+  },
+  {
+   "name": "WHOOSH",
+   "t": 1.92,
+   "frame": 47
+  },
+  {
+   "name": "WHOOSH",
+   "t": 2.67,
+   "frame": 65
+  },
+  {
+   "name": "WHOOSH",
+   "t": 5.7,
+   "frame": 138
+  },
+  {
+   "name": "WHOOSH",
+   "t": 7.04,
+   "frame": 170
+  },
+  {
+   "name": "WHOOSH",
+   "t": 9.62,
+   "frame": 232
+  },
+  {
+   "name": "WHOOSH",
+   "t": 9.62,
+   "frame": 232
+  },
+  {
+   "name": "IMPACT",
+   "t": 10.0,
+   "frame": 241
+  },
+  {
+   "name": "IMPACT",
+   "t": 10.28,
+   "frame": 248
+  },
+  {
+   "name": "IMPACT",
+   "t": 10.42,
+   "frame": 251
+  },
+  {
+   "name": "IMPACT",
+   "t": 10.56,
+   "frame": 254
+  },
+  {
+   "name": "IMPACT",
+   "t": 10.7,
+   "frame": 258
+  },
+  {
+   "name": "IMPACT",
+   "t": 10.84,
+   "frame": 261
+  },
+  {
+   "name": "IMPACT",
+   "t": 10.98,
+   "frame": 265
+  },
+  {
+   "name": "IMPACT",
+   "t": 11.11,
+   "frame": 268
+  },
+  {
+   "name": "IMPACT",
+   "t": 11.47,
+   "frame": 276
+  },
+  {
+   "name": "ZANZOKEN",
+   "t": 11.62,
+   "frame": 280
+  },
+  {
+   "name": "IMPACT",
+   "t": 11.95,
+   "frame": 288
+  },
+  {
+   "name": "IMPACT",
+   "t": 12.15,
+   "frame": 293
+  },
+  {
+   "name": "ZANZOKEN",
+   "t": 13.15,
+   "frame": 317
+  },
+  {
+   "name": "IMPACT",
+   "t": 13.15,
+   "frame": 317
+  },
+  {
+   "name": "IMPACT",
+   "t": 13.4,
+   "frame": 323
+  },
+  {
+   "name": "WHOOSH",
+   "t": 13.6,
+   "frame": 327
+  },
+  {
+   "name": "BEAT_DROP",
+   "t": 15.8,
+   "frame": 380
+  },
+  {
+   "name": "AMBIENCE",
+   "t": 17.0,
+   "frame": 409
+  }
+ ],
+ "bewertung.freigabe": "Vorschau freigegeben am 2026-10-01 („starte jetzt aber mit namek“), Final 2026-10-02",
+ "bewertung.korrekturen": [
+  "Bewegungen: Dragon-Ball-Tempo gefordert („diese immer sehr schnell“) → dbz_style, Hit-Stops, Zanzoken, Ki-Spuren",
+  "Figuren: selbst gebaute → Tripo-Modelle (FBX ohne Textur → GLB mit Textur)",
+  "Baumkronen verdeckten Treffer → baumfreier Sichtkorridor (zuerst 4,5 m, final 8,5 m)",
+  "Strahleinschläge außerhalb des Bildes → Freezer senkrecht über Goku, Kamera bei 12,9 s zurück",
+  "schwarzer Fleck: transparente Burst-Reste → Bursts nach Lebenszeit ausgeblendet",
+  "zu große weiße Blitzkugeln → core_k 0,5; dunkle Ringe → ior 1,0"
+ ],
+ "bewertung.reaktion": "„des ist absolut der wahnsinn.“ (Vorschau)",
+ "bewertung.social": null
+}

@@ -35,6 +35,14 @@ Wow-Motiv hinter einer Verdeckung, stabilisierte Weitwinkel-Action-Cam (kein Fis
 | `world_*.py` | die drei Welten inkl. Flugroute |
 | `params/*.py` | Farbkorrektur/Dunst je Welt |
 
+## Werte-Archiv und Skill
+
+- `werte/<NN_name>/`: alle Parameterwerte eines fertigen Videos für spätere Auswertungen. `werte.json` nutzt die IDs
+  aus dem Parameter-Katalog, `kampfplan_und_kamera.json` enthält alle Schlüssel aus dem Code, `werte.md` ist die
+  lesbare Fassung. Erster Eintrag: `03_namek`.
+- Skill `.claude/skills/anime-fpv-kampfvideo/` (im Repo-Hauptordner): Ablauf, Parameter-Katalog ohne Werte,
+  Werte-Vorlage, Pipeline-Skripte (Vorschau, fortsetzbares Final, Watchdog, Webversion, Werte-Dump).
+
 ## Figuren-Modelle (nicht im Repo)
 
 Die Tripo-Modelle liegen nicht im (öffentlichen) Repo. Für den Namek-Kampf gehören sie nach

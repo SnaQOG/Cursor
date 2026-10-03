@@ -1,0 +1,3314 @@
+{
+ "video": {
+  "nr": 2,
+  "name": "Naruto – Konoha (Naruto gegen Sasuke auf dem Dach der Residenz)",
+  "datum_final": "2026-09-30",
+  "code_commit": "761e7ad (Szene gebaut 2026-09-29 06:18, Branch claude/eloquent-archimedes-og1asl)",
+  "welt_modul": "world_naruto",
+  "datei_master": "drohnen_3d_welten/videos/02_Naruto_Konoha.mp4",
+  "szene": "pv/n52/scene.blend → final/naruto_final.blend",
+  "typ": "Stadt + Kampf"
+ },
+ "briefing.stadt": "Konohagakure (Naruto Shippuden) mit Hokage-Felsen; Kampf Naruto gegen Sasuke",
+ "briefing.stil": "halbrealistisch: physikalische Umgebung, Figuren mit Stoff-/Hautmaterialien (kein Toon)",
+ "briefing.tageszeit": "später Nachmittag: tiefe warme Sonne 18° aus Westsüdwest (250°)",
+ "briefing.wetter": "klar, Wolkenbedeckung 40 %",
+ "briefing.stimmung": "warmer Flug durch ein lebendiges Ninja-Dorf, dann ein kurzer, harter Dachkampf mit Rasengan gegen Chidori",
+ "briefing.kameratyp": "FPV, eine durchgehende Aufnahme ohne Schnitt",
+ "briefing.verwendung": "nicht ausdrücklich festgelegt (NIDO-Drohnenvideo)",
+ "briefing.engine": "Cycles, CPU",
+ "briefing.budget": "vorab geschätzt 15–17 h für das Final (720p, 32 Samples)",
+ "briefing.hardware": {
+  "cpu_kerne": 4,
+  "gpu": "keine",
+  "ram_gb": 16,
+  "umgebung": "Cloud-Container, wird bei Leerlauf neu gestartet"
+ },
+ "briefing.ausgabe": {
+  "frames": "EXR je Pass (Scratchpad)",
+  "video": "H.264 MP4 1080 × 1920 → drohnen_3d_welten/videos/"
+ },
+ "briefing.referenzen": "Dominiks Anime-/Spiel-Standbilder von Konoha (Pastellfassaden, bunte Dächer, Wassertanks, ockerfarbener Sandstein mit Laufspuren, Treppen, Kuppelbauten), Model Sheets Naruto/Sasuke (2006)",
+ "briefing.palette": {
+  "daecher": [
+   [
+    0.42,
+    0.08,
+    0.04
+   ],
+   [
+    0.55,
+    0.2,
+    0.06
+   ],
+   [
+    0.1,
+    0.28,
+    0.13
+   ],
+   [
+    0.07,
+    0.19,
+    0.46
+   ],
+   [
+    0.25,
+    0.11,
+    0.36
+   ],
+   [
+    0.05,
+    0.28,
+    0.29
+   ]
+  ],
+  "residenz": [
+   0.58,
+   0.12,
+   0.045
+  ],
+  "fels": [
+   0.6,
+   0.42,
+   0.22
+  ],
+  "sonne_k": 4300,
+  "rand_k": 7800
+ },
+ "planung.einheiten": {
+  "system": "METRIC",
+  "skalierung": 1.0,
+  "bu": "1 BU = 1 m"
+ },
+ "planung.detailbudget": "keine LOD-Stufen: Straße voll detailliert (Fassaden, Fenster, Stände, Passanten), übriges Dorf als Rasterbebauung, Wald 12 444 GN-Instanzen",
+ "planung.collections": [
+  "AuxScene",
+  "KTrees",
+  "KTrees_0",
+  "KTrees_1",
+  "KTrees_2",
+  "KTrees_3",
+  "KTrees_4",
+  "KTrees_5",
+  "KWin0",
+  "KWin1",
+  "KWin2",
+  "KWin3",
+  "KWindows",
+  "RigidBodyWorld",
+  "RigidBodyWorld.001",
+  "RimLightReceivers",
+  "Scene",
+  "Tank0",
+  "Tank1",
+  "Tank2",
+  "Tanks",
+  "Vil0",
+  "Vil1",
+  "Vil2",
+  "Vil3",
+  "Vil4",
+  "Vil5",
+  "Villagers"
+ ],
+ "planung.versionierung": "Szene pv/n52/scene.blend → final/naruto_final.blend (Scratchpad); Code-Commit 761e7ad",
+ "stadt.koordinaten": "Ursprung im Tor (y 0), +Y nach Norden zur Residenz und zum Felsen, Z oben",
+ "stadt.flaeche": {
+  "groesse": [
+   420,
+   420
+  ],
+  "mitte": [
+   0,
+   190
+  ]
+ },
+ "stadt.mauer": {
+  "mitte": [
+   0.0,
+   190.0
+  ],
+  "radius": 190.0,
+  "segmentwinkel": 3.2,
+  "hoehe": 12.5,
+  "dicke": 3.4,
+  "abdeckung": [
+   4.4,
+   0.8
+  ],
+  "toroeffnung_grad": 6.0,
+  "offen_zum_felsen_ab_y": 340,
+  "bevel": 0.1
+ },
+ "stadt.tor": {
+  "y": 0.0,
+  "halbe_oeffnung": 10.5,
+  "hoehe": 19.0,
+  "pfeiler": 3.2,
+  "querbalken_unten_oberkante": 17.2,
+  "tueren": "あ / ん (A-un)"
+ },
+ "stadt.hauptstrasse": {
+  "halbbreite": 12.0,
+  "laenge": 178.0,
+  "mitte_y": 88.0,
+  "belag": "street_ground_material"
+ },
+ "stadt.zufahrt": {
+  "breite": 12.0,
+  "laenge": 300.0,
+  "mitte_y": -148.0,
+  "belag": "Feldweg"
+ },
+ "stadt.platz": {
+  "mitte": [
+   0,
+   226
+  ],
+  "groesse": [
+   140,
+   100
+  ],
+  "belag": "Pflaster (Cobble)"
+ },
+ "stadt.gelaende": "Hügelring ab r = 198 m über 70 m: (6 + 34·(0,5 + fbm(x/220, y/220, 5, seed 3)))·smoothstep; Tal der Zufahrt bei y < 30; Plateau und Bergspitze siehe gelaende.*",
+ "stadt.gelaende_mesh": {
+  "groesse": [
+   2400,
+   2400
+  ],
+  "punkte": [
+   360,
+   360
+  ],
+  "ursprung": [
+   0,
+   400
+  ]
+ },
+ "stadt.wasser": "entfällt (kein Wasser)",
+ "stadt.bruecken_treppen": "Zickzack-Treppen am Felsen (6 Läufe, x −238 bis −186, je 25 m Steigung), keine Brücke",
+ "stadt.landmarken": [
+  {
+   "name": "Tor",
+   "ort": [
+    0,
+    0
+   ],
+   "rolle": "Hook und Durchflug 1,8 s"
+  },
+  {
+   "name": "alter Baum",
+   "ort": [
+    4,
+    118
+   ],
+   "rolle": "Manöver links vorbei 7,1 s"
+  },
+  {
+   "name": "Hokage-Residenz",
+   "ort": [
+    -20,
+    232
+   ],
+   "radius": 21,
+   "rolle": "Steigflug und Kampf"
+  },
+  {
+   "name": "Hokage-Felsen",
+   "y": 360,
+   "rolle": "Teaser im Hook, Schlussbild"
+  },
+  {
+   "name": "Stufentürme",
+   "orte": [
+    [
+     -44,
+     150
+    ],
+    [
+     40,
+     128
+    ]
+   ],
+   "rolle": "Straßenrand"
+  }
+ ],
+ "stadt.sichtachsen": [
+  [
+   0.0,
+   "durchs Tor auf Residenz und Gesichter"
+  ],
+  [
+   3.2,
+   "unter Laternenkabel 1"
+  ],
+  [
+   4.0,
+   "unter der Wäscheleine"
+  ],
+  [
+   7.1,
+   "links am alten Baum"
+  ],
+  [
+   9.55,
+   "Steigflug über den Platz"
+  ],
+  [
+   10.85,
+   "über die Brüstung: Kampf im Gang"
+  ],
+  [
+   14.45,
+   "beide Kämpfer (6,4 m Abstand) ganz im Bild"
+  ],
+  [
+   17.1,
+   "tief auf dem Dach: Naruto + Gesichter"
+  ]
+ ],
+ "stadt.route": [
+  [
+   0,
+   -60,
+   4.4
+  ],
+  [
+   0,
+   -30,
+   4.8
+  ],
+  [
+   0,
+   0,
+   5.5
+  ],
+  [
+   0,
+   35,
+   7.6
+  ],
+  [
+   -2,
+   75,
+   10.0
+  ],
+  [
+   -7,
+   112,
+   11.0
+  ],
+  [
+   -3,
+   145,
+   14.0
+  ],
+  [
+   -4,
+   168,
+   23.0
+  ],
+  [
+   -10,
+   190,
+   33.5
+  ],
+  [
+   -16,
+   211,
+   39.3
+  ],
+  [
+   -19,
+   232,
+   39.4
+  ],
+  [
+   -19,
+   251,
+   39.6
+  ],
+  [
+   -17,
+   270,
+   49.0
+  ],
+  [
+   -14,
+   290,
+   62.0
+  ],
+  [
+   -11,
+   308,
+   76.0
+  ],
+  [
+   -9,
+   322,
+   86.0
+  ]
+ ],
+ "stadt.seed": 12,
+ "gebaeude.anzahl": 229,
+ "gebaeude.strassenzeile": {
+  "breite_entlang": [
+   10,
+   14
+  ],
+  "tiefe": [
+   11,
+   15
+  ],
+  "stockwerke": [
+   2,
+   4
+  ],
+  "luecke": [
+   1.0,
+   3.5
+  ],
+  "abstand_zur_strasse": 1.5,
+  "y": [
+   22,
+   172
+  ]
+ },
+ "gebaeude.stile": {
+  "strasse": {
+   "flat": 0.4,
+   "barrel": 0.4,
+   "round": 0.2
+  },
+  "raster": {
+   "flat": 0.33,
+   "barrel": 0.33,
+   "hip": 0.17,
+   "round": 0.17
+  },
+  "stufenturm_im_raster": 0.06
+ },
+ "gebaeude.raster": {
+  "weite": 17.0,
+  "versatz": 2.5,
+  "x": [
+   -176,
+   176
+  ],
+  "y": [
+   10,
+   310
+  ],
+  "ausfall": 0.12,
+  "drehung_grad": 6,
+  "groesse": [
+   8,
+   13
+  ],
+  "stockwerke": [
+   1,
+   4
+  ],
+  "aussparungen": "Straße ±29 m bis y 176, Tor, Platz/Residenz (y 176–272, |x| < 70), außerhalb Mauer −12 m, vor dem Felsen"
+ },
+ "gebaeude.platzrand": [
+  [
+   52,
+   205,
+   22,
+   16,
+   5,
+   "barrel"
+  ],
+  [
+   50,
+   246,
+   18,
+   18,
+   4,
+   "round"
+  ],
+  [
+   -62,
+   198,
+   20,
+   14,
+   4,
+   "hip"
+  ],
+  [
+   -64,
+   258,
+   16,
+   16,
+   5,
+   "flat"
+  ],
+  [
+   30,
+   272,
+   14,
+   12,
+   3,
+   "flat"
+  ]
+ ],
+ "gebaeude.stockwerkhoehe": {
+  "stockwerk": 3.2,
+  "streuung_hoehe": [
+   -0.3,
+   0.6
+  ],
+  "bruestung": 0.7
+ },
+ "gebaeude.tuerme": {
+  "anteil_raster": 0.06,
+  "stufen": [
+   2,
+   3
+  ],
+  "erdgeschoss": 6.4,
+  "traufkranz": 1.6,
+  "verjuengung": 0.8,
+  "feste": [
+   [
+    -44,
+    150,
+    5.5,
+    3
+   ],
+   [
+    40,
+    128,
+    5.0,
+    2
+   ]
+  ]
+ },
+ "gebaeude.daecher": {
+  "tonnendach_stich": "0,28·min(B, T)",
+  "walmdach_stich": "0,35·min(B, T)",
+  "walmdach_ueberstand": 0.8,
+  "ziegel_mesh": [
+   0.3,
+   0.42
+  ]
+ },
+ "gebaeude.dachaufbauten": {
+  "wassertanks": "80 % der Flachdächer, 1 (60 %) oder 2, Skalierung 0,85–1,2",
+  "dachaufbau": "30 %: 0,35·B × 0,35·T × 2,4 m",
+  "rohre": "1–2 je Gebäude, Ø 0,14–0,26 m",
+  "klimageraete": "0–2 (0,9 × 0,55 × 0,65 m)"
+ },
+ "gebaeude.fassade": {
+  "fensterachsen": "max(1, int((Breite − 1,2)/2,6))",
+  "fenster_ausfall": 0.12,
+  "fenster_z": "0,9 + 3,2·Stockwerk",
+  "holzbalken": 0.22,
+  "markise": "55 %, 0,8·Breite × 1,8 m in 2,9 m Höhe",
+  "balkone": "60 % der ≥ 2-stöckigen, je Stockwerk 65 %",
+  "ladenfront": "Erdgeschoss zur Straße ohne Fenster"
+ },
+ "gebaeude.banner": {
+  "anteil": 0.55,
+  "zeichen": [
+   "火",
+   "木",
+   "忍",
+   "茶",
+   "楽",
+   "薬",
+   "酒"
+  ],
+  "groesse": [
+   1.4,
+   3.2
+  ],
+  "hoehe_mitte": 5.4,
+  "farbe": {
+   "zeichen": [
+    240,
+    236,
+    226
+   ],
+   "grund": [
+    150,
+    24,
+    18
+   ]
+  }
+ },
+ "gebaeude.schilder": {
+  "zeichen": [
+   "一",
+   "忍",
+   "団",
+   "花",
+   "書"
+  ],
+  "anteil": "35 % bei Höhe > 6 m",
+  "groesse": "0,25 × 1,6 × 2,4–4,0 m",
+  "farben": {
+   "zeichen": [
+    236,
+    232,
+    220
+   ],
+   "grund": [
+    [
+     25,
+     40,
+     70
+    ],
+    [
+     90,
+     30,
+     18
+    ]
+   ]
+  }
+ },
+ "gebaeude.tueren": {
+  "motiv": "あ / ん",
+  "farben": {
+   "zeichen": [
+    170,
+    25,
+    18
+   ],
+   "grund": [
+    236,
+    228,
+    210
+   ]
+  }
+ },
+ "gebaeude.hero": {
+  "name": "Hokage-Residenz",
+  "ort": [
+   -20,
+   232
+  ],
+  "radius": 21.0,
+  "kragen_z": 15.0,
+  "dach_z": 31.0,
+  "dachbelag_z": 31.65,
+  "bruestung": 1.1,
+  "mittelspitze": 2.6,
+  "fensterreihen": [
+   44,
+   44,
+   40,
+   40
+  ],
+  "emblem": "火 im Ring"
+ },
+ "gebaeude.bevel": {
+  "standard": 0.05,
+  "mauer": 0.1,
+  "tor": 0.08,
+  "verwitterung_bevel_r": 0.07
+ },
+ "gebaeude.lod": "keine LOD-Stufen",
+ "gebaeude.instancing": "Wassertanks (3 Varianten) und Fenster (4 Varianten) als Collection-Instanzen, Bäume per Geometry Nodes, Passanten aus 6 Vorlagen",
+ "gebaeude.strassendetails": "Straßenboden-Shader (Wege, Risse, Pfützen, Platten, dunkle Ränder), keine Bordsteine",
+ "material.putz": {
+  "plaster": {
+   "edge": 0.35,
+   "streak": 0.25
+  },
+  "parapet": {
+   "edge": 0.3,
+   "streak": 0.3,
+   "dirt": 0.0
+  },
+  "strasse_pbr": {
+   "edge": 0.4,
+   "streak": 0.25,
+   "dirt": 0.5,
+   "cc0": "plaster, scale 0.35"
+  },
+  "dachflaeche": [
+   0.22,
+   0.2,
+   0.18
+  ]
+ },
+ "material.daecher": {
+  "farben": [
+   [
+    0.42,
+    0.08,
+    0.04
+   ],
+   [
+    0.55,
+    0.2,
+    0.06
+   ],
+   [
+    0.1,
+    0.28,
+    0.13
+   ],
+   [
+    0.07,
+    0.19,
+    0.46
+   ],
+   [
+    0.25,
+    0.11,
+    0.36
+   ],
+   [
+    0.05,
+    0.28,
+    0.29
+   ]
+  ],
+  "tile_w": 0.32,
+  "tile_h": 0.26,
+  "var": 0.18,
+  "tuerme": "zylindrisch"
+ },
+ "material.terrakotta": {
+  "rot": [
+   0.4,
+   0.07,
+   0.035
+  ],
+  "orange": [
+   0.5,
+   0.17,
+   0.05
+  ],
+  "blau": [
+   0.08,
+   0.16,
+   0.34
+  ],
+  "gruen": [
+   0.1,
+   0.24,
+   0.12
+  ],
+  "residenz_kragen": [
+   0.62,
+   0.3,
+   0.06
+  ]
+ },
+ "material.fenster": {
+  "lit": 0.22,
+  "curtain": 0.3,
+  "per_cell": 0.9
+ },
+ "material.verwitterung": {
+  "plaster": {
+   "edge": 0.35,
+   "streak": 0.25
+  },
+  "parapet": {
+   "edge": 0.3,
+   "streak": 0.3,
+   "dirt": 0.0
+  },
+  "plaster_street": {
+   "edge": 0.4,
+   "streak": 0.25,
+   "dirt": 0.5
+  },
+  "red": {
+   "dirt_h": 2.5,
+   "dirt": 0.35,
+   "streak": 0.35
+  },
+  "red_dark": {
+   "dirt": 0.0,
+   "streak": 0.3
+  },
+  "gate": {
+   "dirt": 0.4,
+   "edge": 0.3,
+   "streak": 0.3
+  },
+  "stone": {
+   "dirt": 0.3,
+   "var": 0.03
+  },
+  "horn": {
+   "dirt": 0.0,
+   "streak": 0.35,
+   "var": 0.0
+  },
+  "shutter": {
+   "dirt": 0.0,
+   "edge": 0.4
+  },
+  "standard": {
+   "dirt_h": 2.2,
+   "dirt": 0.45,
+   "edge_col": [
+    0.78,
+    0.74,
+    0.66
+   ],
+   "bevel_r": 0.07
+  }
+ },
+ "material.dachbelag": {
+  "r_edge": 19.3,
+  "holz": "dark 0,9, Achse X, board 0,2"
+ },
+ "material.strasse": {
+  "strassenboden_half_w": 12.0,
+  "platz": "Pflaster (CC0 paving)",
+  "zufahrt": "Feldweg"
+ },
+ "material.gras": {
+  "c1": [
+   0.035,
+   0.06,
+   0.015
+  ],
+  "c2": [
+   0.1,
+   0.12,
+   0.04
+  ],
+  "dry": [
+   0.22,
+   0.19,
+   0.1
+  ],
+  "scale": 2.0
+ },
+ "material.metall": {
+  "tanks": [
+   0.75,
+   0.73,
+   0.68
+  ],
+  "rohre": [
+   0.6,
+   0.6,
+   0.6
+  ],
+  "cc0": "metal, scale 0.5",
+  "eisen": {
+   "farbe": [
+    0.06,
+    0.055,
+    0.05
+   ],
+   "metal": 0.7
+  }
+ },
+ "material.holz": {
+  "balken": {
+   "dark": 0.75,
+   "board": 5.0
+  },
+  "dachdeck": {
+   "dark": 0.9,
+   "board": 0.2,
+   "achse": "X"
+  },
+  "masten": [
+   0.16,
+   0.11,
+   0.07
+  ],
+  "tor": [
+   0.34,
+   0.1,
+   0.05
+  ]
+ },
+ "material.lack": {
+  "horn": [
+   0.8,
+   0.78,
+   0.72
+  ],
+  "laeden": [
+   0.1,
+   0.22,
+   0.15
+  ],
+  "klima": [
+   0.62,
+   0.62,
+   0.6
+  ]
+ },
+ "material.stoff": {
+  "markisen": [
+   [
+    0.45,
+    0.06,
+    0.04
+   ],
+   [
+    0.08,
+    0.16,
+    0.4
+   ],
+   [
+    0.7,
+    0.25,
+    0.04
+   ],
+   [
+    0.1,
+    0.26,
+    0.14
+   ]
+  ],
+  "staende": [
+   [
+    0.4,
+    0.05,
+    0.03
+   ],
+   [
+    0.62,
+    0.58,
+    0.5
+   ],
+   [
+    0.06,
+    0.12,
+    0.26
+   ]
+  ]
+ },
+ "material.mauer": {
+  "c1": [
+   0.16,
+   0.15,
+   0.13
+  ],
+  "c2": [
+   0.32,
+   0.3,
+   0.26
+  ],
+  "c3": [
+   0.26,
+   0.24,
+   0.2
+  ],
+  "bump": 0.5,
+  "crack_w": 0.4,
+  "abdeckung": [
+   0.12,
+   0.1,
+   0.09
+  ]
+ },
+ "material.wahrzeichen_fels": {
+  "wand": {
+   "c1": [
+    0.16,
+    0.1,
+    0.05
+   ],
+   "c2": [
+    0.6,
+    0.42,
+    0.22
+   ],
+   "c3": [
+    0.44,
+    0.28,
+    0.13
+   ],
+   "moss": [
+    0.05,
+    0.1,
+    0.02
+   ],
+   "moss_amount": 0.3,
+   "scale": 2.0,
+   "bump": 1.0,
+   "crack_w": 0.3,
+   "strata_scale": 1.2,
+   "lichen": 0.12
+  },
+  "gesichter": {
+   "c1": [
+    0.22,
+    0.15,
+    0.08
+   ],
+   "c2": [
+    0.66,
+    0.48,
+    0.27
+   ],
+   "c3": [
+    0.5,
+    0.35,
+    0.18
+   ],
+   "scale": 1.5,
+   "bump": 0.5,
+   "crack_w": 0.12,
+   "lichen": 0.1,
+   "moss": [
+    0.06,
+    0.1,
+    0.03
+   ],
+   "moss_amount": 0.15,
+   "cavity": 0.75
+  }
+ },
+ "material.cc0": {
+  "texturen": [
+   "plaster",
+   "metal",
+   "paving",
+   "brick",
+   "concrete"
+  ],
+  "projektion": "Box, blend 0.25",
+  "scale": {
+   "putz": 0.35,
+   "metall": 0.5
+  }
+ },
+ "material.emission": {
+  "laternen": {
+   "farbe": [
+    1.0,
+    0.3,
+    0.1
+   ],
+   "staerke": 0.12
+  },
+  "fenster": "Innenraum-Shader lit 0,22"
+ },
+ "material.texeldichte": "nicht erfasst",
+ "material.farbraum": "CC0-Farbtexturen sRGB, Rauheit/Normal Non-Color",
+ "material.displacement": "kein Displacement, nur Bump/Normal",
+ "material.kachelvariation": "Box-Projektion mit Überblendung, Noise-Mix, Farbton je Objekt (weather var)",
+ "licht.himmel_typ": "Nishita (Multiple Scattering)",
+ "licht.nishita": {
+  "aerosol": 0.9,
+  "ozone": 1.6,
+  "air": 1.0,
+  "hoehe_m": 50.0,
+  "sun_size": 0.0095,
+  "sonnenscheibe": false
+ },
+ "licht.hdri": "entfällt (kein HDRI)",
+ "licht.nacht_quellen": "entfällt (Tagszene)",
+ "licht.farbtemperaturen": {
+  "sonne": 4300,
+  "randlicht": 7800
+ },
+ "licht.schatten": "lange Schatten quer über die Straße, Streiflicht auf den Gesichtern",
+ "licht.mond_sterne": "entfällt (Tagszene)",
+ "licht.rig": "Sonne + Randlicht (Light Linking auf die Kämpfer) + Effektlichter",
+ "atmosphaere.volumen": "entfällt (NIDO_ATMO = 0, Dunst in der Post)",
+ "atmosphaere.bodennebel": "entfällt (keiner)",
+ "atmosphaere.lichtstrahlen": "entfällt (keine)",
+ "atmosphaere.wetter": "treibende Blätter (leben.blaetter), kein Niederschlag",
+ "atmosphaere.tiefenschichten": {
+  "vorn": "Straße und Fassaden 3–30 m",
+  "mitte": "Platz und Residenz ~230 m",
+  "hinten": "Hokage-Felsen 360 m, Wald und Berg bis 950 m"
+ },
+ "leben.passanten": {
+  "abstand_entlang": [
+   3.5,
+   6.0
+  ],
+  "anteil_je_seite": 0.55,
+  "abstand_mitte": [
+   [
+    5.0,
+    7.6
+   ],
+   [
+    11.0,
+    12.2
+   ]
+  ],
+  "anteil_nah": 0.6,
+  "drehung": "±90° zur Straße ± 45°",
+  "aussparung": "um den alten Baum",
+  "anzahl": 43,
+  "seed": 11
+ },
+ "leben.passanten_vorlagen": [
+  [
+   "look_up",
+   1.72
+  ],
+  [
+   "point_up",
+   1.64
+  ],
+  [
+   "carry",
+   1.78
+  ],
+  [
+   "talk",
+   1.58
+  ],
+  [
+   "look_up",
+   1.52
+  ],
+  [
+   "hands_hips",
+   1.75
+  ]
+ ],
+ "leben.staende": {
+  "anzahl": 14,
+  "abstand": 10.5,
+  "start_y": 30,
+  "seite": "abwechselnd",
+  "x": 9.4,
+  "dach": [
+   2.8,
+   3.4,
+   2.4
+  ],
+  "tisch": [
+   2.2,
+   2.8,
+   0.8
+  ],
+  "kisten_je_stand": 2
+ },
+ "leben.laternen": {
+  "y": [
+   33.0,
+   71.0,
+   109.0,
+   147.0
+  ],
+  "x_end": 13.4,
+  "z_end": 7.2,
+  "sag": 1.1,
+  "n": 9,
+  "seed": 3,
+  "pendeln": {
+   "seilachse_grad": [
+    4,
+    7
+   ],
+   "seilachse_hz": [
+    0.3,
+    0.5
+   ],
+   "quer_grad": [
+    1.5,
+    3.0
+   ],
+   "quer_hz": [
+    0.2,
+    0.35
+   ]
+  }
+ },
+ "leben.waesche": {
+  "y": [
+   52.0
+  ],
+  "z": 8.32,
+  "sag": 0.7,
+  "kandidaten_y": [
+   52,
+   90,
+   128,
+   160
+  ],
+  "bedingung": "Fassaden > 7,3 m, ≥ 14 m vom Baum",
+  "pendeln_grad": [
+   5,
+   10
+  ],
+  "pendeln_hz": [
+   0.35,
+   0.6
+  ]
+ },
+ "leben.leitungen": {
+  "mastabstand": 19.0,
+  "y": [
+   14,
+   176
+  ],
+  "x": 11.2,
+  "masthoehe": 9.5,
+  "querbalken": [
+   1.8,
+   8.6
+  ],
+  "draehte": 3,
+  "drahtabstand": 0.7,
+  "drahthoehe": 8.75,
+  "durchhang": 0.9,
+  "drahtradius": 0.018
+ },
+ "leben.voegel": [
+  {
+   "n": 14,
+   "start": [
+    [
+     -20,
+     -14
+    ],
+    [
+     64,
+     80
+    ],
+    [
+     9,
+     13
+    ]
+   ],
+   "flug": [
+    30,
+    14,
+    9
+   ],
+   "t": [
+    3.3,
+    5.6
+   ],
+   "seed": 21
+  },
+  {
+   "n": 12,
+   "start": [
+    [
+     14,
+     20
+    ],
+    [
+     70,
+     84
+    ],
+    [
+     9,
+     13
+    ]
+   ],
+   "flug": [
+    -28,
+    18,
+    10
+   ],
+   "t": [
+    3.45,
+    5.7
+   ],
+   "seed": 22
+  }
+ ],
+ "leben.blaetter": [
+  {
+   "name": "StreetLeaves",
+   "box": [
+    [
+     -12,
+     12
+    ],
+    [
+     18,
+     176
+    ],
+    [
+     0.3,
+     12
+    ]
+   ],
+   "n": 700,
+   "wind": [
+    1.0,
+    2.2,
+    -0.3
+   ],
+   "seed": 4
+  },
+  {
+   "name": "TreeLeaves",
+   "box": [
+    [
+     -6,
+     14
+    ],
+    [
+     104,
+     134
+    ],
+    [
+     0.5,
+     13
+    ]
+   ],
+   "n": 260,
+   "wind": [
+    0.8,
+    1.6,
+    -0.5
+   ],
+   "seed": 6
+  }
+ ],
+ "leben.pendeln": "Laternen und Wäsche (Werte dort), Rauschen 0,25–0,4",
+ "leben.verkehr": "entfällt (keine Fahrzeuge)",
+ "leben.rauch": "entfällt (kein Rauch)",
+ "leben.flaggen": "Banner statisch, Wäsche pendelt (keine Stoffsimulation)",
+ "leben.caches": "Rigid-Body-Bruchstücke als Keyframes gebacken (kein Cache-Ordner)",
+ "leben.asynchron": "Amplitude, Frequenz und Phase je Objekt zufällig",
+ "baum.hero": {
+  "ort": [
+   4.0,
+   118.0
+  ],
+  "hoehe": 21,
+  "krone": 7.0,
+  "cluster": 44,
+  "blaetter": 140,
+  "blattgroesse": 0.45,
+  "seed": 99,
+  "steinring": [
+   3.2,
+   0.6
+  ]
+ },
+ "baum.nadelbaum": {
+  "varianten": [
+   [
+    22,
+    4.0,
+    34
+   ],
+   [
+    16,
+    3.2,
+    28
+   ]
+  ],
+  "blaetter": 110,
+  "form": "konisch",
+  "blattgroesse": 0.3,
+  "farbe": {
+   "c1": [
+    0.015,
+    0.035,
+    0.012
+   ],
+   "c2": [
+    0.04,
+    0.07,
+    0.025
+   ]
+  },
+  "trans": 0.2,
+  "seeds": "80 + i"
+ },
+ "baum.wald": [
+  {
+   "bereich": "Zufahrt",
+   "n": 1400,
+   "x": [
+    -160,
+    160
+   ],
+   "y": [
+    -260,
+    20
+   ]
+  },
+  {
+   "bereich": "Ring um die Mauer",
+   "n": 6000,
+   "x": [
+    -520,
+    520
+   ],
+   "y": [
+    -340,
+    360
+   ]
+  },
+  {
+   "bereich": "Plateau",
+   "n": 5000,
+   "x": [
+    -700,
+    700
+   ],
+   "y": [
+    360,
+    950
+   ]
+  },
+  {
+   "skalierung": [
+    0.75,
+    1.5
+   ]
+  }
+ ],
+ "baum.dorf": {
+  "versuche": 700,
+  "x": [
+   -170,
+   170
+  ],
+  "y": [
+   20,
+   300
+  ],
+  "skalierung": [
+   0.6,
+   1.1
+  ]
+ },
+ "baum.buesche": {
+  "n": 500,
+  "x": "±7,5–40",
+  "y": [
+   -240,
+   -8
+  ],
+  "skalierung": [
+   0.18,
+   0.4
+  ]
+ },
+ "baum.felsbewuchs": {
+  "normale_z": 0.55,
+  "min_hoehe": 8,
+  "max": 900,
+  "skalierung": [
+   0.25,
+   0.7
+  ],
+  "ohne": "Gesichter-Panel |x| < 175, z 42–168",
+  "gewicht": "Fläche·nz²"
+ },
+ "baum.streuung": {
+  "seed": 5,
+  "punkte": 12444,
+  "drehung_groesse": "zufällig (Geometry Nodes)"
+ },
+ "wahrzeichen.wand": {
+  "x": [
+   -420,
+   420
+  ],
+  "y": 360.0,
+  "z": [
+   -2,
+   176
+  ],
+  "aufloesung": 1.0,
+  "seed": 8,
+  "panel": [
+   -172,
+   172,
+   40,
+   168
+  ]
+ },
+ "wahrzeichen.risse": {
+  "n": 10,
+  "x": [
+   -378,
+   378
+  ],
+  "z_top": 176,
+  "tiefe": 2.2,
+  "breite": 1.2,
+  "seed": 28
+ },
+ "wahrzeichen.gesichter": {
+  "liste": [
+   [
+    -110,
+    10.0,
+    "hashirama"
+   ],
+   [
+    -55,
+    -13.0,
+    "tobirama"
+   ],
+   [
+    0,
+    14.0,
+    "hiruzen"
+   ],
+   [
+    56,
+    -13.0,
+    "minato"
+   ],
+   [
+    112,
+    10.0,
+    "tsunade"
+   ]
+  ],
+  "format": "[x, Höhenversatz, Haar]",
+  "skalierung": 10.0,
+  "grundhoehe": 92.0,
+  "y": 362.0,
+  "vorlage": "LeePerrySmith.glb",
+  "voxel": 0.22
+ },
+ "wahrzeichen.kinnlinie": "Kinn je Kopf = 92 + Versatz − 12 m, dazwischen linear",
+ "wahrzeichen.details": {
+  "treppen": "6 Läufe, Stufen 0,56 × 1,7 × 0,4 m alle 0,5 m, Geländer",
+  "wachhuetten": [
+   [
+    -55,
+    34
+   ],
+   [
+    56,
+    32
+   ],
+   [
+    -160,
+    20
+   ],
+   [
+    165,
+    52
+   ]
+  ],
+  "kuppelbauten": [
+   [
+    -84,
+    44,
+    11
+   ],
+   [
+    -22,
+    62,
+    9
+   ],
+   [
+    34,
+    46,
+    10
+   ],
+   [
+    98,
+    70,
+    12
+   ]
+  ],
+  "kuppel_format": "[x, Abstand hinter der Kante, Radius], Höhe 8,5 m"
+ },
+ "kamera.fov": {
+  "vertikal_grad": 54.43,
+  "brennweite_mm": 35.0,
+  "sensor": "36 mm (Höhe)"
+ },
+ "kamera.blende": {
+  "dof": false,
+  "hinweis": "Schärfentiefe aus (großer Schärfebereich wie FPV)"
+ },
+ "kamera.clipping": [
+  0.05,
+  30000.0
+ ],
+ "kamera.overscan": "entfällt (kein Overscan)",
+ "kamera.manoever": [
+  [
+   1.8,
+   "Tor",
+   "Durchflug unter dem unteren Querbalken"
+  ],
+  [
+   3.2,
+   "Laternenkabel 1",
+   "darunter durch"
+  ],
+  [
+   4.0,
+   "Wäscheleine",
+   "darunter durch"
+  ],
+  [
+   4.8,
+   "Laternenkabel 2",
+   "darunter durch"
+  ],
+  [
+   6.4,
+   "Laternenkabel 3",
+   "darunter durch"
+  ],
+  [
+   7.1,
+   "alter Baum",
+   "links vorbei"
+  ],
+  [
+   9.0,
+   "Laternenkabel 4",
+   "darüber"
+  ],
+  [
+   9.55,
+   "Platz/Residenz",
+   "Steigflug"
+  ],
+  [
+   10.85,
+   "Brüstung",
+   "drüber, scharf abbremsen"
+  ],
+  [
+   15.0,
+   "Klimax",
+   "Vorstoß, dann zurückgedrückt"
+  ],
+  [
+   17.1,
+   "Dach",
+   "ganz tief"
+  ]
+ ],
+ "kamera.mindestabstand": {
+  "flug": {
+   "m": 1.36,
+   "t": 6.667,
+   "objekt": "Lantern2.002"
+  },
+  "dach": {
+   "m": 0.14,
+   "t": 17.333,
+   "objekt": "ResRoofDeck"
+  },
+  "hinweis": "Szene des Finals vermessen, ohne Figuren und Effekte; 0,14 m ist das gewollte Tiefbild auf dem Dach"
+ },
+ "kamera.hook": "0–1,8 s: Blick vom Waldweg durchs Tor auf Dorf, Residenz und Gesichter; Teaser-Blitz 1,3 s",
+ "kamera.schlussbild": "17–20 s: Naruto in Untersicht (Blick 8° nach oben), Faust zur Kamera, dahinter die fünf Hokage-Gesichter",
+ "kamera.loop": "kein Loop: harter Anfang und ruhiges Schlussbild",
+ "render.engine": "Cycles, CPU (Cloud-Container mit 4 Kernen, keine GPU)",
+ "render.min_samples": "0 (automatisch)",
+ "render.kaustiken": {
+  "reflektiv": false,
+  "refraktiv": false
+ },
+ "render.vector_pass": "aus (Motion Blur im Render)",
+ "render.cryptomatte": "aus (Object, Material, Asset nicht aktiv)",
+ "render.mist": {
+  "start": 0.0,
+  "tiefe": 6000.0,
+  "abfall": "LINEAR"
+ },
+ "render.farbmanagement": {
+  "view_transform": "AgX",
+  "look": "None",
+  "exposure": 0.0,
+  "gamma": 1.0,
+  "display": "sRGB",
+  "hinweis": "der Look kommt in der Post (post.look)"
+ },
+ "render.ausgabe": {
+  "format": "OpenEXR je Pass (Image, Mist, Env), 16 Bit Half, Codec DWAA",
+  "sequenz": "f_####",
+  "ort": "Scratchpad (flüchtig), danach PNG + MP4"
+ },
+ "render.fortsetzbar": "ja: seq_final.py überspringt fertige Frames (fpv.frame_done); Overwrite/Placeholders nicht genutzt",
+ "render.vram": "entfällt (keine GPU; RAM siehe ressourcen.ram)",
+ "render.testframes": "nicht erfasst",
+ "render.hochrechnung": "vorab 15–17 h geschätzt, tatsächlich 20,2 h Renderzeit",
+ "render.preflight": "entfällt (preflight_check.py gab es zum Zeitpunkt des Finals noch nicht)",
+ "comp.linsenverzerrung": "keine Verzerrung, nur laterale Dispersion (post.optik)",
+ "comp.halation": "entfällt (nicht verwendet)",
+ "comp.grading": "AgX Medium High Contrast, Sättigung 1,12, +0,15 EV, Auto-Belichtung (post.*)",
+ "comp.cryptomatte_korrekturen": "entfällt (keine Cryptomatte)",
+ "comp.shake": "nicht im Comp; Kamerastöße im 3D (kamera.stoesse)",
+ "comp.letterbox": "entfällt (Vollbild 9:16)",
+ "comp.ki_variante": "entfällt (keine KI-Weiterverarbeitung)",
+ "ki.tool": "entfällt (keine KI-Generierung; Higgsfield/Kling/Seedance nicht genutzt)",
+ "ki.einstellungen": "entfällt (keine KI-Generierung)",
+ "ki.kosten": "entfällt (keine KI-Generierung)",
+ "ki.freigabe": "entfällt (keine KI-Generierung)",
+ "ki.eingabe": "entfällt (keine KI-Generierung)",
+ "bewertung.gates": [
+  {
+   "gate": "A",
+   "datum": "2026-09-28 14:28",
+   "frei": true,
+   "zitat": "„ja“ (Zeitleiste Dachkampf, 35 mm, Sonne 18°/250°)"
+  },
+  {
+   "gate": "C",
+   "datum": "2026-09-28",
+   "frei": null,
+   "zitat": "Standbilder je Schritt 3.1–3.6, keine eigene Freigabe festgehalten"
+  },
+  {
+   "gate": "D",
+   "datum": "2026-09-29 06:02",
+   "frei": false,
+   "zitat": "Vorschau v1: Kampf nur auf dem Dach und länger"
+  },
+  {
+   "gate": "D",
+   "datum": "2026-09-29 07:41",
+   "frei": true,
+   "zitat": "„naruto sieht so brutal aus“ (Vorschau v2)"
+  },
+  {
+   "gate": "E",
+   "datum": "2026-09-28 19:48",
+   "frei": true,
+   "zitat": "„720p aber zeig mir vorab das video“"
+  }
+ ],
+ "qc.durchsicht": "8 Stichproben-Frames gegen die freigegebene Vorschau geprüft (nicht das ganze Video)",
+ "qc.frames": "480/480 Frames vorhanden",
+ "qc.flackern": "nicht erfasst",
+ "qc.textur": "nicht erfasst",
+ "qc.banding": "nicht erfasst",
+ "qc.zweitdisplay": "nicht erfasst",
+ "qc.anfang_ende": "kein Loop; Anfang in voller Fahrt, ruhiges Schlussbild",
+ "lieferung.master": {
+  "pfad": "drohnen_3d_welten/videos/02_Naruto_Konoha.mp4",
+  "mb": 45.0,
+  "commit": "4a8cfd2"
+ },
+ "lieferung.varianten": [
+  "Webversion 10 Mbit/s (< 30 MB) für den Chat"
+ ],
+ "lieferung.dateiname": "<NN>_<Welt>_<Ort>.mp4, ohne Version und Datum",
+ "lieferung.archiv": "Code im Repo (Commit), Werte im Werte-Archiv; .blend, EXR und PNG nur im Scratchpad (nicht dauerhaft archiviert)",
+ "lieferung.obsidian": "ZIP-Paket „Drohnen Videos/3D Welten Blender/<NN Name>/{Test,Final,Werte}“",
+ "lieferung.wiederverwendbar": [
+  "konoha.py (Gebäude, Tor, Residenz, Felsen, Verwitterung, Materialien)",
+  "konoha_life.py (Laternen, Wäsche, Passanten, Stände, Vögel, Blätter)",
+  "choreo.py (Kamera-Wegpunkte, Kampf-Backen, Hit-Stops, Kamerastöße)",
+  "vfx.py (Impact-Paket, Voronoi-Bruch, Rigid Body)",
+  "ninja.py (Figuren)"
+ ],
+ "lieferung.notiz": "Kampfort und -dauer früh festlegen (erst Tor, dann Dach, dann nur Dach und länger); Trefferlichter auf hellen Böden schwächer ansetzen",
+ "kampf.ort": {
+  "ort": "Flachdach der Hokage-Residenz",
+  "mitte": [
+   -20.0,
+   231.0
+  ],
+  "hoehe": 31.65,
+  "system": "roof(x, y, z) relativ zur Dachmitte"
+ },
+ "fx.impact_klein": [
+  {
+   "name": "HitAir",
+   "t": 10.95,
+   "ort_dach": [
+    3.25,
+    5.0,
+    4.4
+   ],
+   "licht": 5000.0,
+   "ring": 3.0,
+   "farbe": [
+    0.8,
+    0.88,
+    1.0
+   ]
+  },
+  {
+   "name": "HitKick",
+   "t": 11.5,
+   "ort_dach": [
+    4.3,
+    1.8,
+    1.3
+   ],
+   "licht": 1000.0,
+   "ring": 2.2
+  },
+  {
+   "name": "HitPunch",
+   "t": 11.95,
+   "ort_dach": [
+    3.8,
+    1.8,
+    1.4
+   ],
+   "licht": 1000.0,
+   "ring": 2.2
+  },
+  {
+   "name": "HitStrike",
+   "t": 12.35,
+   "ort_dach": [
+    4.0,
+    1.8,
+    1.9
+   ],
+   "licht": 1600.0,
+   "ring": 3.0,
+   "farbe": [
+    0.85,
+    0.9,
+    1.0
+   ]
+  },
+  {
+   "name": "HitHorn",
+   "t": 12.9,
+   "ort_dach": [
+    15.4,
+    -6.2,
+    1.9
+   ],
+   "licht": 8000.0,
+   "ring": 3.5,
+   "funken": 140,
+   "farbe": [
+    1.0,
+    0.8,
+    0.5
+   ]
+  },
+  {
+   "standard": {
+    "funken": 90,
+    "tempo": [
+     5,
+     12
+    ],
+    "leben": [
+     0.15,
+     0.45
+    ],
+    "licht_frames": "0 → max → 50 % (+2) → 0 (+8)",
+    "ring_dauer": 8
+   }
+  }
+ ],
+ "fx.bruch": {
+  "horn": {
+   "objekt": "Horn7",
+   "t": "12,9 s + 3 Frames",
+   "bruchhoehe": 1.6,
+   "stuecke": 9,
+   "impuls": 40000.0,
+   "dichte": 500.0,
+   "sim_bis_s": 17.5
+  },
+  "dach": {
+   "stuecke": 14,
+   "platte": [
+    2.6,
+    2.6,
+    0.12
+   ],
+   "t": "15,0 s + 4 Frames",
+   "impuls": 34000.0,
+   "dichte": 450.0,
+   "sim_bis_s": 19.0,
+   "max_hoehe": 5.2
+  },
+  "kollision": [
+   "ResRoofDeck",
+   "ResParapet",
+   "ResCap"
+  ],
+  "seed": 31
+ },
+ "fx.techniken": {
+  "rasengan": {
+   "farbe": [
+    0.12,
+    0.42,
+    1.0
+   ],
+   "radius": 0.34,
+   "licht": 160.0,
+   "an": 13.55,
+   "voll": 14.2,
+   "aus": 15.05
+  },
+  "chidori": {
+   "farbe": [
+    0.35,
+    0.6,
+    1.0
+   ],
+   "radius": 0.85,
+   "blitze": 10,
+   "licht": 260.0,
+   "an": 13.4,
+   "aus": 15.05
+  },
+  "klimax": {
+   "kugel_r": 0.45,
+   "kugel_licht": 600.0,
+   "blitzlicht": [
+    [
+     0,
+     8000.0
+    ],
+    [
+     1,
+     14000.0
+    ],
+    [
+     3,
+     4000.0
+    ],
+    [
+     7,
+     0.0
+    ]
+   ],
+   "boegen": {
+    "radius": 1.9,
+    "anzahl": 10,
+    "frames": 10
+   },
+   "funken": {
+    "n": 260,
+    "tempo": [
+     8,
+     20
+    ],
+    "leben": [
+     0.25,
+     0.7
+    ]
+   }
+  }
+ },
+ "format.dauer": 20.0,
+ "format.fps": 24,
+ "format.frames": 480,
+ "format.seitenverhaeltnis": "9:16",
+ "format.ausgabe_aufloesung": [
+  1080,
+  1920
+ ],
+ "ablauf.abschnitte": [
+  [
+   0,
+   1.8,
+   "Hook: vom Waldweg durchs Tor auf Dorf, Residenz und Gesichter; ferner Teaser-Blitz 1,3 s",
+   "17–19"
+  ],
+  [
+   1.8,
+   7.0,
+   "Tor-Durchflug, Hauptstraße tief (3,6–5 m) unter Laternenkabeln und Wäsche, Passanten, Stände; Teaser-Blitz 5,3 s",
+   "19–24"
+  ],
+  [
+   7.0,
+   9.0,
+   "links am alten Baum vorbei, über Kabel 4, schnell über den Platz",
+   "17–29"
+  ],
+  [
+   9.0,
+   10.85,
+   "Steigflug an der Residenz, über die Brüstung aufs Dach",
+   "29–38 (max. 38,0 bei 9,83 s)"
+  ],
+  [
+   10.85,
+   17.0,
+   "Dachkampf: Luftzusammenprall 10,95, Tritt/Block 11,5, Schlag/Block 11,95, Sprungtritt 12,35, Konter gegen das Horn 12,9, Aufladen, Rasengan gegen Chidori 15,0 (Klimax)",
+   "18,6 → 0,9–8,5"
+  ],
+  [
+   17.0,
+   20.0,
+   "Schlussbild: Naruto in Untersicht, Faust zur Kamera, dahinter die fünf Hokage-Gesichter",
+   "1,2–2,1"
+  ]
+ ],
+ "ablauf.koordinaten": "+Y Hauptflugrichtung (Tor y 0 → Felsen y 360), Z oben, Meter; Kampf in Dachkoordinaten relativ zu C_ROOF (−20, 231) und DECK_Z 31,65",
+ "licht.hauptsonne.hoehe": 18.0,
+ "licht.hauptsonne.azimut": 250.0,
+ "licht.hauptsonne.staerke": 5.0,
+ "licht.hauptsonne.kelvin": 4300,
+ "licht.hauptsonne.winkel": 0.5,
+ "licht.zusatzsonnen": [],
+ "licht.sonnenscheiben": "entfällt (Nishita-Himmel, Sonnenscheibe aus)",
+ "licht.randlicht": {
+  "hoehe": 22.0,
+  "azimut": 60.0,
+  "staerke": 2.5,
+  "kelvin": 7800,
+  "winkel": 3.0,
+  "nur": "Naruto + Sasuke (Light Linking)"
+ },
+ "licht.toon_richtung": "entfällt (keine Toon-Figuren)",
+ "himmel.verlauf": "physikalischer Himmel (Nishita, Multiple Scattering), kein eigener Verlauf",
+ "himmel.unter_horizont": "Standard (nicht gesetzt)",
+ "himmel.sonnenleuchten": "Standard (nicht gesetzt)",
+ "himmel.entsaettigung_diffus": "Standard (nicht gesetzt)",
+ "himmel.staerke": 0.1,
+ "wolken.bedeckung": 0.4,
+ "wolken.ref": 9.0,
+ "wolken.farbe": [
+  1.0,
+  0.98,
+  0.95
+ ],
+ "wolken.skala": "Standard 1,0 (Höhe 2000 m)",
+ "atmosphaere.dichte": 0.0,
+ "gelaende.hauptform": {
+  "art": "Talkessel mit runder Stadtmauer, Hügelring, Hokage-Felsen im Norden",
+  "mitte": [
+   0.0,
+   190.0
+  ],
+  "radius": 190.0
+ },
+ "gelaende.umriss": "entfällt (Kreis (Stadtmauer))",
+ "gelaende.plateau": "nördlich des Felsens: 168 + 22·fbm(x/160, y/160, 5, seed 4), Übergang y 374–390",
+ "gelaende.kante": "Hokage-Felsen als eigene Wand (wahrzeichen.wand)",
+ "gelaende.heightfield": {
+  "groesse": 2400.0,
+  "punkte": 360,
+  "ursprung": [
+   0,
+   400
+  ],
+  "offset_z": -0.05
+ },
+ "gelaende.steilwand": "siehe wahrzeichen.wand",
+ "gelaende.felsnadeln": "entfällt (keine Felsnadeln)",
+ "gelaende.felsnadel_mesh": "entfällt (keine Felsnadeln)",
+ "gelaende.ferne_felsen": "Bergspitze links hinter dem Felsen: 250 m hoch bei (−190, 620), σ 150 m (terrain_height)",
+ "gelaende.inseln": "entfällt (keine Inseln)",
+ "material.fels": {
+  "name": "GateStone (Torsockel, Baumring)",
+  "c1": [
+   0.2,
+   0.19,
+   0.17
+  ],
+  "c2": [
+   0.36,
+   0.34,
+   0.3
+  ],
+  "c3": [
+   0.3,
+   0.28,
+   0.25
+  ],
+  "wet": false,
+  "bump": 0.4,
+  "crack_w": 0.3,
+  "verwitterung": {
+   "dirt": 0.3,
+   "var": 0.03
+  }
+ },
+ "material.steilwand": "siehe material.wahrzeichen_fels",
+ "material.boden": {
+  "dorf": "konoha.ground_material()",
+  "strasse": "konoha.street_ground_material(half_w 12)",
+  "platz": "konoha.street_material (Pflaster)",
+  "zufahrt": "konoha.dirt_road_material",
+  "huegel": "siehe material.gras"
+ },
+ "objekte.haeuser": "siehe gebaeude.* (229 Gebäude)",
+ "objekte.dragonballs": "entfällt (nicht in dieser Welt)",
+ "objekte.raumschiff": "entfällt (nicht in dieser Welt)",
+ "wasser.kacheln": "entfällt (kein Wasser)",
+ "wasser.wellen": "entfällt (kein Wasser)",
+ "wasser.material": "entfällt (kein Wasser)",
+ "wasser.brandung": "entfällt (kein Wasser)",
+ "baum.varianten": {
+  "laubbaeume": [
+   [
+    14,
+    5.0,
+    26
+   ],
+   [
+    11,
+    4.2,
+    22
+   ],
+   [
+    17,
+    6.0,
+    30
+   ],
+   [
+    8,
+    3.2,
+    16
+   ]
+  ],
+  "format": "[Höhe m, Kronenradius m, Blattcluster]",
+  "blaetter_je_cluster": 90,
+  "blattgroesse": 0.4,
+  "seeds": "60 + i",
+  "nadelbaeume": "siehe baum.nadelbaum"
+ },
+ "baum.material": {
+  "KLeaves": {
+   "c1": [
+    0.035,
+    0.1,
+    0.018
+   ],
+   "c2": [
+    0.12,
+    0.22,
+    0.04
+   ]
+  },
+  "KLeaves2": {
+   "c1": [
+    0.05,
+    0.12,
+    0.02
+   ],
+   "c2": [
+    0.16,
+    0.24,
+    0.05
+   ]
+  },
+  "rinde": "nature.bark_material (Standard)",
+  "abwechselnd": "gerade Varianten KLeaves"
+ },
+ "baum.haine": "siehe baum.wald und baum.dorf",
+ "baum.abstaende": {
+  "dorf_mauer": "innerhalb Radius 182 m",
+  "dorf_strasse": "|x| > 14 m",
+  "dorf_gebaeude": "außerhalb Grundriss + 2,5 m",
+  "dorf_residenz": 28.0,
+  "wald_mauer": "Radius > 202 m",
+  "wald_torstrasse": "|x| < 11 m bei y < 5 frei",
+  "wald_felsband": "y 335–394 frei"
+ },
+ "baum.sichtlinie": "entfällt (Kampf auf dem Dach, kein Baum in der Sichtlinie)",
+ "findlinge": "entfällt (keine)",
+ "sandflecken": "entfällt (keine)",
+ "pilze": "entfällt (keine)",
+ "gras.feld": "entfällt (Gras nur als Material, keine Halme)",
+ "gras.farben": "siehe material.gras",
+ "gras.aussparungen": "entfällt (keine Halme)",
+ "gras.bewegung": "entfällt (keine Halme)",
+ "gras.druckwellen": "entfällt (keine Halme)",
+ "gras.brennen": "entfällt (keine Halme)",
+ "kamera.brennweite": 35.0,
+ "kamera.sensor": {
+  "fit": "VERTICAL",
+  "hoehe_mm": 36.0
+ },
+ "kamera.wegpunkte": [
+  {
+   "t": 0.0,
+   "pos": [
+    0.0,
+    -32.0,
+    9.0
+   ]
+  },
+  {
+   "t": 1.8,
+   "pos": [
+    0.0,
+    0.0,
+    7.0
+   ]
+  },
+  {
+   "t": 2.7,
+   "pos": [
+    0.5,
+    20.0,
+    5.0
+   ]
+  },
+  {
+   "t": 3.2,
+   "pos": [
+    1.5,
+    31.0,
+    3.6
+   ]
+  },
+  {
+   "t": 4.0,
+   "pos": [
+    -1.5,
+    50.0,
+    4.2
+   ]
+  },
+  {
+   "t": 4.8,
+   "pos": [
+    -2.0,
+    69.0,
+    3.6
+   ]
+  },
+  {
+   "t": 5.7,
+   "pos": [
+    -1.5,
+    90.0,
+    4.0
+   ]
+  },
+  {
+   "t": 6.4,
+   "pos": [
+    -4.5,
+    104.0,
+    3.6
+   ]
+  },
+  {
+   "t": 7.1,
+   "pos": [
+    -7.5,
+    116.0,
+    4.5
+   ]
+  },
+  {
+   "t": 7.8,
+   "pos": [
+    -6.5,
+    128.0,
+    5.5
+   ]
+  },
+  {
+   "t": 8.4,
+   "pos": [
+    -5.0,
+    142.0,
+    7.5
+   ]
+  },
+  {
+   "t": 9.0,
+   "pos": [
+    -5.5,
+    157.0,
+    10.5
+   ]
+  },
+  {
+   "t": 9.55,
+   "pos": [
+    -10.0,
+    174.0,
+    16.5
+   ]
+  },
+  {
+   "t": 10.1,
+   "pos": [
+    -15.5,
+    192.0,
+    24.5
+   ]
+  },
+  {
+   "t": 10.55,
+   "pos": [
+    -19.5,
+    205.5,
+    31.0
+   ]
+  },
+  {
+   "t": 10.85,
+   "pos": [
+    -20.0,
+    212.2,
+    35.45
+   ]
+  },
+  {
+   "t": 11.3,
+   "pos": [
+    -22.5,
+    218.5,
+    34.65
+   ]
+  },
+  {
+   "t": 12.2,
+   "pos": [
+    -19.5,
+    219.0,
+    34.35
+   ]
+  },
+  {
+   "t": 13.2,
+   "pos": [
+    -16.6,
+    220.0,
+    34.25
+   ]
+  },
+  {
+   "t": 14.45,
+   "pos": [
+    -15.25,
+    220.6,
+    34.05
+   ]
+  },
+  {
+   "t": 15.0,
+   "pos": [
+    -15.25,
+    229.0,
+    33.65
+   ]
+  },
+  {
+   "t": 15.9,
+   "pos": [
+    -13.6,
+    228.0,
+    34.45
+   ]
+  },
+  {
+   "t": 17.1,
+   "pos": [
+    -13.7,
+    226.4,
+    32.0
+   ]
+  },
+  {
+   "t": 20.05,
+   "pos": [
+    -13.3,
+    230.4,
+    32.4
+   ]
+  }
+ ],
+ "kamera.tempo": [
+  [
+   0.0,
+   17.8
+  ],
+  [
+   0.5,
+   17.1
+  ],
+  [
+   1.0,
+   17.4
+  ],
+  [
+   1.5,
+   18.8
+  ],
+  [
+   2.0,
+   21.8
+  ],
+  [
+   2.5,
+   23.0
+  ],
+  [
+   3.0,
+   22.2
+  ],
+  [
+   3.5,
+   24.2
+  ],
+  [
+   4.0,
+   24.0
+  ],
+  [
+   4.5,
+   23.7
+  ],
+  [
+   5.0,
+   23.9
+  ],
+  [
+   5.5,
+   22.9
+  ],
+  [
+   6.0,
+   20.7
+  ],
+  [
+   6.5,
+   18.4
+  ],
+  [
+   7.0,
+   17.4
+  ],
+  [
+   7.5,
+   16.8
+  ],
+  [
+   8.0,
+   23.4
+  ],
+  [
+   8.5,
+   24.3
+  ],
+  [
+   9.0,
+   29.2
+  ],
+  [
+   9.5,
+   35.6
+  ],
+  [
+   10.0,
+   37.1
+  ],
+  [
+   10.5,
+   31.6
+  ],
+  [
+   11.0,
+   18.6
+  ],
+  [
+   11.5,
+   4.2
+  ],
+  [
+   12.0,
+   2.7
+  ],
+  [
+   12.5,
+   3.5
+  ],
+  [
+   13.0,
+   2.6
+  ],
+  [
+   13.5,
+   0.9
+  ],
+  [
+   14.0,
+   1.0
+  ],
+  [
+   14.5,
+   8.5
+  ],
+  [
+   15.0,
+   5.7
+  ],
+  [
+   15.5,
+   1.9
+  ],
+  [
+   16.0,
+   2.6
+  ],
+  [
+   16.5,
+   2.7
+  ],
+  [
+   17.0,
+   2.1
+  ],
+  [
+   17.5,
+   1.6
+  ],
+  [
+   18.0,
+   1.4
+  ],
+  [
+   18.5,
+   1.3
+  ],
+  [
+   19.0,
+   1.2
+  ],
+  [
+   19.5,
+   1.3
+  ],
+  [
+   20.0,
+   1.4
+  ]
+ ],
+ "kamera.halte": [
+  [
+   12.35,
+   2
+  ],
+  [
+   12.9,
+   2
+  ],
+  [
+   15.0,
+   4
+  ]
+ ],
+ "kamera.ausrichtung": {
+  "look_pitch": -2.0,
+  "pitch_follow": 0.45,
+  "bank_gain": 1.0,
+  "max_bank": 30,
+  "micro": 1.0,
+  "seed": 9
+ },
+ "kamera.pitch_overrides": "entfällt (keine)",
+ "kamera.blickgewicht": [
+  [
+   0.0,
+   0.0
+  ],
+  [
+   1.8,
+   0.0
+  ],
+  [
+   2.6,
+   0.25
+  ],
+  [
+   6.0,
+   0.25
+  ],
+  [
+   6.5,
+   0.0
+  ],
+  [
+   7.8,
+   0.0
+  ],
+  [
+   8.6,
+   0.45
+  ],
+  [
+   10.3,
+   0.6
+  ],
+  [
+   10.85,
+   1.0
+  ],
+  [
+   21.0,
+   1.0
+  ]
+ ],
+ "kamera.blickziele": [
+  {
+   "phase": "Kämpferpaar",
+   "ziel": "Mitte + 1,0 m"
+  },
+  {
+   "phase": "Naruto gegen das Horn",
+   "von": [
+    12.55,
+    12.75
+   ],
+   "bis": [
+    13.05,
+    13.4
+   ],
+   "ziel": "Naruto + 1,2 m"
+  },
+  {
+   "phase": "nach dem Zusammenprall",
+   "von": [
+    15.12,
+    15.5
+   ],
+   "ziel": "Naruto + 1,2 m"
+  },
+  {
+   "phase": "Schlussbild",
+   "von": [
+    16.8,
+    17.8
+   ],
+   "ziel": "Naruto + 1,3 m (Blick 8° nach oben)"
+  }
+ ],
+ "kamera.glaettung_ziele": "entfällt (Kämpferbahnen ungeglättet (choreo.track))",
+ "kamera.stoesse": {
+  "liste": [
+   [
+    10.95,
+    1.0,
+    6
+   ],
+   [
+    11.5,
+    0.8,
+    6
+   ],
+   [
+    11.95,
+    0.8,
+    6
+   ],
+   [
+    12.35,
+    1.2,
+    7
+   ],
+   [
+    12.9,
+    1.6,
+    8
+   ],
+   [
+    15.0,
+    3.2,
+    10
+   ]
+  ],
+  "format": "[Zeit s, Stärke °, Frames]",
+  "seed": 77,
+  "pos_amp": 0.03
+ },
+ "figur.<name>.modell": "siehe figur.naruto.modell / figur.sasuke.modell",
+ "figur.<name>.hoehe": "siehe figur.naruto.hoehe / figur.sasuke.hoehe",
+ "figur.<name>.gelenke": "siehe figur.naruto.gelenke / figur.sasuke.gelenke",
+ "figur.<name>.schwanz": "entfällt (kein Schwanz)",
+ "figur.<name>.material": "siehe figur.naruto.material / figur.sasuke.material",
+ "figur.<name>.kontur": "entfällt (keine Kontur, halbrealistische Stoff-/Hautmaterialien)",
+ "figur.<name>.gewichte": "entfällt (Teile hängen an den Gelenken, keine Gewichtsrechnung)",
+ "figur.backen": {
+  "style": "choreo.default_style",
+  "nachziehen_s": {
+   "elbow": 0.07,
+   "wrist": 0.12,
+   "neck": 0.03,
+   "head": 0.06
+  },
+  "seed_naruto": 1,
+  "seed_sasuke": 2,
+  "look_win_naruto": [
+   17.0,
+   21.0
+  ]
+ },
+ "figur.schwanz_peitsche": "entfällt (kein Schwanz)",
+ "figur.aura": "entfällt (keine Aura)",
+ "figur.verschwinden": "kein Ausblenden: Sasuke springt 16,15–17,1 s über die Brüstung aus dem Bild",
+ "figur.mimik": "nicht erfasst",
+ "kampf.brusthoehe": {
+  "paar": 1.0,
+  "naruto": 1.2,
+  "schlussbild": 1.3,
+  "hinweis": "Blickziel über dem Ursprung"
+ },
+ "kampf.stil": {
+  "angriff": [
+   0.36,
+   0.2,
+   0.14
+  ],
+  "reaktion": [
+   0.12,
+   0.0,
+   0.18
+  ],
+  "landung": [
+   0.14,
+   0.0,
+   0.14
+  ],
+  "sprung": [
+   0.2,
+   0.1,
+   0.06
+  ],
+  "lauf": [
+   0.14,
+   0.0,
+   0.05
+  ],
+  "aufladen": [
+   0.3,
+   0.1,
+   0.06
+  ],
+  "sonst": [
+   0.32,
+   0.06,
+   0.07
+  ],
+  "format": "[Dauer s, Ausholen, Überschwingen] (choreo.default_style)"
+ },
+ "kampf.bahnprofile": "Standard-Interpolation (keine ease-Angaben in den Schlüsseln)",
+ "kampf.hitstops": [
+  [
+   10.95,
+   3
+  ],
+  [
+   11.5,
+   3
+  ],
+  [
+   11.95,
+   3
+  ],
+  [
+   12.35,
+   3
+  ],
+  [
+   12.9,
+   3
+  ],
+  [
+   15.0,
+   4
+  ]
+ ],
+ "kampf.teaser": [
+  {
+   "t": 1.3,
+   "ort_dach": [
+    3.0,
+    5.0,
+    3.5
+   ]
+  },
+  {
+   "t": 5.3,
+   "ort_dach": [
+    3.0,
+    5.0,
+    3.5
+   ]
+  }
+ ],
+ "kampf.vorstoss": {
+  "naruto": {
+   "t": [
+    14.65,
+    15.0
+   ],
+   "von_dach": [
+    6.9,
+    6.5
+   ],
+   "nach_dach": [
+    5.37,
+    6.5,
+    1.0
+   ]
+  },
+  "sasuke": {
+   "t": [
+    14.65,
+    15.0
+   ],
+   "von_dach": [
+    2.6,
+    6.5
+   ],
+   "nach_dach": [
+    4.13,
+    6.5,
+    1.0
+   ]
+  }
+ },
+ "kampf.zusammenprall": {
+  "luft": {
+   "t": 10.95,
+   "ort_dach": [
+    3.25,
+    5.0,
+    3.3
+   ]
+  },
+  "klimax": {
+   "t": 15.0,
+   "ort_dach": [
+    4.75,
+    6.5,
+    1.0
+   ],
+   "ort_welt": [
+    -15.25,
+    237.5,
+    32.65
+   ]
+  }
+ },
+ "kampf.schlaghagel": {
+  "wechsel": [
+   [
+    11.5,
+    "S",
+    "kick_L",
+    "N blockt"
+   ],
+   [
+    11.95,
+    "N",
+    "punch_R",
+    "S blockt"
+   ],
+   [
+    12.35,
+    "N",
+    "kick_R (Sprungtritt)",
+    "S blockt"
+   ],
+   [
+    12.65,
+    "S",
+    "kick_L (Drehtritt)",
+    "trifft"
+   ]
+  ],
+  "linie_y_dach": 1.8
+ },
+ "kampf.aktionen": {
+  "konter": 12.67,
+  "horn": 12.9,
+  "chidori_aufladen": [
+   13.45,
+   14.5
+  ],
+  "rasengan_aufladen": [
+   13.6,
+   14.5
+  ],
+  "ansturm": 14.65,
+  "sasuke_absprung": [
+   16.15,
+   17.1
+  ],
+  "naruto_steht_auf": 16.4,
+  "hero_pose": 17.0
+ },
+ "kampf.zanzoken": "entfällt (keine Teleports)",
+ "kampf.strahlen": "entfällt (keine Strahlen)",
+ "kampf.trennung": {
+  "rueckstoss": 15.35,
+  "landung": 15.8,
+  "naruto_dach": [
+   8.9,
+   4.3
+  ],
+  "sasuke_dach": [
+   -5.5,
+   8.6
+  ]
+ },
+ "kampf.duell": {
+  "aufladen": [
+   13.45,
+   14.5
+  ],
+  "start": 14.65,
+  "klimax": 15.0
+ },
+ "kampf.posen": "hero (Faust zur Kamera) + Posenbibliothek figures.POSES (guard, jump, kick_R/L, punch_R/L, recoil, land, run_a/b, crouch_charge_R/L, dash_thrust_R/L, stand)",
+ "kampf.schluessel": "siehe kampfplan_und_kamera.json (Naruto 38, Sasuke 33 Schlüssel)",
+ "fx.farben": {
+  "rasengan": [
+   0.12,
+   0.42,
+   1.0
+  ],
+  "chidori": [
+   0.35,
+   0.6,
+   1.0
+  ],
+  "klimax_kugel": [
+   0.3,
+   0.55,
+   1.0
+  ],
+  "klimax_blitz": [
+   0.75,
+   0.85,
+   1.0
+  ],
+  "teaser": [
+   0.55,
+   0.75,
+   1.0
+  ],
+  "treffer": [
+   1.0,
+   0.75,
+   0.4
+  ],
+  "horn": [
+   1.0,
+   0.8,
+   0.5
+  ]
+ },
+ "fx.kispur": "entfällt (keine Ki-Spuren)",
+ "fx.zanzoken": "entfällt (keine Teleports)",
+ "fx.treffer": "siehe fx.impact_klein",
+ "fx.teaser_blitze": {
+  "r": 6.5,
+  "dauer": 12,
+  "licht": 30000.0,
+  "core_s": 25.0,
+  "glow_s": 6.0,
+  "glow_alpha": 0.35,
+  "funken": 120,
+  "funken_tempo": [
+   6,
+   14
+  ],
+  "funken_leben": [
+   0.2,
+   0.5
+  ]
+ },
+ "fx.druckwellen": {
+  "treffer": {
+   "r": [
+    2.2,
+    3.5
+   ],
+   "dauer": 8,
+   "dicke": 0.1,
+   "gluehen": 1.5
+  },
+  "klimax": {
+   "r": 15.0,
+   "dauer": 12,
+   "dicke": 0.2,
+   "gluehen": 2.5
+  },
+  "ior": 1.04
+ },
+ "fx.einschlag": {
+  "horn_staub": {
+   "n": 260,
+   "r": 3.0,
+   "steigen": 1.2,
+   "leben": 1.2
+  },
+  "klimax_staub": {
+   "n": 1600,
+   "r": 8.0,
+   "steigen": 1.8,
+   "leben": 1.6
+  },
+  "brandfleck_r": 1.6,
+  "bruchstuecke": "siehe fx.bruch"
+ },
+ "fx.strahlen": "entfällt (keine Strahlen)",
+ "fx.duell": "siehe fx.techniken",
+ "fx.explosion": "entfällt (keine Explosion)",
+ "fx.sicherheit": {
+  "transparent_bounces": 8,
+  "bruchstuecke_bis_blitz_ausgeblendet": true
+ },
+ "render.aufloesung": {
+  "final": [
+   720,
+   1280
+  ],
+  "vorschau": [
+   270,
+   480
+  ],
+  "standbild": [
+   540,
+   960
+  ],
+  "szene_gebaut_mit": [
+   540,
+   960
+  ]
+ },
+ "render.samples": {
+  "final": 32,
+  "vorschau": 8,
+  "standbild": 16
+ },
+ "render.adaptiv": 0.04,
+ "render.denoiser": "OpenImageDenoise, Albedo+Normal, ACCURATE",
+ "render.bounces": {
+  "max": 4,
+  "diffus": 2,
+  "glossy": 2,
+  "transmission": 6,
+  "volumen": 0,
+  "transparent": 8
+ },
+ "render.clamp": 6.0,
+ "render.blur_glossy": 1.0,
+ "render.light_tree": true,
+ "render.persistent": true,
+ "render.volumen": "Standard (step_rate 1,0, max_steps 1024; keine Volumen)",
+ "render.motion_blur": {
+  "an": true,
+  "shutter": 0.5
+ },
+ "render.filter": [
+  "BLACKMAN_HARRIS",
+  1.5
+ ],
+ "render.paesse": {
+  "paesse": [
+   "Combined",
+   "Mist",
+   "Environment"
+  ],
+  "mist_tiefe": 6000.0,
+  "film_transparent": true
+ },
+ "render.seed": {
+  "seed": 7,
+  "animiert": false
+ },
+ "post.dunst": {
+  "mist_depth": 6000,
+  "haze_dist": 1600,
+  "haze_start": 20,
+  "haze_color": [
+   0.62,
+   0.7,
+   0.82
+  ],
+  "haze_sky": true
+ },
+ "post.look": "AgX - Medium High Contrast",
+ "post.farbe": {
+  "sat": 1.12,
+  "ev": 0.15
+ },
+ "post.autobelichtung": {
+  "ae_ref": -2.3,
+  "ae_strength": 0.55,
+  "ae_tau": 0.45,
+  "ev_bereich": [
+   -0.61,
+   0.47
+  ]
+ },
+ "post.bloom": {
+  "bloom": 0.22,
+  "bloom_thr": 1.6,
+  "fog_glow": 0.6,
+  "bloom_clamp": 4.0
+ },
+ "post.optik": {
+  "dispersion": 0.006,
+  "vignette": 0.22,
+  "grain": 0.025
+ },
+ "post.pulse": [
+  [
+   10.95,
+   0.4,
+   0.008,
+   0.06
+  ],
+  [
+   11.5,
+   0.35,
+   0.006,
+   0.06
+  ],
+  [
+   11.95,
+   0.35,
+   0.006,
+   0.06
+  ],
+  [
+   12.35,
+   0.5,
+   0.01,
+   0.07
+  ],
+  [
+   12.9,
+   0.6,
+   0.012,
+   0.08
+  ],
+  [
+   15.0,
+   1.8,
+   0.02,
+   0.07
+  ]
+ ],
+ "post.flare": "entfällt (kein Lens Flare)",
+ "encode.skalierung": [
+  "Lanczos",
+  [
+   1080,
+   1920
+  ]
+ ],
+ "encode.master": {
+  "codec": "H.264 High, Zwei-Pass, preset slow",
+  "soll_mbit": 18,
+  "maxrate": "20.2M",
+  "bufsize": "36M",
+  "ist_mbit": 18.0,
+  "mb": 45.0
+ },
+ "encode.web": {
+  "mbit": 10,
+  "maxrate": "11.2M",
+  "bufsize": "20M",
+  "ist_mbit": 10.0,
+  "mb": 24.9
+ },
+ "zeit.szene_bauen": "ca. 1,4 min (06:17:07 → Blend gespeichert 06:18:31)",
+ "zeit.frame_mittel": 151.5,
+ "zeit.frame_max": 1017.0,
+ "zeit.render_gesamt": 20.2,
+ "zeit.wanduhr": 22.5,
+ "zeit.vorschau": {
+  "v1_480_frames_270x480_8spp_min": 45.3,
+  "v2_480_frames_270x480_8spp_min": 61.4
+ },
+ "ressourcen.ram": "3,7–7,6 GB im System belegt (zusammen mit der Namek-Vorschau), 16 GB gesamt",
+ "ressourcen.blend": 120,
+ "ressourcen.exr": "≈0,78 MB/Frame (376 MB gesamt), dazu 839 MB PNG",
+ "ressourcen.neustarts": "2 (4 Starts im Log; nach Frame 104 ein Doppelstart: Frames 105–113 liefen zweimal parallel, daher bis 1017 s/Frame)",
+ "sound.marker": [
+  {
+   "name": "AMBIENCE",
+   "t": 0.0,
+   "frame": 1
+  },
+  {
+   "name": "WHOOSH",
+   "t": 1.83,
+   "frame": 45
+  },
+  {
+   "name": "WHOOSH",
+   "t": 3.29,
+   "frame": 80
+  },
+  {
+   "name": "WHOOSH",
+   "t": 4.92,
+   "frame": 119
+  },
+  {
+   "name": "WHOOSH",
+   "t": 6.71,
+   "frame": 162
+  },
+  {
+   "name": "WHOOSH",
+   "t": 8.62,
+   "frame": 208
+  },
+  {
+   "name": "WHOOSH",
+   "t": 10.85,
+   "frame": 261
+  },
+  {
+   "name": "IMPACT",
+   "t": 10.95,
+   "frame": 264
+  },
+  {
+   "name": "IMPACT",
+   "t": 11.5,
+   "frame": 277
+  },
+  {
+   "name": "IMPACT",
+   "t": 11.95,
+   "frame": 288
+  },
+  {
+   "name": "IMPACT",
+   "t": 12.35,
+   "frame": 297
+  },
+  {
+   "name": "IMPACT",
+   "t": 12.9,
+   "frame": 311
+  },
+  {
+   "name": "BEAT_DROP",
+   "t": 15.0,
+   "frame": 361
+  },
+  {
+   "name": "AMBIENCE",
+   "t": 17.0,
+   "frame": 409
+  }
+ ],
+ "bewertung.freigabe": "Vorschau v2 am 2026-09-29 07:41 freigegeben („naruto sieht so brutal aus“), Final-Start 07:42, Final geliefert 2026-09-30 06:14",
+ "bewertung.korrekturen": [
+  "2026-09-27: Konoha v3 nach Dominiks Referenzbildern (Pastellfassaden, bunte Dächer, Wassertanks, ockerfarbener Felsen)",
+  "2026-09-27: „Bei Naruto finde ich den Kameraflug sehr gut.“ Wunsch: Kampf Naruto gegen Sasuke auf dem Dach, nur Rasengan gegen Chidori, Wow-Effekt",
+  "2026-09-28: Cinematic-Briefing → Speed-Ramp, Sonne 10–25°, Randlicht, Verwitterung, Impact-Paket, Straßenleben, Laternen an Seilen, Schlussbild an den Gesichtern (Schritte 3.1–3.6)",
+  "2026-09-28: Kampfort-Vorschlag am Tor abgelehnt („neeee die sollen am ende auf dem dach vom haus des hokage einen kurzen kmpf haben.“) → Dachkampf; Brennweite fest 35 mm",
+  "2026-09-28: Final in 720p hochskaliert („720p aber zeig mir vorab das video“)",
+  "2026-09-29: „Der Kampf … hätte ich gerne nur da, wo er am Ende ist, auf dem Dach … länger gezeigt.“ → Flug 0–10,9 s ohne Kampf, Teaser-Blitze 1,3/5,3 s, Dachkampf 10,95–20 s (vorher ca. 5,5 s)",
+  "2026-09-29: Trefferlichter auf dem Dach von 3500–5000 W auf 1000–1600 W gesenkt (grelle Lichtflecken)"
+ ],
+ "bewertung.reaktion": "„naruto sieht so brutal aus“ (Vorschau v2); zum Flug: „Bei Naruto finde ich den Kameraflug sehr gut.“",
+ "bewertung.social": null,
+ "schiff.modell": "entfällt (kein Schiff, keine Crew)",
+ "schiff.kurs": "entfällt (kein Schiff, keine Crew)",
+ "schiff.tempo": "entfällt (kein Schiff, keine Crew)",
+ "schiff.start": "entfällt (kein Schiff, keine Crew)",
+ "schiff.bewegung": "entfällt (kein Schiff, keine Crew)",
+ "schiff.flaggen": "entfällt (kein Schiff, keine Crew)",
+ "schiff.gischt": "entfällt (kein Schiff, keine Crew)",
+ "schiff.kielwasser": "entfällt (kein Schiff, keine Crew)",
+ "kamera.speed_keys": "entfällt (Tempo aus Wegpunkt-Zeiten (kamera.wegpunkte))",
+ "kamera.route_welt": "siehe stadt.route (Blockout) und kamera.wegpunkte",
+ "kamera.route_schiff": "entfällt (kein Schiff, keine Crew)",
+ "kamera.uebergang": "entfällt (kein Schiff, keine Crew)",
+ "kamera.impact": "entfällt (Kamerastöße über kamera.stoesse)",
+ "licht.randlicht_fade": "entfällt (Randlicht durchgehend)",
+ "crew.figuren": "entfällt (kein Schiff, keine Crew)",
+ "crew.aufstellung": "entfällt (kein Schiff, keine Crew)",
+ "crew.schauspiel": "entfällt (kein Schiff, keine Crew)",
+ "crew.posen_map": "entfällt (kein Schiff, keine Crew)",
+ "crew.drehung": "entfällt (kein Schiff, keine Crew)",
+ "crew.requisiten": "entfällt (kein Schiff, keine Crew)",
+ "crew.texturen": "entfällt (kein Schiff, keine Crew)",
+ "figur.naruto.modell": "selbst gebaut: ninja.naruto() nach den Shippuden-Model-Sheets (Skin-Modifier-Skelett + Subdivision, Kleidung als Teile, Haar-Stacheln, Uzumaki-Spirale als Decal)",
+ "figur.sasuke.modell": "selbst gebaut: ninja.sasuke() (hellgraues Hemd mit Uchiha-Wappen, indigo Hüftwickel, lila Seilgürtel, Kusanagi)",
+ "figur.naruto.hoehe": 1.66,
+ "figur.sasuke.hoehe": "1,66 (Code; Docstring nennt 1,68)",
+ "figur.naruto.gelenke": "eigenes Gelenk-Rig (figures.Figure)",
+ "figur.sasuke.gelenke": "eigenes Gelenk-Rig (figures.Figure)",
+ "figur.naruto.material": {
+  "orange": [
+   0.86,
+   0.26,
+   0.035
+  ],
+  "schwarz": [
+   0.028,
+   0.028,
+   0.032
+  ],
+  "haar": [
+   0.95,
+   0.7,
+   0.06
+  ],
+  "stirnband": [
+   0.02,
+   0.025,
+   0.055
+  ],
+  "platte": [
+   0.62,
+   0.63,
+   0.66
+  ],
+  "bandage": [
+   0.8,
+   0.78,
+   0.72
+  ],
+  "stiefel": [
+   0.045,
+   0.045,
+   0.05
+  ],
+  "haut": "skin_material Standard"
+ },
+ "figur.sasuke.material": {
+  "grau": [
+   0.4,
+   0.4,
+   0.46
+  ],
+  "indigo": [
+   0.045,
+   0.045,
+   0.16
+  ],
+  "hose": [
+   0.035,
+   0.035,
+   0.11
+  ],
+  "beinwickel": [
+   0.16,
+   0.16,
+   0.18
+  ],
+  "seil": [
+   0.2,
+   0.1,
+   0.34
+  ],
+  "haut": [
+   0.74,
+   0.48,
+   0.35
+  ],
+  "haar": [
+   0.012,
+   0.012,
+   0.025
+  ]
+ }
+}

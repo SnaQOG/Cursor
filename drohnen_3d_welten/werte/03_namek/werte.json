@@ -5,8 +5,336 @@
   "datum_final": "2026-10-02",
   "code_commit": "ef59ba2 (Branch claude/eloquent-archimedes-og1asl)",
   "welt_modul": "world_dragonball",
-  "datei_master": "drohnen_3d_welten/videos/03_DragonBall_Namek.mp4"
+  "datei_master": "drohnen_3d_welten/videos/03_DragonBall_Namek.mp4",
+  "typ": "Anime-Welt + Kampf"
  },
+ "briefing.stadt": "Planet Namek (Dragon Ball Z), Kampf Son Goku gegen Freezer",
+ "briefing.stil": "Umgebung halbrealistisch (physikalisch), Figuren Toon (Tripo-Modelle mit Kontur)",
+ "briefing.tageszeit": "Dauertag mit drei Sonnen; Hauptsonne tief (19°) links hinten",
+ "briefing.wetter": "klar, Wolkenbedeckung 22 %",
+ "briefing.stimmung": "Kampf im Dragon-Ball-Tempo über blauem Gras, Klimax Explosion über dem Meer",
+ "briefing.kameratyp": "FPV, eine durchgehende Aufnahme ohne Schnitt",
+ "briefing.verwendung": "nicht ausdrücklich festgelegt (NIDO-Drohnenvideo)",
+ "briefing.engine": "Cycles, CPU",
+ "briefing.budget": "vorab geschätzt 15–20 h für das Final (720p, 32 Samples)",
+ "briefing.hardware": {
+  "cpu_kerne": 4,
+  "gpu": "keine",
+  "ram_gb": 16,
+  "umgebung": "Cloud-Container, wird bei Leerlauf neu gestartet"
+ },
+ "briefing.ausgabe": {
+  "frames": "EXR je Pass (Scratchpad)",
+  "video": "H.264 MP4 1080 × 1920 → drohnen_3d_welten/videos/"
+ },
+ "briefing.referenzen": "Dominiks Anime-Bilder von Namek (Farben per Pixelmessung), Model Sheets Goku/Freezer, Tripo-Modelle",
+ "briefing.palette": "siehe himmel.verlauf, gras.farben, material.fels (aus den Referenzbildern gemessen)",
+ "planung.einheiten": {
+  "system": "METRIC",
+  "skalierung": 1.0,
+  "bu": "1 BU = 1 m"
+ },
+ "planung.detailbudget": "Gras nah 360 Halme/m², Grund 170, fern 8 (gras.feld); ferne Felsen und Inseln als einfache Meshes; keine LOD-Stufen",
+ "planung.collections": [
+  "AjisaTrees",
+  "AjisaTrees_0",
+  "AjisaTrees_1",
+  "AjisaTrees_2",
+  "AjisaTrees_3",
+  "glTF_not_exported",
+  "RigidBodyWorld",
+  "RimLightReceivers"
+ ],
+ "planung.versionierung": "Szene final/namek_final_v2.blend (Scratchpad), Code-Commit ef59ba2",
+ "stadt.koordinaten": "siehe ablauf.koordinaten",
+ "stadt.flaeche": "entfällt (keine Stadt)",
+ "stadt.mauer": "entfällt (keine Stadt)",
+ "stadt.tor": "entfällt (keine Stadt)",
+ "stadt.hauptstrasse": "entfällt (keine Stadt)",
+ "stadt.zufahrt": "entfällt (keine Stadt)",
+ "stadt.platz": "entfällt (keine Stadt)",
+ "stadt.gelaende": "entfällt (keine Stadt)",
+ "stadt.gelaende_mesh": "entfällt (keine Stadt)",
+ "stadt.wasser": "entfällt (keine Stadt)",
+ "stadt.bruecken_treppen": "entfällt (keine Stadt)",
+ "stadt.landmarken": "keine Stadt; Landmarken: Felsnadel 1 (y 52) und 2 (y 72) für den Slalom, Tafelberg-Wand (Steigflug), Kante (Reveal), Dragon Balls, Raumschiff",
+ "stadt.sichtachsen": "entfällt (keine Stadt)",
+ "stadt.route": "siehe kamera.wegpunkte",
+ "stadt.seed": "entfällt (keine Stadt)",
+ "gebaeude.anzahl": "entfällt (keine Stadt)",
+ "gebaeude.strassenzeile": "entfällt (keine Stadt)",
+ "gebaeude.stile": "entfällt (keine Stadt)",
+ "gebaeude.raster": "entfällt (keine Stadt)",
+ "gebaeude.platzrand": "entfällt (keine Stadt)",
+ "gebaeude.stockwerkhoehe": "entfällt (keine Stadt)",
+ "gebaeude.tuerme": "entfällt (keine Stadt)",
+ "gebaeude.daecher": "entfällt (keine Stadt)",
+ "gebaeude.dachaufbauten": "entfällt (keine Stadt)",
+ "gebaeude.fassade": "entfällt (keine Stadt)",
+ "gebaeude.banner": "entfällt (keine Stadt)",
+ "gebaeude.schilder": "entfällt (keine Stadt)",
+ "gebaeude.tueren": "entfällt (keine Stadt)",
+ "gebaeude.hero": "entfällt (keine Stadt)",
+ "gebaeude.bevel": "entfällt (keine Stadt)",
+ "gebaeude.lod": "entfällt (keine Stadt)",
+ "gebaeude.instancing": "entfällt (keine Stadt)",
+ "gebaeude.strassendetails": "entfällt (keine Stadt)",
+ "material.putz": "entfällt (keine Stadt)",
+ "material.daecher": "entfällt (keine Stadt)",
+ "material.terrakotta": "entfällt (keine Stadt)",
+ "material.fenster": "entfällt (keine Stadt)",
+ "material.verwitterung": "entfällt (keine Stadt)",
+ "material.dachbelag": "entfällt (keine Stadt)",
+ "material.strasse": "entfällt (keine Stadt)",
+ "material.gras": "siehe gras.farben (Halme) und material.boden",
+ "material.metall": "entfällt (keine Stadt)",
+ "material.holz": "entfällt (keine Stadt)",
+ "material.lack": "entfällt (keine Stadt)",
+ "material.stoff": "entfällt (keine Stadt)",
+ "material.mauer": "entfällt (keine Stadt)",
+ "material.wahrzeichen_fels": "entfällt (keine Stadt)",
+ "material.cc0": "entfällt (keine Stadt)",
+ "material.emission": "Raumschiff-Fenster, siehe objekte.raumschiff",
+ "material.texeldichte": "nicht erfasst",
+ "material.farbraum": "Tripo-Farbtexturen sRGB, Normal-Maps Non-Color; Umgebung prozedural",
+ "material.displacement": "nicht erfasst",
+ "material.kachelvariation": "prozedurale Materialien mit Rauschen (keine Kacheltexturen)",
+ "licht.himmel_typ": "eigener Shader (namek_sky)",
+ "licht.nishita": "entfällt (eigener Himmel)",
+ "licht.hdri": "entfällt (kein HDRI)",
+ "licht.nacht_quellen": "entfällt (Tagszene)",
+ "licht.farbtemperaturen": {
+  "sonne1": 4300,
+  "sonne2": 5600,
+  "sonne3": 4700,
+  "randlicht": 7800
+ },
+ "licht.schatten": "Hauptsonne 19° aus 225° (links hinten): lange Schatten, Gegenlicht durch Sonne 3",
+ "licht.mond_sterne": "entfällt (Tagszene)",
+ "licht.rig": "3 Sonnen + Randlicht (Light Linking auf die Kämpfer) + Effektlichter",
+ "atmosphaere.volumen": "entfällt (NIDO_ATMO = 0; Explosion als eigenes Volumen (fx.explosion))",
+ "atmosphaere.bodennebel": "entfällt (keiner)",
+ "atmosphaere.lichtstrahlen": "entfällt (keine)",
+ "atmosphaere.wetter": "entfällt (kein Wetter)",
+ "atmosphaere.tiefenschichten": {
+  "vorn": "Meer und Gras 2–30 m",
+  "mitte": "Tafelberg und Kampf 30–200 m",
+  "hinten": "Felsnadeln bis 1150 m, Inseln 1400–1700 m"
+ },
+ "leben.passanten": "entfällt (keine Stadt)",
+ "leben.passanten_vorlagen": "entfällt (keine Stadt)",
+ "leben.staende": "entfällt (keine Stadt)",
+ "leben.laternen": "entfällt (keine Stadt)",
+ "leben.waesche": "entfällt (keine Stadt)",
+ "leben.leitungen": "entfällt (keine Stadt)",
+ "leben.voegel": "entfällt (keine)",
+ "leben.blaetter": "entfällt (keine)",
+ "leben.pendeln": "Gras im Wind mit Böen (gras.bewegung)",
+ "leben.verkehr": "entfällt (keine Stadt)",
+ "leben.rauch": "Explosions-Rauchsäule (fx.explosion)",
+ "leben.flaggen": "entfällt (keine)",
+ "leben.caches": "Rigid-Body-Bruchstücke als Keyframes gebacken",
+ "leben.asynchron": "Gras: Böen und Druckwellen (gras.druckwellen)",
+ "baum.hero": "entfällt (keine Stadt)",
+ "baum.nadelbaum": "entfällt (keine Stadt)",
+ "baum.wald": "siehe baum.haine",
+ "baum.dorf": "entfällt (keine Stadt)",
+ "baum.buesche": "entfällt (keine Stadt)",
+ "baum.felsbewuchs": "entfällt (keine Stadt)",
+ "baum.streuung": "Ajisa-Bäume in Hainen (baum.haine)",
+ "wahrzeichen.wand": "entfällt (kein Relief; Tafelberg-Wand siehe gelaende.steilwand)",
+ "wahrzeichen.risse": "entfällt (kein Relief; Tafelberg-Wand siehe gelaende.steilwand)",
+ "wahrzeichen.gesichter": "entfällt (kein Relief; Tafelberg-Wand siehe gelaende.steilwand)",
+ "wahrzeichen.kinnlinie": "entfällt (kein Relief; Tafelberg-Wand siehe gelaende.steilwand)",
+ "wahrzeichen.details": "entfällt (kein Relief; Tafelberg-Wand siehe gelaende.steilwand)",
+ "kamera.fov": {
+  "vertikal_grad": 65.47,
+  "brennweite_mm": 28.0,
+  "sensor": "36 mm (Höhe)"
+ },
+ "kamera.blende": {
+  "dof": false,
+  "hinweis": "Schärfentiefe aus (großer Schärfebereich wie FPV)"
+ },
+ "kamera.clipping": [
+  0.05,
+  30000.0
+ ],
+ "kamera.overscan": "entfällt (kein Overscan)",
+ "kamera.manoever": [
+  [
+   1.9,
+   "Felsnadel 1 (y 52)",
+   "links vorbei"
+  ],
+  [
+   2.7,
+   "Felsnadel 2 (y 72)",
+   "rechts vorbei"
+  ],
+  [
+   5.2,
+   "Tafelberg-Wand",
+   "Steigflug dicht an der Wand"
+  ],
+  [
+   7.8,
+   "Kante",
+   "drüber: Reveal"
+  ],
+  [
+   9.55,
+   "Dragon Balls",
+   "links vorbei"
+  ],
+  [
+   10.0,
+   "Kampf",
+   "Abbremsen auf die Kämpfer"
+  ],
+  [
+   16.0,
+   "Explosion",
+   "zurückziehen und steigen"
+  ]
+ ],
+ "kamera.mindestabstand": {
+  "flug_meer": {
+   "m": 2.27,
+   "t": 1.875,
+   "objekt": "Ocean"
+  },
+  "steilwand": {
+   "m": 3.87,
+   "t": 7.0,
+   "objekt": "MesaWall"
+  },
+  "plateau": {
+   "m": 3.08,
+   "t": 9.042,
+   "objekt": "SandPatches"
+  },
+  "kampf": {
+   "m": 3.5,
+   "t": 10.125,
+   "objekt": "Mesa"
+  },
+  "hinweis": "Szene des Finals vermessen, ohne Figuren, Effekte und Grashalme; Meer im Wellenstand von Frame 1"
+ },
+ "kamera.hook": "0–2.7 s: Hook tief über dem Meer, Slalom an zwei Felsnadeln",
+ "kamera.schlussbild": "16.0–20.0 s: Nachglühen, Rauchsäule, Kamera zieht zurück und steigt",
+ "kamera.loop": "kein Loop: harter Anfang und ruhiges Schlussbild",
+ "render.engine": "Cycles, CPU (Cloud-Container mit 4 Kernen, keine GPU)",
+ "render.min_samples": "0 (automatisch)",
+ "render.kaustiken": {
+  "reflektiv": false,
+  "refraktiv": false
+ },
+ "render.vector_pass": "aus (Motion Blur im Render)",
+ "render.cryptomatte": "aus (Object, Material, Asset nicht aktiv)",
+ "render.mist": {
+  "start": 0.0,
+  "tiefe": 6000.0,
+  "abfall": "LINEAR"
+ },
+ "render.farbmanagement": {
+  "view_transform": "AgX",
+  "look": "None",
+  "exposure": 0.0,
+  "gamma": 1.0,
+  "display": "sRGB",
+  "hinweis": "der Look kommt in der Post (post.look)"
+ },
+ "render.ausgabe": {
+  "format": "OpenEXR je Pass (Image, Mist, Env), 16 Bit Half, Codec DWAA",
+  "sequenz": "f_####",
+  "ort": "Scratchpad (flüchtig), danach PNG + MP4"
+ },
+ "render.fortsetzbar": "ja: seq_final.py überspringt fertige Frames (fpv.frame_done); Overwrite/Placeholders nicht genutzt",
+ "render.vram": "entfällt (keine GPU; RAM siehe ressourcen.ram)",
+ "render.testframes": "nicht erfasst",
+ "render.hochrechnung": "vorab 15–20 h geschätzt (zu Beginn ~150 s/Frame → 18 h), tatsächlich 18,1 h",
+ "render.preflight": "entfällt (preflight_check.py gab es zum Zeitpunkt des Finals noch nicht)",
+ "comp.linsenverzerrung": "keine Verzerrung, nur laterale Dispersion (post.optik)",
+ "comp.halation": "entfällt (nicht verwendet)",
+ "comp.grading": "AgX Medium High Contrast, Auto-Belichtung, Pulse und Flare (post.*)",
+ "comp.cryptomatte_korrekturen": "entfällt (keine Cryptomatte)",
+ "comp.shake": "nicht im Comp; Kamerastöße im 3D (kamera.stoesse)",
+ "comp.letterbox": "entfällt (Vollbild 9:16)",
+ "comp.ki_variante": "entfällt (keine KI-Weiterverarbeitung)",
+ "ki.tool": "entfällt (keine KI-Generierung; Higgsfield/Kling/Seedance nicht genutzt)",
+ "ki.einstellungen": "entfällt (keine KI-Generierung)",
+ "ki.kosten": "entfällt (keine KI-Generierung)",
+ "ki.freigabe": "entfällt (keine KI-Generierung)",
+ "ki.eingabe": "entfällt (keine KI-Generierung)",
+ "bewertung.gates": [
+  {
+   "gate": "A",
+   "datum": "2026-09-28",
+   "frei": null,
+   "zitat": "Cinematic-Briefing; Zeitleiste vorgeschlagen, Freigabe nicht festgehalten"
+  },
+  {
+   "gate": "D",
+   "datum": "2026-09-30 21:49",
+   "frei": false,
+   "zitat": "„der kampf ist jetzt brutal. wir müssen aber die bewegungen und das aussehen von den 2 verbessen.“"
+  },
+  {
+   "gate": "D",
+   "datum": "2026-09-30 22:24",
+   "frei": false,
+   "zitat": "„… beachte aber das bei dragon ball diese immer sehr shcnell sind.“"
+  },
+  {
+   "gate": "D",
+   "datum": "2026-10-01 12:54",
+   "frei": true,
+   "zitat": "„die vorschau passt“"
+  },
+  {
+   "gate": "E",
+   "datum": "2026-10-01 15:05",
+   "frei": true,
+   "zitat": "„starte das finale …“ / 15:11 „nein, nacheinander passt.“"
+  }
+ ],
+ "qc.durchsicht": "Stichprobe aus 10 Zeitpunkten (Flug, Plateau, Kampf, Strahlenduell, Explosion), nicht das ganze Video",
+ "qc.frames": "480/480 Frames vorhanden",
+ "qc.flackern": "nicht erfasst",
+ "qc.textur": "nicht erfasst",
+ "qc.banding": "nicht erfasst",
+ "qc.zweitdisplay": "nicht erfasst",
+ "qc.anfang_ende": "kein Loop; Anfang in voller Fahrt, ruhiges Schlussbild",
+ "lieferung.master": {
+  "pfad": "drohnen_3d_welten/videos/03_DragonBall_Namek.mp4",
+  "mb": 44.9
+ },
+ "lieferung.varianten": [
+  "Webversion 10 Mbit/s (< 30 MB) für den Chat"
+ ],
+ "lieferung.dateiname": "<NN>_<Welt>_<Ort>.mp4, ohne Version und Datum",
+ "lieferung.archiv": "Code im Repo (Commit), Werte im Werte-Archiv; .blend, EXR und PNG nur im Scratchpad (nicht dauerhaft archiviert)",
+ "lieferung.obsidian": "ZIP-Paket „Drohnen Videos/3D Welten Blender/<NN Name>/{Test,Final,Werte}“",
+ "lieferung.wiederverwendbar": [
+  "choreo.py (dbz_style, Hit-Stops)",
+  "dbz_fx.py (Ki-Spuren, Zanzoken)",
+  "vfx.py (Strahlen, Explosion als Volumen, Aura)",
+  "tripo_chars.py (Tripo-Figuren riggen)",
+  "Skill anime-fpv-kampfvideo"
+ ],
+ "lieferung.notiz": "Dragon-Ball-Tempo von Anfang an planen; Tripo-Figuren früh einbauen; Sichtkorridor zu den Kämpfern freihalten",
+ "kampf.ort": {
+  "ort": "in der Luft über dem Plateau und dem Nordrand",
+  "zusammenprall": [
+   1.0,
+   273.0,
+   45.5
+  ]
+ },
+ "fx.impact_klein": "siehe fx.treffer",
+ "fx.bruch": "siehe fx.einschlag (16 Bruchstücke) und fx.strahlen (Brocken)",
+ "fx.techniken": "Kamehameha und Todesstrahl, siehe fx.strahlen und fx.duell",
  "format.dauer": 20.0,
  "format.fps": 24,
  "format.frames": 480,
@@ -1524,83 +1852,13 @@
   "seed": 78,
   "pos_amp": 0.03
  },
- "figur.goku.modell": "assets/models/dragonball/goku5/gokuactionfigure3dmodel_repariert.glb (Tripo GLB, repariert)",
- "figur.freezer.modell": "assets/models/dragonball/freezer4/friezafinalform3dmodel.glb (Tripo GLB)",
- "figur.goku.hoehe": 1.75,
- "figur.freezer.hoehe": 1.5,
- "figur.goku.gelenke": "Mixamo",
- "figur.freezer.gelenke": "Mixamo",
- "figur.goku.schwanz": null,
- "figur.freezer.schwanz": {
-  "mittellinie": "FREEZER3_TAIL (12 Punkte)",
-  "glieder": 10
- },
- "figur.goku.material": {
-  "sat": 1.12,
-  "value": 1.04,
-  "shade": [
-   0.52,
-   0.48,
-   0.64
-  ],
-  "hair_glow": 0.25,
-  "lit": 1.0,
-  "mid": 0.8,
-  "bands": [
-   -0.1,
-   0.35
-  ],
-  "tint_lit": [
-   1.0,
-   0.96,
-   0.9
-  ],
-  "rim": [
-   1.0,
-   0.97,
-   0.9
-  ],
-  "rim_w": 0.4,
-  "diffuse_mix": 0.14
- },
- "figur.freezer.material": {
-  "sat": 1.05,
-  "shade": [
-   0.58,
-   0.55,
-   0.74
-  ],
-  "rim": [
-   0.92,
-   0.88,
-   1.0
-  ],
-  "lit": 1.0,
-  "mid": 0.8,
-  "bands": [
-   -0.1,
-   0.35
-  ],
-  "tint_lit": [
-   1.0,
-   0.96,
-   0.9
-  ],
-  "rim_w": 0.4,
-  "diffuse_mix": 0.14
- },
- "figur.goku.kontur": 0.004,
- "figur.freezer.kontur": 0.004,
- "figur.goku.gewichte": {
-  "smooth": 3,
-  "power": 4.0,
-  "naehte_verschweisst": false
- },
- "figur.freezer.gewichte": {
-  "smooth": 3,
-  "power": 4.0,
-  "naehte_verschweisst": false
- },
+ "figur.<name>.modell": "siehe figur.goku.modell / figur.freezer.modell",
+ "figur.<name>.hoehe": "siehe figur.goku.hoehe / figur.freezer.hoehe",
+ "figur.<name>.gelenke": "siehe figur.goku.gelenke / figur.freezer.gelenke",
+ "figur.<name>.schwanz": "siehe figur.goku.schwanz / figur.freezer.schwanz",
+ "figur.<name>.material": "siehe figur.goku.material / figur.freezer.material",
+ "figur.<name>.kontur": "siehe figur.goku.kontur / figur.freezer.kontur",
+ "figur.<name>.gewichte": "siehe figur.goku.gewichte / figur.freezer.gewichte",
  "figur.backen": {
   "style": "dbz_style",
   "lag_scale": 0.35,
@@ -2891,5 +3149,103 @@
   "zu große weiße Blitzkugeln → core_k 0,5; dunkle Ringe → ior 1,0"
  ],
  "bewertung.reaktion": "„des ist absolut der wahnsinn.“ (Vorschau)",
- "bewertung.social": null
+ "bewertung.social": null,
+ "schiff.modell": "entfällt (kein Schiff, keine Crew)",
+ "schiff.kurs": "entfällt (kein Schiff, keine Crew)",
+ "schiff.tempo": "entfällt (kein Schiff, keine Crew)",
+ "schiff.start": "entfällt (kein Schiff, keine Crew)",
+ "schiff.bewegung": "entfällt (kein Schiff, keine Crew)",
+ "schiff.flaggen": "entfällt (kein Schiff, keine Crew)",
+ "schiff.gischt": "entfällt (kein Schiff, keine Crew)",
+ "schiff.kielwasser": "entfällt (kein Schiff, keine Crew)",
+ "kamera.speed_keys": "entfällt (Tempo aus Wegpunkt-Zeiten (kamera.wegpunkte))",
+ "kamera.route_welt": "siehe kamera.wegpunkte",
+ "kamera.route_schiff": "entfällt (kein Schiff, keine Crew)",
+ "kamera.uebergang": "entfällt (kein Schiff, keine Crew)",
+ "kamera.impact": "entfällt (Kamerastöße über kamera.stoesse)",
+ "licht.randlicht_fade": "entfällt (Randlicht durchgehend)",
+ "crew.figuren": "entfällt (kein Schiff, keine Crew)",
+ "crew.aufstellung": "entfällt (kein Schiff, keine Crew)",
+ "crew.schauspiel": "entfällt (kein Schiff, keine Crew)",
+ "crew.posen_map": "entfällt (kein Schiff, keine Crew)",
+ "crew.drehung": "entfällt (kein Schiff, keine Crew)",
+ "crew.requisiten": "entfällt (kein Schiff, keine Crew)",
+ "crew.texturen": "entfällt (kein Schiff, keine Crew)",
+ "figur.goku.modell": "assets/models/dragonball/goku5/gokuactionfigure3dmodel_repariert.glb (Tripo GLB, repariert)",
+ "figur.freezer.modell": "assets/models/dragonball/freezer4/friezafinalform3dmodel.glb (Tripo GLB)",
+ "figur.goku.hoehe": 1.75,
+ "figur.freezer.hoehe": 1.5,
+ "figur.goku.gelenke": "Mixamo",
+ "figur.freezer.gelenke": "Mixamo",
+ "figur.goku.schwanz": null,
+ "figur.freezer.schwanz": {
+  "mittellinie": "FREEZER3_TAIL (12 Punkte)",
+  "glieder": 10
+ },
+ "figur.goku.material": {
+  "sat": 1.12,
+  "value": 1.04,
+  "shade": [
+   0.52,
+   0.48,
+   0.64
+  ],
+  "hair_glow": 0.25,
+  "lit": 1.0,
+  "mid": 0.8,
+  "bands": [
+   -0.1,
+   0.35
+  ],
+  "tint_lit": [
+   1.0,
+   0.96,
+   0.9
+  ],
+  "rim": [
+   1.0,
+   0.97,
+   0.9
+  ],
+  "rim_w": 0.4,
+  "diffuse_mix": 0.14
+ },
+ "figur.freezer.material": {
+  "sat": 1.05,
+  "shade": [
+   0.58,
+   0.55,
+   0.74
+  ],
+  "rim": [
+   0.92,
+   0.88,
+   1.0
+  ],
+  "lit": 1.0,
+  "mid": 0.8,
+  "bands": [
+   -0.1,
+   0.35
+  ],
+  "tint_lit": [
+   1.0,
+   0.96,
+   0.9
+  ],
+  "rim_w": 0.4,
+  "diffuse_mix": 0.14
+ },
+ "figur.goku.kontur": 0.004,
+ "figur.freezer.kontur": 0.004,
+ "figur.goku.gewichte": {
+  "smooth": 3,
+  "power": 4.0,
+  "naehte_verschweisst": false
+ },
+ "figur.freezer.gewichte": {
+  "smooth": 3,
+  "power": 4.0,
+  "naehte_verschweisst": false
+ }
 }

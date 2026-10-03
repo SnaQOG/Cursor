@@ -311,3 +311,233 @@ AMBIENCE 0,0 · WHOOSH 1,92 / 2,67 (Felsnadeln) · WHOOSH 5,7 (Hochziehen) · WH
 WHOOSH 9,62 (Vorstoß) · IMPACT 10,0, 10,28, 10,42, 10,56, 10,70, 10,84, 10,98, 11,11, 11,47 ·
 ZANZOKEN 11,62 · IMPACT 11,95, 12,15 · ZANZOKEN 13,15 · IMPACT 13,15, 13,40 · WHOOSH 13,6 ·
 BEAT_DROP 15,8 · AMBIENCE 17,0
+
+---
+
+# Ergänzung: Stadt- und Kino-Parameter (Katalog Teil A) und fehlende IDs
+
+Nachgetragen am 2026-10-03, als der Parameter-Katalog um die Stadt- und Kino-Parameter erweitert wurde. „entfällt“ heißt, dass es den Parameter in diesem Video nicht gibt; „nicht erfasst“, dass er nicht gemessen oder festgehalten wurde.
+
+## S1. Briefing und Planung
+- `briefing.stadt` (Stadt, Thema, Epoche, Kultur): Planet Namek (Dragon Ball Z), Kampf Son Goku gegen Freezer
+- `briefing.stil` (fotoreal, stilisiert oder Anime): Umgebung halbrealistisch (physikalisch), Figuren Toon (Tripo-Modelle mit Kontur)
+- `briefing.tageszeit` (Tageszeit (genau benannt)): Dauertag mit drei Sonnen; Hauptsonne tief (19°) links hinten
+- `briefing.wetter` (Wetter und Jahreszeit): klar, Wolkenbedeckung 22 %
+- `briefing.stimmung` (Stimmung in einem Satz): Kampf im Dragon-Ball-Tempo über blauem Gras, Klimax Explosion über dem Meer
+- `briefing.kameratyp` (FPV, Flyover oder Static): FPV, eine durchgehende Aufnahme ohne Schnitt
+- `briefing.verwendung` (privat, Video-zu-Video-KI oder Veröffentlichung): nicht ausdrücklich festgelegt (NIDO-Drohnenvideo)
+- `briefing.engine` (Engine und Device): Cycles, CPU
+- `briefing.budget` (Renderbudget: max. Minuten pro Frame, Gesamtstunden): vorab geschätzt 15–20 h für das Final (720p, 32 Samples)
+- `briefing.hardware` (VRAM, RAM, CPU-Kerne, freier Speicher für die Sequenz): {cpu_kerne: 4; gpu: keine; ram_gb: 16; umgebung: Cloud-Container, wird bei Leerlauf neu gestartet}
+- `briefing.ausgabe` (Ausgabeformat und Zielordner): {frames: EXR je Pass (Scratchpad); video: H.264 MP4 1080 × 1920 → drohnen_3d_welten/videos/}
+- `briefing.referenzen` (Referenzen für Architektur, Material, Licht, Atmosphäre, Kamera): Dominiks Anime-Bilder von Namek (Farben per Pixelmessung), Model Sheets Goku/Freezer, Tripo-Modelle
+- `briefing.palette` (Farbpalette und Kontrastidee (aus Referenzen gemessen)): siehe himmel.verlauf, gras.farben, material.fels (aus den Referenzbildern gemessen)
+- `planung.einheiten` (Einheitensystem, Maßstab, Skalierung angewendet): {system: METRIC; skalierung: 1; bu: 1 BU = 1 m}
+- `planung.detailbudget` (Grenzen nah / mittel / fern und Detailstufe je Zone): Gras nah 360 Halme/m², Grund 170, fern 8 (gras.feld); ferne Felsen und Inseln als einfache Meshes; keine LOD-Stufen
+- `planung.collections` (Collection-Struktur und Namensschema): AjisaTrees · AjisaTrees_0 · AjisaTrees_1 · AjisaTrees_2 · AjisaTrees_3 · glTF_not_exported · RigidBodyWorld · RimLightReceivers
+- `planung.versionierung` (Dateiname, Version, Backup-Ort): Szene final/namek_final_v2.blend (Scratchpad), Code-Commit ef59ba2
+
+## S2. Stadtlayout und Blockout
+- `stadt.koordinaten` (Ursprung, Hauptflugrichtung, Achsen): siehe ablauf.koordinaten
+- `stadt.flaeche` (Stadtfläche: Größe, Mitte): entfällt (keine Stadt)
+- `stadt.mauer` (Stadtmauer: Mitte, Radius, Segmentwinkel, Höhe, Dicke, Abdeckung, Toröffnung): entfällt (keine Stadt)
+- `stadt.tor` (Tor: Ort, halbe Öffnung, Höhe, Oberkante des Querbalkens): entfällt (keine Stadt)
+- `stadt.hauptstrasse` (Hauptstraße: Halbbreite, Länge, Mitte, Belag): entfällt (keine Stadt)
+- `stadt.zufahrt` (Zufahrtsweg: Breite, Länge, Belag): entfällt (keine Stadt)
+- `stadt.platz` (Platz: Mitte, Größe, Belag): entfällt (keine Stadt)
+- `stadt.gelaende` (Höhenprofil: Hügelring (Abstand, Breite, Höhe, fbm), Tal der Zufahrt, Plateau, Gipfel): entfällt (keine Stadt)
+- `stadt.gelaende_mesh` (Geländenetz: Größe, Auflösung, Ursprung): entfällt (keine Stadt)
+- `stadt.wasser` (Fluss, Hafen, Kanäle, Uferlinien): entfällt (keine Stadt)
+- `stadt.bruecken_treppen` (Brücken, Treppen, Terrassen): entfällt (keine Stadt)
+- `stadt.landmarken` (Wahrzeichen: Name, Ort, Größe, Rolle im Flug (Hook, Manöver, Reveal, Schlussbild)): keine Stadt; Landmarken: Felsnadel 1 (y 52) und 2 (y 72) für den Slalom, Tafelberg-Wand (Steigflug), Kante (Reveal), Dragon Balls, Raumschiff
+- `stadt.sichtachsen` (Sichtachsen und Kompositionsmomente entlang der Route): entfällt (keine Stadt)
+- `stadt.route` (grobe Flugroute auf dem Blockout): siehe kamera.wegpunkte
+- `stadt.seed` (Zufalls-Seed des Aufbaus): entfällt (keine Stadt)
+
+## S3. Gebäude und Aufbau
+- `gebaeude.anzahl` (Gebäude gesamt (Messwert)): entfällt (keine Stadt)
+- `gebaeude.strassenzeile` (Häuser an der Hauptstraße: Breite, Tiefe, Stockwerke, Lücke, Rücksprung, y-Bereich): entfällt (keine Stadt)
+- `gebaeude.stile` (Bauformen und ihre Gewichte (flach, Tonnendach, rund, Walmdach)): entfällt (keine Stadt)
+- `gebaeude.raster` (übrige Stadt: Rasterweite, Versatz, Aussparungen, Ausfallquote, Drehung, Größen, Stockwerke): entfällt (keine Stadt)
+- `gebaeude.platzrand` (Randbebauung des Platzes: je Gebäude x, y, Breite, Tiefe, Stockwerke, Stil): entfällt (keine Stadt)
+- `gebaeude.stockwerkhoehe` (Stockwerkhöhe, Sockel, Brüstung): entfällt (keine Stadt)
+- `gebaeude.tuerme` (Stufentürme: Anteil, Radius, Stufen, Dachfarbe, feste Türme an der Straße): entfällt (keine Stadt)
+- `gebaeude.daecher` (Dachformen: Stich des Tonnendachs, Stich und Überstand des Walmdachs, Ziegelmaße): entfällt (keine Stadt)
+- `gebaeude.dachaufbauten` (Wassertanks, Klimageräte, Rohre, Antennen, Schornsteine: Anteil, Größe): entfällt (keine Stadt)
+- `gebaeude.fassade` (Fenster je Stockwerk, Rahmen, Bänke, Läden, Rohre, Kabel, Markisen): entfällt (keine Stadt)
+- `gebaeude.banner` (Banner: Anteil, Zeichen, Größe, Höhe, Farben): entfällt (keine Stadt)
+- `gebaeude.schilder` (Ladenschilder: Zeichen, Vorder- und Hintergrundfarbe): entfällt (keine Stadt)
+- `gebaeude.tueren` (Türen: Motiv, Farben): entfällt (keine Stadt)
+- `gebaeude.hero` (Hauptgebäude: Ort, Radius, Dachhöhe, Brüstung, Dachbelag): entfällt (keine Stadt)
+- `gebaeude.bevel` (Kantenfase der Bauteile): entfällt (keine Stadt)
+- `gebaeude.lod` (Detailstufe je Zone, Proxies und Karten in der Ferne): entfällt (keine Stadt)
+- `gebaeude.instancing` (Instanzierung und Variation (Höhe, Dach, Farbe, Drehung, Skalierung)): entfällt (keine Stadt)
+- `gebaeude.strassendetails` (Bordsteine, Gullys, Markierungen, Pflaster): entfällt (keine Stadt)
+
+## S4. Stadt-Materialien
+- `material.putz` (Putz: Farben, Fenster an/aus, PBR-Variante): entfällt (keine Stadt)
+- `material.daecher` (Dachfarben, Ziegelbreite und -höhe, Streuung, zylindrisch): entfällt (keine Stadt)
+- `material.terrakotta` (Farben der Ziegel-Meshes): entfällt (keine Stadt)
+- `material.fenster` (Fensterglas: lit, curtain, per_cell, Innenraum): entfällt (keine Stadt)
+- `material.verwitterung` (je Material: dirt_h, dirt, ground_z, edge, edge_col, bevel_r, streak, var): entfällt (keine Stadt)
+- `material.dachbelag` (Abnutzung des Dachbelags (r_edge)): entfällt (keine Stadt)
+- `material.strasse` (Straßenboden (half_w), Pflaster, Feldweg, Sandstraße): entfällt (keine Stadt)
+- `material.gras` (Gras zwischen den Häusern und am Hang: c1, c2, dry, scale): siehe gras.farben (Halme) und material.boden
+- `material.metall` (Rostmetall für Tanks und Rohre: tint): entfällt (keine Stadt)
+- `material.holz` (Balken, Dachdeck, Masten: dark, board, Achse): entfällt (keine Stadt)
+- `material.lack` (lackierte Teile (Läden, Klimageräte, Horn): Farbe, Rauheit): entfällt (keine Stadt)
+- `material.stoff` (Markisen, Stände, Wäsche: Farben, Rauheit): entfällt (keine Stadt)
+- `material.mauer` (Mauer- und Torstein: c1–c3, bump, crack_w): entfällt (keine Stadt)
+- `material.wahrzeichen_fels` (Fels des Wahrzeichens: c1–c3, moss, moss_amount, scale, bump, crack_w, strata_scale, lichen, cavity): entfällt (keine Stadt)
+- `material.cc0` (CC0-PBR-Texturen: Dateien, Skalierung, Überblendung): entfällt (keine Stadt)
+- `material.emission` (Laternen, Fenster, Schilder: Farbe, Stärke): Raumschiff-Fenster, siehe objekte.raumschiff
+- `material.texeldichte` (Texeldichte): nicht erfasst
+- `material.farbraum` (Farbtexturen sRGB, Datentexturen Non-Color (geprüft)): Tripo-Farbtexturen sRGB, Normal-Maps Non-Color; Umgebung prozedural
+- `material.displacement` (Displacement und Bump nah an der Kamera): nicht erfasst
+- `material.kachelvariation` (Mittel gegen sichtbare Kacheln (Noise-Mix, Objekt-Zufall, Attribute)): prozedurale Materialien mit Rauschen (keine Kacheltexturen)
+
+## S5. Stadt-Licht
+- `licht.himmel_typ` (Nishita, HDRI oder eigener Verlauf): eigener Shader (namek_sky)
+- `licht.nishita` (aerosol, ozone, air, Sonnenscheibe): entfällt (eigener Himmel)
+- `licht.hdri` (Datei, Drehung, Stärke): entfällt (kein HDRI)
+- `licht.nacht_quellen` (Laternen, Fenster, Schilder, Fahrzeuge, Feuer: Anzahl, Stärke): entfällt (Tagszene)
+- `licht.farbtemperaturen` (Kelvin je Quellenart (Natrium, warm, neutral, kühl)): {sonne1: 4300; sonne2: 5600; sonne3: 4700; randlicht: 7800}
+- `licht.schatten` (Richtung, Länge, Härte (Prüfung gegen Tageszeit)): Hauptsonne 19° aus 225° (links hinten): lange Schatten, Gegenlicht durch Sonne 3
+- `licht.mond_sterne` (Mond, Sterne): entfällt (Tagszene)
+- `licht.rig` (Lichtrig als Collection (Name, Inhalt)): 3 Sonnen + Randlicht (Light Linking auf die Kämpfer) + Effektlichter
+
+## S6. Atmosphäre
+- `atmosphaere.volumen` (Streuvolumen: Größe, Mitte, Farbe): entfällt (NIDO_ATMO = 0; Explosion als eigenes Volumen (fx.explosion))
+- `atmosphaere.bodennebel` (Höhen- und Bodennebel: Höhe, Dichte, Bereich): entfällt (keiner)
+- `atmosphaere.lichtstrahlen` (volumetrische Lichtstrahlen): entfällt (keine)
+- `atmosphaere.wetter` (Regen, Schnee, Staub, Asche: Anzahl, Tempo): entfällt (kein Wetter)
+- `atmosphaere.tiefenschichten` (Vorder-, Mittel-, Hintergrund: Abstände): {vorn: Meer und Gras 2–30 m; mitte: Tafelberg und Kampf 30–200 m; hinten: Felsnadeln bis 1150 m, Inseln 1400–1700 m}
+
+## S7. Leben und Bewegung
+- `leben.passanten` (Passanten: Abstand entlang der Straße, Anteil je Seite, Abstand zur Straßenmitte, Drehungsstreuung, Aussparungen, Anzahl): entfällt (keine Stadt)
+- `leben.passanten_vorlagen` (Vorlagen, Posen, Kleidungsfarben, Seed): entfällt (keine Stadt)
+- `leben.staende` (Marktstände: Anzahl, Abstand, Seite, Maße, Dachstoff, Waren, Kisten): entfällt (keine Stadt)
+- `leben.laternen` (Laternenleinen: y-Positionen, x_end, z_end, sag, n je Leine, Seed): entfällt (keine Stadt)
+- `leben.waesche` (Wäscheleinen: y-Positionen, Höhe (aus Fassaden), sag, Abstand zum Baum): entfällt (keine Stadt)
+- `leben.leitungen` (Strommasten: Abstand, Höhe, Querbalken, Drahtabstand, Durchhang): entfällt (keine Stadt)
+- `leben.voegel` (je Schwarm: Anzahl, Startbox, Flugvektor, t0, t1, Seed): entfällt (keine)
+- `leben.blaetter` (treibende Blätter je Feld: Box, Anzahl, Wind, Seed): entfällt (keine)
+- `leben.pendeln` (Schwingen: Achse, Amplitude, Frequenz, Phase, Rauschen): Gras im Wind mit Böen (gras.bewegung)
+- `leben.verkehr` (Fahrzeuge, Bahnen, Boote: Anzahl, Pfade, Tempo, Lichter): entfällt (keine Stadt)
+- `leben.rauch` (Rauch und Dampf: Quellen, Dichte, Tempo): Explosions-Rauchsäule (fx.explosion)
+- `leben.flaggen` (Flaggen, Planen, Wäsche im Wind (Stoff-Cache)): entfällt (keine)
+- `leben.caches` (Simulations-Caches: Ordner, Frames): Rigid-Body-Bruchstücke als Keyframes gebacken
+- `leben.asynchron` (Variation, damit nichts synchron läuft (Phase, Tempo)): Gras: Böen und Druckwellen (gras.druckwellen)
+
+## S8. Vegetation in der Stadt
+- `baum.hero` (Manöver-Baum: Ort, Höhe, Kronenradius, Cluster, Blätter je Cluster, Steinring): entfällt (keine Stadt)
+- `baum.nadelbaum` (Nadelbäume: Höhe, Krone, Cluster, Form, Transluzenz): entfällt (keine Stadt)
+- `baum.wald` (Waldbereiche: Anzahl, x/y-Bereich, Ausschlüsse, Skalierung): siehe baum.haine
+- `baum.dorf` (Bäume im Ort: Versuche, Abstand zu Gebäuden, Hauptgebäude, Straße; Skalierung): entfällt (keine Stadt)
+- `baum.buesche` (Büsche an der Zufahrt: Anzahl, Bereich, Skalierung): entfällt (keine Stadt)
+- `baum.felsbewuchs` (Bewuchs auf Felsbändern: Normalen-Schwelle, Mindesthöhe, Anzahl, Skalierung, Aussparung): entfällt (keine Stadt)
+- `baum.streuung` (Streuung per Geometry Nodes: Seed, Drehung, Größe, Punkte gesamt): Ajisa-Bäume in Hainen (baum.haine)
+
+## S9. Wahrzeichen-Relief (Felswand, Monument)
+- `wahrzeichen.wand` (Felswand: x-Bereich, y, z-Bereich, Auflösung, Seed, Panel): entfällt (kein Relief; Tafelberg-Wand siehe gelaende.steilwand)
+- `wahrzeichen.risse` (Risse: Anzahl, Bereich, Tiefe, Breite): entfällt (kein Relief; Tafelberg-Wand siehe gelaende.steilwand)
+- `wahrzeichen.gesichter` (je Gesicht x, Höhenversatz, Haar; Skalierung, Grundhöhe, Kopfvorlage, Voxelgröße): entfällt (kein Relief; Tafelberg-Wand siehe gelaende.steilwand)
+- `wahrzeichen.kinnlinie` (Kinnlinie, Panel-Aussparung): entfällt (kein Relief; Tafelberg-Wand siehe gelaende.steilwand)
+- `wahrzeichen.details` (Treppen, Geländer, Hütten, Kuppeln an der Wand): entfällt (kein Relief; Tafelberg-Wand siehe gelaende.steilwand)
+
+## S10. Kamera wie im Film
+- `kamera.fov` (Sichtfeld): {vertikal_grad: 65,47; brennweite_mm: 28; sensor: 36 mm (Höhe)}
+- `kamera.blende` (Blende, Fokusdistanz, Schärfentiefe an/aus): {dof: nein; hinweis: Schärfentiefe aus (großer Schärfebereich wie FPV)}
+- `kamera.clipping` (Clip Start, Clip End): (0,05; 30000)
+- `kamera.overscan` (Overscan für Stabilisierung und Verzerrung im Comp): entfällt (kein Overscan)
+- `kamera.manoever` (je Manöver: Zeit, festes Objekt, Art (Tor, Kabel, Baum, Steigflug, Brüstung)): 1,9 · Felsnadel 1 (y 52) · links vorbei · 2,7 · Felsnadel 2 (y 72) · rechts vorbei · 5,2 · Tafelberg-Wand · Steigflug dicht an der Wand · 7,8 · Kante · drüber: Reveal · 9,55 · Dragon Balls · links vorbei · 10 · Kampf · Abbremsen auf die Kämpfer · 16 · Explosion · zurückziehen und steigen
+- `kamera.mindestabstand` (kleinster Abstand zur Geometrie (Messwert)): {flug_meer: {m: 2,27; t: 1,875; objekt: Ocean}; steilwand: {m: 3,87; t: 7; objekt: MesaWall}; plateau: {m: 3,08; t: 9,042; objekt: SandPatches}; kampf: {m: 3,5; t: 10,125; objekt: Mesa}; hinweis: Szene des Finals vermessen, ohne Figuren, Effekte und Grashalme; Meer im Wellenstand von Frame 1}
+- `kamera.hook` (Hook-Bild am Anfang: Inhalt, Dauer): 0–2.7 s: Hook tief über dem Meer, Slalom an zwei Felsnadeln
+- `kamera.schlussbild` (Schlussbild: Motiv, Blickwinkel): 16.0–20.0 s: Nachglühen, Rauchsäule, Kamera zieht zurück und steigt
+- `kamera.loop` (Loop oder fester Anfang und Ende): kein Loop: harter Anfang und ruhiges Schlussbild
+
+## S11. Render-Setup in Kinoqualität
+- `render.engine` (Engine und Device): Cycles, CPU (Cloud-Container mit 4 Kernen, keine GPU)
+- `render.min_samples` (Mindest-Samples beim adaptiven Sampling): 0 (automatisch)
+- `render.kaustiken` (Kaustiken reflektiv / refraktiv): {reflektiv: nein; refraktiv: nein}
+- `render.vector_pass` (Vector-Pass (nur ohne Cycles-Motion-Blur)): aus (Motion Blur im Render)
+- `render.cryptomatte` (Object, Material, Asset; Tiefe): aus (Object, Material, Asset nicht aktiv)
+- `render.mist` (Mist Start, Tiefe, Abfall): {start: 0; tiefe: 6000; abfall: LINEAR}
+- `render.farbmanagement` (View Transform, Look, Exposure, Gamma, Display): {view_transform: AgX; look: None; exposure: 0; gamma: 1; display: sRGB; hinweis: der Look kommt in der Post (post.look)}
+- `render.ausgabe` (Format, Bit-Tiefe, Codec, Bildsequenz, Pfadschema): {format: OpenEXR je Pass (Image, Mist, Env), 16 Bit Half, Codec DWAA; sequenz: f_####; ort: Scratchpad (flüchtig), danach PNG + MP4}
+- `render.fortsetzbar` (Overwrite aus, Placeholders an, vorhandene Frames überspringen): ja: seq_final.py überspringt fertige Frames (fpv.frame_done); Overwrite/Placeholders nicht genutzt
+- `render.vram` (VRAM- und RAM-Spitze bei schweren Frames (Messwert)): entfällt (keine GPU; RAM siehe ressourcen.ram)
+- `render.testframes` (Testframes in Endqualität: Frame, Sekunden): nicht erfasst
+- `render.hochrechnung` (s pro Frame × Frames = Gesamtzeit, gegen Budget): vorab 15–20 h geschätzt (zu Beginn ~150 s/Frame → 18 h), tatsächlich 18,1 h
+- `render.preflight` (Ergebnis des Preflight-Checks (Fehler, Warnungen)): entfällt (preflight_check.py gab es zum Zeitpunkt des Finals noch nicht)
+
+## S12. Compositing (Kinolook)
+- `comp.linsenverzerrung` (Linsenverzerrung (Distortion)): keine Verzerrung, nur laterale Dispersion (post.optik)
+- `comp.halation` (Halation an hellen Kanten): entfällt (nicht verwendet)
+- `comp.grading` (Schwarzwert, Highlights, Lift/Gamma/Gain, Farbtrennung Schatten/Lichter): AgX Medium High Contrast, Auto-Belichtung, Pulse und Flare (post.*)
+- `comp.cryptomatte_korrekturen` (selektive Korrekturen (Fenster, Himmel, Wasser)): entfällt (keine Cryptomatte)
+- `comp.shake` (Kamerashake im Comp): nicht im Comp; Kamerastöße im 3D (kamera.stoesse)
+- `comp.letterbox` (Letterbox / Scope): entfällt (Vollbild 9:16)
+- `comp.ki_variante` (saubere Fassung ohne Korn, Glare, Verzerrung): entfällt (keine KI-Weiterverarbeitung)
+
+## S13. Video-zu-Video-KI
+- `ki.tool` (Plattform und Modell): entfällt (keine KI-Generierung; Higgsfield/Kling/Seedance nicht genutzt)
+- `ki.einstellungen` (Einstellungen der Generierung): entfällt (keine KI-Generierung)
+- `ki.kosten` (vorab genannte Kosten): entfällt (keine KI-Generierung)
+- `ki.freigabe` (Freigabe: Datum, Zitat): entfällt (keine KI-Generierung)
+- `ki.eingabe` (Eingabevideo (saubere Fassung)): entfällt (keine KI-Generierung)
+
+## S14. QC, Lieferung, Gates
+- `bewertung.gates` (je Gate (A, A2, B, C, D, E): Datum, freigegeben ja/nein, Zitat): {gate: A; datum: 2026-09-28; frei: –; zitat: Cinematic-Briefing; Zeitleiste vorgeschlagen, Freigabe nicht festgehalten} · {gate: D; datum: 2026-09-30 21:49; frei: nein; zitat: „der kampf ist jetzt brutal. wir müssen aber die bewegungen und das aussehen von den 2 verbessen.“} · {gate: D; datum: 2026-09-30 22:24; frei: nein; zitat: „… beachte aber das bei dragon ball diese immer sehr shcnell sind.“} · {gate: D; datum: 2026-10-01 12:54; frei: ja; zitat: „die vorschau passt“} · {gate: E; datum: 2026-10-01 15:05; frei: ja; zitat: „starte das finale …“ / 15:11 „nein, nacheinander passt.“}
+- `qc.durchsicht` (komplett in Originalgeschwindigkeit gesehen): Stichprobe aus 10 Zeitpunkten (Flug, Plateau, Kampf, Strahlenduell, Explosion), nicht das ganze Video
+- `qc.frames` (fehlende oder schwarze Frames, Fireflies): 480/480 Frames vorhanden
+- `qc.flackern` (Flackern in Schatten, Lichtern, Wasser, Fenstern): nicht erfasst
+- `qc.textur` (Kachelmuster, Texturstreckung, Z-Fighting): nicht erfasst
+- `qc.banding` (Banding in Himmel und Nebel): nicht erfasst
+- `qc.zweitdisplay` (auf Handy oder zweitem Display geprüft): nicht erfasst
+- `qc.anfang_ende` (Anfang und Ende sauber (Loop, Fade)): kein Loop; Anfang in voller Fahrt, ruhiges Schlussbild
+- `lieferung.master` (Master (EXR-Sequenz, ProRes oder MP4): Pfad, Größe): {pfad: drohnen_3d_welten/videos/03_DragonBall_Namek.mp4; mb: 44,9}
+- `lieferung.varianten` (weitere Formate (9:16, 1:1, Webversion)): Webversion 10 Mbit/s (< 30 MB) für den Chat
+- `lieferung.dateiname` (Dateiname mit Version und Datum): <NN>_<Welt>_<Ort>.mp4, ohne Version und Datum
+- `lieferung.archiv` (archivierte Teile (Projekt, Texturen, Caches, Skripte), Ort): Code im Repo (Commit), Werte im Werte-Archiv; .blend, EXR und PNG nur im Scratchpad (nicht dauerhaft archiviert)
+- `lieferung.obsidian` (ZIP-Paket für den Vault): ZIP-Paket „Drohnen Videos/3D Welten Blender/<NN Name>/{Test,Final,Werte}“
+- `lieferung.wiederverwendbar` (Assets, Materialien, Node-Gruppen, Lichtrig, Kameraskript für die nächste Stadt): choreo.py (dbz_style, Hit-Stops) · dbz_fx.py (Ki-Spuren, Zanzoken) · vfx.py (Strahlen, Explosion als Volumen, Aura) · tripo_chars.py (Tripo-Figuren riggen) · Skill anime-fpv-kampfvideo
+- `lieferung.notiz` (was beim nächsten Mal früher entschieden werden muss): Dragon-Ball-Tempo von Anfang an planen; Tripo-Figuren früh einbauen; Sichtkorridor zu den Kämpfern freihalten
+
+## S15. Kampf in der Stadt
+- `kampf.ort` (Kampfort (z. B. Dach): Mitte, Höhe, lokales Koordinatensystem): {ort: in der Luft über dem Plateau und dem Nordrand; zusammenprall: (1; 273; 45,5)}
+- `fx.impact_klein` (kleines Impact-Paket: Farbe, Licht, Ring, Funken, Seed): siehe fx.treffer
+- `fx.bruch` (Bruchstücke an Gebäudeteilen: Objekt, Zeit, Bruchhöhe, Stücke): siehe fx.einschlag (16 Bruchstücke) und fx.strahlen (Brocken)
+- `fx.techniken` (Signatur-Techniken (z. B. Rasengan, Chidori): Farbe, Radius, Licht, Zeiten): Kamehameha und Todesstrahl, siehe fx.strahlen und fx.duell
+
+## 7. Figuren
+- `figur.<name>.modell` (Datei, Quelle, Reparaturen): siehe figur.goku.modell / figur.freezer.modell
+- `figur.<name>.hoehe` (Zielgröße): siehe figur.goku.hoehe / figur.freezer.hoehe
+- `figur.<name>.gelenke` (Quelle der Gelenke (Mixamo / vermessen)): siehe figur.goku.gelenke / figur.freezer.gelenke
+- `figur.<name>.schwanz` (Mittellinie, Gliederzahl): siehe figur.goku.schwanz / figur.freezer.schwanz
+- `figur.<name>.material` (lit, mid, shade, bands, tint_lit, rim, rim_w, sat, value, diffuse_mix, hair_glow): siehe figur.goku.material / figur.freezer.material
+- `figur.<name>.kontur` (Konturstärke relativ zur Höhe): siehe figur.goku.kontur / figur.freezer.kontur
+- `figur.<name>.gewichte` (smooth, power, Saat-Bereiche): siehe figur.goku.gewichte / figur.freezer.gewichte
+
+## 15. Schiff und Crew (Videos mit Fahrzeug und Figurengruppe statt Kampf)
+- `schiff.modell` (Schiffsmodell, Bauweise, Quelle (Model Sheets)): entfällt (kein Schiff, keine Crew)
+- `schiff.kurs` (Kurs, Fahrt, Startpunkt): entfällt (kein Schiff, keine Crew)
+- `schiff.tempo` (Kurs, Fahrt, Startpunkt): entfällt (kein Schiff, keine Crew)
+- `schiff.start` (Kurs, Fahrt, Startpunkt): entfällt (kein Schiff, keine Crew)
+- `schiff.bewegung` (Stampfen/Rollen): entfällt (kein Schiff, keine Crew)
+- `schiff.flaggen` (Stoff-Simulation (Cache)): entfällt (kein Schiff, keine Crew)
+- `schiff.gischt` (Bug-Gischt: Raten, Aufwärtstempo, Tropfenradien): entfällt (kein Schiff, keine Crew)
+- `schiff.kielwasser` (Bugwelle, Heckwelle, Rumpfschaum): entfällt (kein Schiff, keine Crew)
+- `kamera.speed_keys` (Tempo über die Zeit (statt Wegpunkt-Zeiten)): entfällt (Tempo aus Wegpunkt-Zeiten (kamera.wegpunkte))
+- `kamera.route_welt` (Bahn weltfest / im Schiffssystem): siehe kamera.wegpunkte
+- `kamera.route_schiff` (Bahn weltfest / im Schiffssystem): entfällt (kein Schiff, keine Crew)
+- `kamera.uebergang` (Überblendung weltfest → schiffsfest): entfällt (kein Schiff, keine Crew)
+- `kamera.impact` (Kamerastoß beim Überfliegen der Reling): entfällt (Kamerastöße über kamera.stoesse)
+- `licht.randlicht_fade` (Randlicht aus, bevor die Kamera zurückblickt): entfällt (Randlicht durchgehend)
+- `crew.figuren` (je Figur: Modell, Höhe, Rig-Quelle, Look): entfällt (kein Schiff, keine Crew)
+- `crew.aufstellung` (je Figur: Ort (Schiffssystem), Yaw, Boden/Sitz): entfällt (kein Schiff, keine Crew)
+- `crew.schauspiel` (je Figur: Posenfolge (Zeit, Pose, Dauer, Ausholen, Überschwingen), Atmen, Schwanken, Blick): entfällt (kein Schiff, keine Crew)
+- `crew.posen_map` (figurenspezifische Posen-Ersetzungen): entfällt (kein Schiff, keine Crew)
+- `crew.drehung` (Körperdrehung über die Zeit (z. B. zur Kamera)): entfällt (kein Schiff, keine Crew)
+- `crew.requisiten` (Requisiten an Gelenken): entfällt (kein Schiff, keine Crew)
+- `crew.texturen` (Texturgröße der Figuren): entfällt (kein Schiff, keine Crew)

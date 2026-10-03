@@ -6,8 +6,307 @@
   "code_commit": "564582a (Szene gebaut 2026-10-01, Branch claude/eloquent-archimedes-og1asl)",
   "welt_modul": "world_onepiece",
   "datei_master": "drohnen_3d_welten/videos/01_OnePiece_ThousandSunny.mp4",
-  "vorgaenger": "Final v1 (selbst gebaute Crew), 2026-09-30"
+  "vorgaenger": "Final v1 (selbst gebaute Crew), 2026-09-30",
+  "typ": "Meer + Schiff + Crew"
  },
+ "briefing.stadt": "Grand Line (One Piece): Thousand Sunny mit der ganzen Strohhutbande",
+ "briefing.stil": "Umgebung halbrealistisch (Meer, Himmel, Felsen physikalisch), Crew Toon (Tripo-Modelle)",
+ "briefing.tageszeit": "später Nachmittag, tiefe warme Sonne 14° aus 195°, Gegenlicht am Ende",
+ "briefing.wetter": "klar, Wolkenbedeckung 42 %",
+ "briefing.stimmung": "schneller Flug über tiefblaues Meer, Reveal der Sunny, die Crew winkt",
+ "briefing.kameratyp": "FPV, eine durchgehende Aufnahme ohne Schnitt",
+ "briefing.verwendung": "nicht ausdrücklich festgelegt (NIDO-Drohnenvideo)",
+ "briefing.engine": "Cycles, CPU",
+ "briefing.budget": "vorab für die erste Fassung 15–17 h geschätzt (720p, 32 Samples)",
+ "briefing.hardware": {
+  "cpu_kerne": 4,
+  "gpu": "keine",
+  "ram_gb": 16,
+  "umgebung": "Cloud-Container, wird bei Leerlauf neu gestartet"
+ },
+ "briefing.ausgabe": {
+  "frames": "EXR je Pass (Scratchpad)",
+  "video": "H.264 MP4 1080 × 1920 → drohnen_3d_welten/videos/"
+ },
+ "briefing.referenzen": "Dominiks One-Piece-Bilder, Model Sheets der Thousand Sunny, Tripo-Modelle der Crew",
+ "briefing.palette": "siehe wasser.material, material.fels, licht.* (aus den Referenzbildern gemessen)",
+ "planung.einheiten": {
+  "system": "METRIC",
+  "skalierung": 1.0,
+  "bu": "1 BU = 1 m"
+ },
+ "planung.detailbudget": "Schiff und Crew voll detailliert, Felsnadeln mit Graskappe, ferne Inseln als einfache Meshes; keine LOD-Stufen",
+ "planung.collections": [
+  "glTF_not_exported",
+  "OPTrees",
+  "OPTrees_0",
+  "OPTrees_1",
+  "OPTrees_2",
+  "OPTrees_3",
+  "OPTrees_4",
+  "OPTrees_5",
+  "RimReceivers"
+ ],
+ "planung.versionierung": "Szene final/onepiece_final_v2.blend (Scratchpad), Code-Commit 564582a; v1 ersetzt",
+ "stadt.koordinaten": "siehe ablauf.koordinaten",
+ "stadt.flaeche": "entfällt (keine Stadt)",
+ "stadt.mauer": "entfällt (keine Stadt)",
+ "stadt.tor": "entfällt (keine Stadt)",
+ "stadt.hauptstrasse": "entfällt (keine Stadt)",
+ "stadt.zufahrt": "entfällt (keine Stadt)",
+ "stadt.platz": "entfällt (keine Stadt)",
+ "stadt.gelaende": "entfällt (keine Stadt)",
+ "stadt.gelaende_mesh": "entfällt (keine Stadt)",
+ "stadt.wasser": "entfällt (keine Stadt)",
+ "stadt.bruecken_treppen": "entfällt (keine Stadt)",
+ "stadt.landmarken": "keine Stadt; Landmarken: Felsentor aus zwei Nadeln, große Felsnadel (Verdeckung für den Reveal), Thousand Sunny",
+ "stadt.sichtachsen": "entfällt (keine Stadt)",
+ "stadt.route": "siehe kamera.route_welt",
+ "stadt.seed": "entfällt (keine Stadt)",
+ "gebaeude.anzahl": "entfällt (keine Stadt)",
+ "gebaeude.strassenzeile": "entfällt (keine Stadt)",
+ "gebaeude.stile": "entfällt (keine Stadt)",
+ "gebaeude.raster": "entfällt (keine Stadt)",
+ "gebaeude.platzrand": "entfällt (keine Stadt)",
+ "gebaeude.stockwerkhoehe": "entfällt (keine Stadt)",
+ "gebaeude.tuerme": "entfällt (keine Stadt)",
+ "gebaeude.daecher": "entfällt (keine Stadt)",
+ "gebaeude.dachaufbauten": "entfällt (keine Stadt)",
+ "gebaeude.fassade": "entfällt (keine Stadt)",
+ "gebaeude.banner": "entfällt (keine Stadt)",
+ "gebaeude.schilder": "entfällt (keine Stadt)",
+ "gebaeude.tueren": "entfällt (keine Stadt)",
+ "gebaeude.hero": "entfällt (keine Stadt)",
+ "gebaeude.bevel": "entfällt (keine Stadt)",
+ "gebaeude.lod": "entfällt (keine Stadt)",
+ "gebaeude.instancing": "entfällt (keine Stadt)",
+ "gebaeude.strassendetails": "entfällt (keine Stadt)",
+ "material.putz": "entfällt (keine Stadt)",
+ "material.daecher": "entfällt (keine Stadt)",
+ "material.terrakotta": "entfällt (keine Stadt)",
+ "material.fenster": "entfällt (keine Stadt)",
+ "material.verwitterung": "entfällt (keine Stadt)",
+ "material.dachbelag": "entfällt (keine Stadt)",
+ "material.strasse": "entfällt (keine Stadt)",
+ "material.gras": "Graskappen der Felsnadeln (sunny.py/nature.py), Rasendeck der Sunny",
+ "material.metall": "entfällt (keine Stadt)",
+ "material.holz": "entfällt (keine Stadt)",
+ "material.lack": "entfällt (keine Stadt)",
+ "material.stoff": "entfällt (keine Stadt)",
+ "material.mauer": "entfällt (keine Stadt)",
+ "material.wahrzeichen_fels": "entfällt (keine Stadt)",
+ "material.cc0": "entfällt (keine Stadt)",
+ "material.emission": "entfällt (Tagszene ohne Leuchtquellen)",
+ "material.texeldichte": "nicht erfasst",
+ "material.farbraum": "Tripo-Farbtexturen sRGB, Normal-Maps Non-Color; Umgebung prozedural",
+ "material.displacement": "Meer: Ozean-Modifier; sonst Bump",
+ "material.kachelvariation": "prozedurale Materialien mit Rauschen (keine Kacheltexturen)",
+ "licht.himmel_typ": "Nishita (Multiple Scattering)",
+ "licht.nishita": {
+  "aerosol": 0.5,
+  "ozone": 2.0,
+  "air": 1.0,
+  "hoehe_m": 50.0,
+  "sun_size": 0.0095,
+  "sonnenscheibe": "eigene Scheibe 0,4° (licht.sonnenscheiben)"
+ },
+ "licht.hdri": "entfällt (kein HDRI)",
+ "licht.nacht_quellen": "entfällt (Tagszene)",
+ "licht.farbtemperaturen": {
+  "sonne": 4300,
+  "randlicht": 7800
+ },
+ "licht.schatten": "tiefe Sonne 14°: lange Schatten über das Deck, Gegenlicht-Silhouette am Ende",
+ "licht.mond_sterne": "entfällt (Tagszene)",
+ "licht.rig": "Sonne + Randlicht (Light Linking auf Schiff und Crew, Ausblenden 15,5–17 s)",
+ "atmosphaere.volumen": "entfällt (NIDO_ATMO = 0, Dunst in der Post)",
+ "atmosphaere.bodennebel": "entfällt (keiner)",
+ "atmosphaere.lichtstrahlen": "entfällt (keine)",
+ "atmosphaere.wetter": "Bug-Gischt (schiff.gischt), kein Niederschlag",
+ "atmosphaere.tiefenschichten": {
+  "vorn": "Wellen und Felsentor 3–40 m",
+  "mitte": "Sunny und große Felsnadel ~160–200 m",
+  "hinten": "Inseln 1150–2600 m"
+ },
+ "leben.passanten": "entfällt (keine Stadt)",
+ "leben.passanten_vorlagen": "entfällt (keine Stadt)",
+ "leben.staende": "entfällt (keine Stadt)",
+ "leben.laternen": "entfällt (keine Stadt)",
+ "leben.waesche": "entfällt (keine Stadt)",
+ "leben.leitungen": "entfällt (keine Stadt)",
+ "leben.voegel": "entfällt (keine)",
+ "leben.blaetter": "entfällt (keine)",
+ "leben.pendeln": "Schiff stampft und rollt (schiff.bewegung), Crew atmet und winkt (crew.schauspiel)",
+ "leben.verkehr": "entfällt (keine Stadt)",
+ "leben.rauch": "entfällt (kein Rauch)",
+ "leben.flaggen": "siehe schiff.flaggen",
+ "leben.caches": "PC2-Caches für Flaggen und Gischt (tc2_cache)",
+ "leben.asynchron": "Wink-Perioden je Figur verschieden (wave_loop)",
+ "baum.hero": "entfällt (keine Stadt)",
+ "baum.nadelbaum": "entfällt (keine Stadt)",
+ "baum.wald": "entfällt (kein Wald)",
+ "baum.dorf": "entfällt (keine Stadt)",
+ "baum.buesche": "entfällt (keine Stadt)",
+ "baum.felsbewuchs": "entfällt (keine Stadt)",
+ "baum.streuung": "Bäume und Palmen auf den Felsnadeln (baum.varianten)",
+ "wahrzeichen.wand": "entfällt (kein Relief)",
+ "wahrzeichen.risse": "entfällt (kein Relief)",
+ "wahrzeichen.gesichter": "entfällt (kein Relief)",
+ "wahrzeichen.kinnlinie": "entfällt (kein Relief)",
+ "wahrzeichen.details": "entfällt (kein Relief)",
+ "kamera.fov": {
+  "vertikal_grad": 65.47,
+  "brennweite_mm": 28.0,
+  "sensor": "36 mm (Höhe)"
+ },
+ "kamera.blende": {
+  "dof": false,
+  "hinweis": "Schärfentiefe aus (großer Schärfebereich wie FPV)"
+ },
+ "kamera.clipping": [
+  0.05,
+  30000.0
+ ],
+ "kamera.overscan": "entfällt (kein Overscan)",
+ "kamera.manoever": [
+  [
+   0.0,
+   "Felsentor",
+   "Durchflug zwischen zwei Felsnadeln, 3 m über den Wellen"
+  ],
+  [
+   5.0,
+   "große Felsnadel",
+   "Linkskurve mit Schräglage"
+  ],
+  [
+   11.25,
+   "Sunny",
+   "Reveal und Abbremsen"
+  ],
+  [
+   12.0,
+   "Steuerbord",
+   "Anflug quer, Steigflug"
+  ],
+  [
+   15.5,
+   "Rasendeck",
+   "Überflug ~4 m über der Crew"
+  ],
+  [
+   17.0,
+   "offenes Meer",
+   "hinaus Richtung Sonne"
+  ]
+ ],
+ "kamera.mindestabstand": "nicht gemessen (Schiff bewegt sich); Planwert: Überflug ca. 4 m über der Crew auf dem Rasendeck, Start 3 m über den Wellen",
+ "kamera.hook": "0–5 s: tief (3 m) über den Wellen, Durchflug zwischen zwei Felsnadeln",
+ "kamera.schlussbild": "16.5–20 s: über Backbord hinaus aufs offene Meer, Sunny vor tiefer Sonne",
+ "kamera.loop": "kein Loop: harter Anfang und ruhiges Schlussbild",
+ "render.engine": "Cycles, CPU (Cloud-Container mit 4 Kernen, keine GPU)",
+ "render.min_samples": "0 (automatisch)",
+ "render.kaustiken": {
+  "reflektiv": false,
+  "refraktiv": false
+ },
+ "render.vector_pass": "aus (Motion Blur im Render)",
+ "render.cryptomatte": "aus (Object, Material, Asset nicht aktiv)",
+ "render.mist": {
+  "start": 0.0,
+  "tiefe": 6000.0,
+  "abfall": "LINEAR"
+ },
+ "render.farbmanagement": {
+  "view_transform": "AgX",
+  "look": "None",
+  "exposure": 0.0,
+  "gamma": 1.0,
+  "display": "sRGB",
+  "hinweis": "der Look kommt in der Post (post.look)"
+ },
+ "render.ausgabe": {
+  "format": "OpenEXR je Pass (Image, Mist, Env), 16 Bit Half, Codec DWAA",
+  "sequenz": "f_####",
+  "ort": "Scratchpad (flüchtig), danach PNG + MP4"
+ },
+ "render.fortsetzbar": "ja: seq_final.py überspringt fertige Frames (fpv.frame_done); Overwrite/Placeholders nicht genutzt",
+ "render.vram": "entfällt (keine GPU; RAM siehe ressourcen.ram)",
+ "render.testframes": "nicht erfasst",
+ "render.hochrechnung": "beim Check-in nach 106 Frames noch 8–10 h hochgerechnet, tatsächlich 11,1 h Renderzeit gesamt",
+ "render.preflight": "entfällt (preflight_check.py gab es zum Zeitpunkt des Finals noch nicht)",
+ "comp.linsenverzerrung": "keine Verzerrung, nur laterale Dispersion (post.optik)",
+ "comp.halation": "entfällt (nicht verwendet)",
+ "comp.grading": "AgX Medium High Contrast, Sättigung 1,15, +0,25 EV, Auto-Belichtung (post.*)",
+ "comp.cryptomatte_korrekturen": "entfällt (keine Cryptomatte)",
+ "comp.shake": "nicht im Comp; Kamerastoß beim Überfliegen der Reling im 3D (kamera.impact)",
+ "comp.letterbox": "entfällt (Vollbild 9:16)",
+ "comp.ki_variante": "entfällt (keine KI-Weiterverarbeitung)",
+ "ki.tool": "entfällt (keine KI-Generierung; Higgsfield/Kling/Seedance nicht genutzt)",
+ "ki.einstellungen": "entfällt (keine KI-Generierung)",
+ "ki.kosten": "entfällt (keine KI-Generierung)",
+ "ki.freigabe": "entfällt (keine KI-Generierung)",
+ "ki.eingabe": "entfällt (keine KI-Generierung)",
+ "bewertung.gates": [
+  {
+   "gate": "A",
+   "datum": "2026-09-28 12:28",
+   "frei": true,
+   "zitat": "„oke passt“ (Stil, Brennweite, Rendervarianten)"
+  },
+  {
+   "gate": "E",
+   "datum": "2026-09-28 19:48",
+   "frei": true,
+   "zitat": "„720p aber zeig mir vorab das video“"
+  },
+  {
+   "gate": "E",
+   "datum": "2026-09-29 11:37",
+   "frei": true,
+   "zitat": "„ja soll es auch“ (One Piece final nach Naruto)"
+  },
+  {
+   "gate": "D",
+   "datum": "2026-10-01 12:54",
+   "frei": true,
+   "zitat": "„die vorschau passt“ (v2 mit Tripo-Strohhüten)"
+  },
+  {
+   "gate": "E",
+   "datum": "2026-10-01 15:05",
+   "frei": true,
+   "zitat": "„starte das finale …“ (v2 nach Namek)"
+  }
+ ],
+ "qc.durchsicht": "10 Zeitpunkte geprüft (Felsentor, Reveal, Crew auf dem Rasen, SUPER-Pose, Schluss vor der Sonne), nicht das ganze Video",
+ "qc.frames": "480/480 Frames vorhanden",
+ "qc.flackern": "Vorschau (8 Samples): einzelne helle/dunkle Pixel im Sonnenglitzern ab 17 s; im Final (32 Samples + Entrauschen) nicht gesondert geprüft",
+ "qc.textur": "nicht erfasst",
+ "qc.banding": "nicht erfasst",
+ "qc.zweitdisplay": "nicht erfasst",
+ "qc.anfang_ende": "kein Loop; Anfang in voller Fahrt, Schluss im Gegenlicht",
+ "lieferung.master": {
+  "pfad": "drohnen_3d_welten/videos/01_OnePiece_ThousandSunny.mp4",
+  "mb": 44.7
+ },
+ "lieferung.varianten": [
+  "Webversion 10 Mbit/s (< 30 MB) für den Chat"
+ ],
+ "lieferung.dateiname": "<NN>_<Welt>_<Ort>.mp4, ohne Version und Datum",
+ "lieferung.archiv": "Code im Repo (Commit), Werte im Werte-Archiv; .blend, EXR und PNG nur im Scratchpad (nicht dauerhaft archiviert)",
+ "lieferung.obsidian": "ZIP-Paket „Drohnen Videos/3D Welten Blender/<NN Name>/{Test,Final,Werte}“",
+ "lieferung.wiederverwendbar": [
+  "ocean.py (Ozean, Bugwelle, Kielwasser, Gischt)",
+  "sunny.py (Schiff, Flaggen)",
+  "crew.py (Aufstellung, Schauspiel)",
+  "tripo_crew.py (Tripo-Crew)"
+ ],
+ "lieferung.notiz": "Tripo-Modelle mit Auto-Rig und leeren Händen bestellen; UV-Nähte vor dem Gewichten verschweißen; Posen je Figur prüfen",
+ "kampf.ort": "entfällt (kein Kampf)",
+ "fx.impact_klein": "entfällt (kein Kampf)",
+ "fx.bruch": "entfällt (kein Kampf)",
+ "fx.techniken": "entfällt (kein Kampf)",
  "format.dauer": 20.0,
  "format.fps": 24,
  "format.frames": 480,

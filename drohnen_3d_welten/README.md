@@ -39,7 +39,9 @@ Wow-Motiv hinter einer Verdeckung, stabilisierte Weitwinkel-Action-Cam (kein Fis
 
 - `werte/<NN_name>/`: alle Parameterwerte eines fertigen Videos für spätere Auswertungen. `werte.json` nutzt die IDs
   aus dem Parameter-Katalog, `kampfplan_und_kamera.json` enthält alle Schlüssel aus dem Code, `werte.md` ist die
-  lesbare Fassung. Erster Eintrag: `03_namek`.
+  lesbare Fassung. Einträge: `01_onepiece`, `02_naruto`, `03_namek`. Alle drei füllen den vollständigen Katalog mit
+  332 IDs (Stadt und Kino aus dem Skill blender-stadt-vfx plus die gemeinsamen IDs); „entfällt“ heißt, dass es den
+  Parameter im Video nicht gibt, „nicht erfasst“, dass er nicht gemessen wurde.
 - Skill `.claude/skills/anime-fpv-kampfvideo/` (im Repo-Hauptordner): Ablauf, Parameter-Katalog ohne Werte,
   Werte-Vorlage, Pipeline-Skripte (Vorschau, fortsetzbares Final, Watchdog, Webversion, Werte-Dump).
 

@@ -8,7 +8,11 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 # alte Instanz beenden – nur wenn die PID wirklich ein Watchdog ist (nach Neustart werden PIDs neu vergeben)
 if [ -f "$WORK/watchdog.pid" ]; then
   old=$(cat "$WORK/watchdog.pid")
-  if [ "$old" != "$$" ] && grep -q watchdog.sh /proc/$old/cmdline 2>/dev/null; then kill "$old"; fi
+  # nur eine echte Watchdog-Instanz beenden: Befehlszeile genau "/bin/bash <pfad>/watchdog.sh", nicht wir selbst und
+  # nicht unsere Eltern-Shell (deren "bash -c …watchdog.sh" passt sonst auch – nach einem Neustart kann die alte PID
+  # genau die Eltern-Shell sein, dann beendet sich der Watchdog selbst)
+  if [ "$old" != "$$" ] && [ "$old" != "$PPID" ] && \
+     [ "$(tr '\0' ' ' < /proc/$old/cmdline 2>/dev/null)" = "/bin/bash $HERE/watchdog.sh " ]; then kill "$old"; fi
 fi
 echo $$ > "$WORK/watchdog.pid"
 end=$(( $(date +%s) + 7080 ))

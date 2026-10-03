@@ -23,6 +23,7 @@ Code-Ort bezieht sich auf das Repo `SnaQOG/Cursor`, Ordner `drohnen_3d_welten/`.
 12. Laufzeiten und Ressourcen (Messwerte)
 13. Sound-Marker
 14. Bewertung (für die spätere Analyse)
+15. Schiff und Crew (Videos mit Fahrzeug und Figurengruppe statt Kampf)
 
 ---
 
@@ -221,3 +222,28 @@ Code-Ort bezieht sich auf das Repo `SnaQOG/Cursor`, Ordner `drohnen_3d_welten/`.
 | bewertung.korrekturen | was nach Vorschauen geändert wurde (Parameter-ID → alt/neu, Grund) | Liste |
 | bewertung.reaktion | Reaktion auf das Ergebnis (wörtlich) | Text |
 | bewertung.social | später: Aufrufe, Watchtime, Likes (falls gepostet) | Zahlen |
+
+## 15. Schiff und Crew (Videos mit Fahrzeug und Figurengruppe statt Kampf)
+Bei Videos ohne Kampf (z. B. One Piece: Thousand Sunny mit Strohhutbande) entfallen `kampf.*` und große Teile von
+`fx.*`; dafür gelten diese IDs. Referenz-Umsetzung: `world_onepiece.py`, `sunny.py`, `crew.py`, `tripo_crew.py`.
+
+| ID | Bedeutung | Einheit / Format | Code-Ort |
+|---|---|---|---|
+| schiff.modell | Schiffsmodell, Bauweise, Quelle (Model Sheets) | Text | `sunny.build` |
+| schiff.kurs / .tempo / .start | Kurs, Fahrt, Startpunkt | °, m/s, m | `SHIP_HEADING`, `SHIP_SPEED`, `SHIP_START` |
+| schiff.bewegung | Stampfen/Rollen | Faktoren | `sunny.animate` |
+| schiff.flaggen | Stoff-Simulation (Cache) | Text | `sunny.flag_cloth` |
+| schiff.gischt | Bug-Gischt: Raten, Aufwärtstempo, Tropfenradien | 1/s, m/s, m | `SPRAY`, `ocean.bow_spray` |
+| schiff.kielwasser | Bugwelle, Heckwelle, Rumpfschaum | Text | `ocean.ocean_fx_gn` |
+| kamera.speed_keys | Tempo über die Zeit (statt Wegpunkt-Zeiten) | Liste (s, m/s) | `SPEED_KEYS` |
+| kamera.route_welt / .route_schiff | Bahn weltfest / im Schiffssystem | Liste (x, y, z) | `WORLD_ROUTE`, `SHIP_ROUTE` |
+| kamera.uebergang | Überblendung weltfest → schiffsfest | m, s | `BLEND_M`, `t_join` |
+| kamera.impact | Kamerastoß beim Überfliegen der Reling | dict | `IMPACT` |
+| licht.randlicht_fade | Randlicht aus, bevor die Kamera zurückblickt | s, s | `RIM_FADE` |
+| crew.figuren | je Figur: Modell, Höhe, Rig-Quelle, Look | Liste | `tripo_crew.SPEC`, `TOON` |
+| crew.aufstellung | je Figur: Ort (Schiffssystem), Yaw, Boden/Sitz | Liste | `crew.place_crew` |
+| crew.schauspiel | je Figur: Posenfolge (Zeit, Pose, Dauer, Ausholen, Überschwingen), Atmen, Schwanken, Blick | Liste | `crew.place_crew`, `act` |
+| crew.posen_map | figurenspezifische Posen-Ersetzungen | dict | `tripo_crew.POSE_MAP` |
+| crew.drehung | Körperdrehung über die Zeit (z. B. zur Kamera) | Liste (s, °) | `act(turn=…)` |
+| crew.requisiten | Requisiten an Gelenken | Liste | `tripo_crew.PROPS` |
+| crew.texturen | Texturgröße der Figuren | px | `tripo_crew.TEX` |

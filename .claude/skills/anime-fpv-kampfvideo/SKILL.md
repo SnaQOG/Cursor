@@ -21,11 +21,17 @@ als Klimax. Dieser Skill hält fest, **welche Parameter** ein solches Video best
     (Ki-Spuren, Zanzoken), `vfx.py` (Treffer, Strahlen, Aura, Explosion, Partikel), `tripo_chars.py`
     (Tripo-Figuren riggen), `namek.py` (Namek-Objekte, Gras), `nature.py`, `ocean.py`, `post.py`
     (Grade und Encoding), `params/<welt>.py` (Nachbearbeitung).
-- **Parameter-Katalog:** `references/parameter_katalog.md`, alle IDs mit Bedeutung, Einheit und Code-Ort. Lies ihn
-  beim Planen eines neuen Videos vollständig.
-- **Werte-Vorlage:** `references/werte_vorlage.json`, alle IDs mit leeren Werten.
+- **Parameter-Katalog:** `references/parameter_katalog.md`, alle 332 IDs mit Bedeutung, Einheit und Code-Ort. Lies
+  ihn beim Planen eines neuen Videos vollständig.
+  - Teil A (S1–S15): Briefing, Stadt, Gebäude, Materialien, Licht, Atmosphäre, Leben, Kamera wie im Film,
+    Render-Setup, Compositing, KI, QC/Lieferung/Gates, Kampf in der Stadt.
+  - Teil B (1–15): die gemeinsamen Parameter aus dem Namek-Video (Format bis Schiff und Crew).
+  - Derselbe Katalog liegt im Skill `blender-stadt-vfx`, die IDs sind in allen Videos gleich.
+- **Werte-Vorlage:** `references/werte_vorlage.json`, alle 332 IDs mit leeren Werten. Was es im Video nicht gibt,
+  bekommt „entfällt“; was nicht gemessen wurde, „nicht erfasst“.
 - **Werte-Archiv:** `drohnen_3d_welten/werte/<NN_name>/` im Repo, mit `werte.json` (IDs → Werte),
-  `kampfplan_und_kamera.json` (alle Schlüssel) und `werte.md` (lesbare Fassung). Erster Eintrag: `03_namek`.
+  `kampfplan_und_kamera.json` (alle Schlüssel) und `werte.md` (lesbare Fassung). Einträge: `01_onepiece`,
+  `02_naruto`, `03_namek`, alle mit den 332 IDs.
   Die Werte bleiben für die Auswertung dort und werden nicht in diesen Skill übernommen.
 - **Pipeline:** `scripts/pipeline/`
   - `build_scene.py`, `preview.py`, `render_final.py`: Szene bauen, Vorschau, fortsetzbarer Final-Render
@@ -38,7 +44,10 @@ als Klimax. Dieser Skill hält fest, **welche Parameter** ein solches Video best
 
 ## Ablauf
 Die Phasen folgen den Abschnitten des Katalogs. In jeder Phase legst du die Werte der genannten IDs fest und
-notierst Begründungen, denn die braucht die spätere Analyse.
+notierst Begründungen, denn die braucht die spätere Analyse. Aus Teil A gehören dazu: Briefing (S1) in Phase 1,
+Licht und Atmosphäre (S5, S6) in Phase 3, Kamera wie im Film (S10) in Phase 4, Render-Setup und Compositing (S11,
+S12) in Phase 9, QC, Lieferung und Gates (S14) in Phase 10. Die Stadt-Abschnitte (S2–S4, S7–S9, S15) nur, wenn
+die Welt eine Stadt ist.
 
 1. **Briefing und Zeitleiste** (`format.*`, `ablauf.*`): Welt, Figuren und Wow-Moment klären; vorhandene Vorlagen
    (Anime-Bilder, Model Sheets) ansehen und Farben per Pixelmessung übernehmen. Schlag eine Zeitleiste vor

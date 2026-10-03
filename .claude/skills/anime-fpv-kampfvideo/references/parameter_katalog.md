@@ -1,31 +1,329 @@
-# Parameter-Katalog für ein Anime-FPV-Kampfvideo
+# Parameter-Katalog: Blender-Städte und FPV-Welten
 
-Alle Stellschrauben eines Videos nach dem Vorbild Namek, **ohne Werte**. Die Werte legst du je Video fest und
-trägst sie nach dem Final mit denselben IDs ins Werte-Archiv ein
+Alle Stellschrauben einer Stadt in Kinoqualität und der übrigen 3D-Welten, **ohne Werte**. Die Werte legst du je
+Video fest und trägst sie nach dem Final mit denselben IDs ins Werte-Archiv ein
 (`drohnen_3d_welten/werte/<NN_name>/werte.json`, Vorlage: `werte_vorlage.json`). Gleiche IDs über alle Videos
-erlauben später die Auswertung, z. B. welche Kameratempi, Schlagdauern oder Effektgrößen gut ankamen.
+erlauben später die Auswertung, z. B. welche Kameratempi, Detaildichten, Sample-Zahlen oder Grades gut ankamen.
 
-Code-Ort bezieht sich auf das Repo `SnaQOG/Cursor`, Ordner `drohnen_3d_welten/`. Die Referenz-Umsetzung ist
-`world_dragonball.py` (Namek).
+- **Teil A** enthält die Stadt- und Kino-Parameter (Abschnitte S1 bis S15).
+- **Teil B** enthält die gemeinsamen Parameter aller 3D-Welten (Abschnitte 1 bis 15).
+- Derselbe Katalog (und dieselbe Werte-Vorlage) liegt in den Skills `blender-stadt-vfx` und
+  `anime-fpv-kampfvideo`. Alle Videos nutzen dieselben IDs, deshalb sind Stadt-, Anime- und Kampfvideos direkt
+  vergleichbar.
+- Jede ID gibt es nur einmal. Wo Teil A einen Bereich aus Teil B ergänzt, steht ein Verweis statt einer Kopie.
+
+**Code-Ort:**
+- Repo `SnaQOG/Cursor`, Ordner `drohnen_3d_welten/`.
+- Referenz-Umsetzung einer Stadt ist `world_naruto.py` (Konoha) mit `konoha.py` (Gebäude, Materialien,
+  Felsen) und `konoha_life.py` (Straßenleben). Für Teil B ist es `world_dragonball.py` (Namek).
+- Blender-Eigenschaften stehen als Pfad da (z. B. `scene.cycles.*`), Einstellungen der Skill-Skripte als
+  `CONFIG["…"]` (`scripts/setup_cinema_render.py`) bzw. als Konstante in `scripts/preflight_check.py`.
+
+**Nicht zutreffend:** Gibt es einen Parameter im Video nicht (z. B. kein Wasser), trägst du im Archiv „entfällt“
+ein. Die ID wird nicht gelöscht.
 
 ## Inhalt
-1. Format und Ablauf
-2. Licht und Himmel
-3. Gelände und Welt-Objekte
-4. Wasser
-5. Vegetation, Gras, Kleinkram
-6. Kamera
-7. Figuren
-8. Kampfplan und Timing
-9. Effekte
-10. Render
-11. Nachbearbeitung und Encoding
-12. Laufzeiten und Ressourcen (Messwerte)
-13. Sound-Marker
-14. Bewertung (für die spätere Analyse)
-15. Schiff und Crew (Videos mit Fahrzeug und Figurengruppe statt Kampf)
+Teil A: Stadt und Kino
+- S1. Briefing und Planung
+- S2. Stadtlayout und Blockout
+- S3. Gebäude und Aufbau
+- S4. Stadt-Materialien
+- S5. Stadt-Licht
+- S6. Atmosphäre
+- S7. Leben und Bewegung
+- S8. Vegetation in der Stadt
+- S9. Wahrzeichen-Relief (Felswand, Monument)
+- S10. Kamera wie im Film
+- S11. Render-Setup in Kinoqualität
+- S12. Compositing (Kinolook)
+- S13. Video-zu-Video-KI
+- S14. QC, Lieferung, Gates
+- S15. Kampf in der Stadt
+
+Teil B: gemeinsame Parameter aller 3D-Welten
+- 1. Format und Ablauf
+- 2. Licht und Himmel
+- 3. Gelände und Welt-Objekte
+- 4. Wasser
+- 5. Vegetation, Gras, Kleinkram
+- 6. Kamera
+- 7. Figuren
+- 8. Kampfplan und Timing
+- 9. Effekte
+- 10. Render
+- 11. Nachbearbeitung und Encoding
+- 12. Laufzeiten und Ressourcen
+- 13. Sound-Marker
+- 14. Bewertung
+- 15. Schiff und Crew
+
+**Phasen und Gates des Skills:**
+
+| Phase (Gate) | Abschnitte |
+|---|---|
+| 0 Briefing (A) | S1, 1 |
+| 1 Shotlist, Referenzen, Maßstab (A2) | S1, S2, 6 |
+| 2 Blockout und Kamera (B) | S2, S10, 6 |
+| 3 Assets und Aufbau | S3, S8, S9, 3, 5 |
+| 4 Look-Dev (C) | S4, S5, S6, 2 |
+| 5 Leben und Bewegung | S7, S15, 7–9, 15 |
+| 6 Preview-Animation (D) | S14 (Gates), 12, 14 |
+| 7 Render-Setup und Preflight (E) | S11, 10 |
+| 8 Compositing und Lieferung | S12, S13, S14, 11–14 |
 
 ---
+
+# Teil A: Stadt und Kino
+
+## S1. Briefing und Planung
+| ID | Bedeutung | Einheit / Format | Code-Ort |
+|---|---|---|---|
+| briefing.stadt | Stadt, Thema, Epoche, Kultur | Text | Docstring der Welt |
+| briefing.stil | fotoreal, stilisiert oder Anime | Text | – |
+| briefing.tageszeit | Tageszeit (genau benannt) | Text, Uhrzeit | – |
+| briefing.wetter | Wetter und Jahreszeit | Text | – |
+| briefing.stimmung | Stimmung in einem Satz | Text | – |
+| briefing.kameratyp | FPV, Flyover oder Static | Text | – |
+| briefing.verwendung | privat, Video-zu-Video-KI oder Veröffentlichung | Text | – |
+| briefing.engine | Engine und Device | Text | `CONFIG["device"]` |
+| briefing.budget | Renderbudget: max. Minuten pro Frame, Gesamtstunden | min, h | `BUDGET_HOURS` |
+| briefing.hardware | VRAM, RAM, CPU-Kerne, freier Speicher für die Sequenz | GB, Anzahl | – |
+| briefing.ausgabe | Ausgabeformat und Zielordner | Text, Pfad | `CONFIG["output_root"]` |
+| briefing.referenzen | Referenzen für Architektur, Material, Licht, Atmosphäre, Kamera | Liste | Docstring der Welt |
+| briefing.palette | Farbpalette und Kontrastidee (aus Referenzen gemessen) | Liste RGB | Material-Farben in `build()` |
+| planung.einheiten | Einheitensystem, Maßstab, Skalierung angewendet | Text | `scene.unit_settings` |
+| planung.detailbudget | Grenzen nah / mittel / fern und Detailstufe je Zone | m, Text | – |
+| planung.collections | Collection-Struktur und Namensschema | Liste | – |
+| planung.versionierung | Dateiname, Version, Backup-Ort | Text | `CONFIG["city"]`, `CONFIG["version"]` |
+
+## S2. Stadtlayout und Blockout
+| ID | Bedeutung | Einheit / Format | Code-Ort |
+|---|---|---|---|
+| stadt.koordinaten | Ursprung, Hauptflugrichtung, Achsen | Text | Welt-Modul |
+| stadt.flaeche | Stadtfläche: Größe, Mitte | m | `VillageGround` in `build()` |
+| stadt.mauer | Stadtmauer: Mitte, Radius, Segmentwinkel, Höhe, Dicke, Abdeckung, Toröffnung | m, ° | `WALL_C`, `WALL_R`, `build()` |
+| stadt.tor | Tor: Ort, halbe Öffnung, Höhe, Oberkante des Querbalkens | m | `konoha.gate`, `BEAM2_TOP` |
+| stadt.hauptstrasse | Hauptstraße: Halbbreite, Länge, Mitte, Belag | m | `STREET_HW`, `MainStreet` |
+| stadt.zufahrt | Zufahrtsweg: Breite, Länge, Belag | m | `Road` in `build()` |
+| stadt.platz | Platz: Mitte, Größe, Belag | m | `Plaza` in `build()` |
+| stadt.gelaende | Höhenprofil: Hügelring (Abstand, Breite, Höhe, fbm), Tal der Zufahrt, Plateau, Gipfel | m, Formel | `terrain_height` |
+| stadt.gelaende_mesh | Geländenetz: Größe, Auflösung, Ursprung | m, Punkte | `fpv.grid_mesh("Terrain", …)` |
+| stadt.wasser | Fluss, Hafen, Kanäle, Uferlinien | m, Liste | Welt-Modul, `ocean.py` |
+| stadt.bruecken_treppen | Brücken, Treppen, Terrassen | Liste | Welt-Modul |
+| stadt.landmarken | Wahrzeichen: Name, Ort, Größe, Rolle im Flug (Hook, Manöver, Reveal, Schlussbild) | Liste | `RES_POS`, `TREE_POS`, `CLIFF_Y`, `HEADS` |
+| stadt.sichtachsen | Sichtachsen und Kompositionsmomente entlang der Route | Liste (s, Motiv) | Kommentare in `CAM_KEYS` |
+| stadt.route | grobe Flugroute auf dem Blockout | Liste (x, y, z) | `ROUTE` |
+| stadt.seed | Zufalls-Seed des Aufbaus | Zahl | `np.random.default_rng` in `build()` |
+
+## S3. Gebäude und Aufbau
+| ID | Bedeutung | Einheit / Format | Code-Ort |
+|---|---|---|---|
+| gebaeude.anzahl | Gebäude gesamt (Messwert) | Anzahl | Ausgabe „buildings“ |
+| gebaeude.strassenzeile | Häuser an der Hauptstraße: Breite, Tiefe, Stockwerke, Lücke, Rücksprung, y-Bereich | m, Anzahl | `build()` Teil a |
+| gebaeude.stile | Bauformen und ihre Gewichte (flach, Tonnendach, rund, Walmdach) | Liste | `rng.choice` in `build()` |
+| gebaeude.raster | übrige Stadt: Rasterweite, Versatz, Aussparungen, Ausfallquote, Drehung, Größen, Stockwerke | m, Anteil, ° | `build()` Teil b |
+| gebaeude.platzrand | Randbebauung des Platzes: je Gebäude x, y, Breite, Tiefe, Stockwerke, Stil | Liste | `build()` Teil c |
+| gebaeude.stockwerkhoehe | Stockwerkhöhe, Sockel, Brüstung | m | `konoha.building` |
+| gebaeude.tuerme | Stufentürme: Anteil, Radius, Stufen, Dachfarbe, feste Türme an der Straße | Anteil, m, Anzahl | `konoha.tiered_tower` |
+| gebaeude.daecher | Dachformen: Stich des Tonnendachs, Stich und Überstand des Walmdachs, Ziegelmaße | Faktor, m | `barrel_roof`, `hip_roof`, `tile_roof_mesh` |
+| gebaeude.dachaufbauten | Wassertanks, Klimageräte, Rohre, Antennen, Schornsteine: Anteil, Größe | Anteil, m | `water_tank_collection`, `building` |
+| gebaeude.fassade | Fenster je Stockwerk, Rahmen, Bänke, Läden, Rohre, Kabel, Markisen | Anzahl, Anteil | `facade_details`, `window_collection` |
+| gebaeude.banner | Banner: Anteil, Zeichen, Größe, Höhe, Farben | Anteil, m, RGB | `build()` |
+| gebaeude.schilder | Ladenschilder: Zeichen, Vorder- und Hintergrundfarbe | Liste | `sign_mats`, `textures.kanji_disc` |
+| gebaeude.tueren | Türen: Motiv, Farben | Liste | `konoha.door_material` |
+| gebaeude.hero | Hauptgebäude: Ort, Radius, Dachhöhe, Brüstung, Dachbelag | m | `konoha.residence`, `RES_POS`, `DECK_Z`, `C_ROOF` |
+| gebaeude.bevel | Kantenfase der Bauteile | m | `konoha.box(bevel)`, `weather(bevel_r)` |
+| gebaeude.lod | Detailstufe je Zone, Proxies und Karten in der Ferne | Text | – |
+| gebaeude.instancing | Instanzierung und Variation (Höhe, Dach, Farbe, Drehung, Skalierung) | Text, Bereiche | `place_instance`, `nature.scatter_gn` |
+| gebaeude.strassendetails | Bordsteine, Gullys, Markierungen, Pflaster | Liste | – |
+
+## S4. Stadt-Materialien
+Boden, Felsen und Steilwände der Welt stehen in Abschnitt 3 (`material.boden`, `material.fels`,
+`material.steilwand`).
+
+| ID | Bedeutung | Einheit / Format | Code-Ort |
+|---|---|---|---|
+| material.putz | Putz: Farben, Fenster an/aus, PBR-Variante | RGB, an/aus | `plaster_material`, `plaster_pbr_material` |
+| material.daecher | Dachfarben, Ziegelbreite und -höhe, Streuung, zylindrisch | RGB, m, Faktor | `tile_roof_material`, `roof_material` |
+| material.terrakotta | Farben der Ziegel-Meshes | RGB | `terracotta_material` |
+| material.fenster | Fensterglas: lit, curtain, per_cell, Innenraum | Faktoren | `window_glass_material` |
+| material.verwitterung | je Material: dirt_h, dirt, ground_z, edge, edge_col, bevel_r, streak, var | m, RGB, Faktoren | `konoha.weather` |
+| material.dachbelag | Abnutzung des Dachbelags (r_edge) | m | `konoha.deck_wear` |
+| material.strasse | Straßenboden (half_w), Pflaster, Feldweg, Sandstraße | m, Faktoren | `street_ground_material`, `street_material`, `dirt_road_material`, `sand_street_material` |
+| material.gras | Gras zwischen den Häusern und am Hang: c1, c2, dry, scale | RGB, Faktor | `nature.grass_material` |
+| material.metall | Rostmetall für Tanks und Rohre: tint | RGB | `rust_metal_material` |
+| material.holz | Balken, Dachdeck, Masten: dark, board, Achse | Faktoren | `sunny.wood_material`, `nature.bark_material` |
+| material.lack | lackierte Teile (Läden, Klimageräte, Horn): Farbe, Rauheit | RGB, Faktor | `sunny.paint_material` |
+| material.stoff | Markisen, Stände, Wäsche: Farben, Rauheit | RGB, Faktor | `simple_mat` in `build()` |
+| material.mauer | Mauer- und Torstein: c1–c3, bump, crack_w | RGB, Faktoren | `nature.rock_material` |
+| material.wahrzeichen_fels | Fels des Wahrzeichens: c1–c3, moss, moss_amount, scale, bump, crack_w, strata_scale, lichen, cavity | RGB, Faktoren | `CliffRock`, `FaceRock` |
+| material.cc0 | CC0-PBR-Texturen: Dateien, Skalierung, Überblendung | Pfad, Faktor | `konoha.CC0`, `pbr_box` |
+| material.emission | Laternen, Fenster, Schilder: Farbe, Stärke | RGB, Faktor | `lantern_materials`, `simple_mat(emission)` |
+| material.texeldichte | Texeldichte | px/m | – |
+| material.farbraum | Farbtexturen sRGB, Datentexturen Non-Color (geprüft) | Text | Image-Nodes |
+| material.displacement | Displacement und Bump nah an der Kamera | m, Faktor | Material-Nodes |
+| material.kachelvariation | Mittel gegen sichtbare Kacheln (Noise-Mix, Objekt-Zufall, Attribute) | Text, Faktoren | Material-Nodes |
+
+## S5. Stadt-Licht
+Ergänzt Abschnitt 2 (Hauptsonne, Randlicht, Himmel, Wolken).
+
+| ID | Bedeutung | Einheit / Format | Code-Ort |
+|---|---|---|---|
+| licht.himmel_typ | Nishita, HDRI oder eigener Verlauf | Text | `fpv.build_world` |
+| licht.nishita | aerosol, ozone, air, Sonnenscheibe | Faktoren | `build_world(aerosol, ozone)` |
+| licht.hdri | Datei, Drehung, Stärke | Pfad, °, Faktor | World-Nodes |
+| licht.nacht_quellen | Laternen, Fenster, Schilder, Fahrzeuge, Feuer: Anzahl, Stärke | Anzahl, W | Welt-Modul |
+| licht.farbtemperaturen | Kelvin je Quellenart (Natrium, warm, neutral, kühl) | K | Lichter |
+| licht.schatten | Richtung, Länge, Härte (Prüfung gegen Tageszeit) | Text | – |
+| licht.mond_sterne | Mond, Sterne | Text | World-Nodes |
+| licht.rig | Lichtrig als Collection (Name, Inhalt) | Text | – |
+
+## S6. Atmosphäre
+Ergänzt `atmosphaere.dichte`, `wolken.*` (Abschnitt 2) und `post.dunst` (Abschnitt 11).
+
+| ID | Bedeutung | Einheit / Format | Code-Ort |
+|---|---|---|---|
+| atmosphaere.volumen | Streuvolumen: Größe, Mitte, Farbe | m, RGB | `fpv.add_atmosphere` |
+| atmosphaere.bodennebel | Höhen- und Bodennebel: Höhe, Dichte, Bereich | m, 1/m | – |
+| atmosphaere.lichtstrahlen | volumetrische Lichtstrahlen | Faktor | – |
+| atmosphaere.wetter | Regen, Schnee, Staub, Asche: Anzahl, Tempo | Anzahl, m/s | – |
+| atmosphaere.tiefenschichten | Vorder-, Mittel-, Hintergrund: Abstände | m | – |
+
+## S7. Leben und Bewegung
+| ID | Bedeutung | Einheit / Format | Code-Ort |
+|---|---|---|---|
+| leben.passanten | Passanten: Abstand entlang der Straße, Anteil je Seite, Abstand zur Straßenmitte, Drehungsstreuung, Aussparungen, Anzahl | m, Anteil, °, Anzahl | `build()`, `konoha_life.place_villagers` |
+| leben.passanten_vorlagen | Vorlagen, Posen, Kleidungsfarben, Seed | Liste | `villager_templates`, `VILLAGER_POSES`, `villager_materials` |
+| leben.staende | Marktstände: Anzahl, Abstand, Seite, Maße, Dachstoff, Waren, Kisten | Anzahl, m | `build()`, `stall_goods` |
+| leben.laternen | Laternenleinen: y-Positionen, x_end, z_end, sag, n je Leine, Seed | m, Anzahl | `konoha_life.lantern_lines` |
+| leben.waesche | Wäscheleinen: y-Positionen, Höhe (aus Fassaden), sag, Abstand zum Baum | m | `konoha_life.laundry_lines` |
+| leben.leitungen | Strommasten: Abstand, Höhe, Querbalken, Drahtabstand, Durchhang | m | `build()` |
+| leben.voegel | je Schwarm: Anzahl, Startbox, Flugvektor, t0, t1, Seed | Anzahl, m, s | `konoha_life.birds` |
+| leben.blaetter | treibende Blätter je Feld: Box, Anzahl, Wind, Seed | m, Anzahl, m/s | `konoha_life.leaves_gn` |
+| leben.pendeln | Schwingen: Achse, Amplitude, Frequenz, Phase, Rauschen | °, Hz | `konoha_life.sway` |
+| leben.verkehr | Fahrzeuge, Bahnen, Boote: Anzahl, Pfade, Tempo, Lichter | Anzahl, m/s | – |
+| leben.rauch | Rauch und Dampf: Quellen, Dichte, Tempo | Anzahl, Faktoren | – |
+| leben.flaggen | Flaggen, Planen, Wäsche im Wind (Stoff-Cache) | Text | `sunny.flag_cloth` |
+| leben.caches | Simulations-Caches: Ordner, Frames | Pfad | – |
+| leben.asynchron | Variation, damit nichts synchron läuft (Phase, Tempo) | Bereiche | – |
+
+## S8. Vegetation in der Stadt
+Ergänzt Abschnitt 5 (`baum.varianten`, `baum.material`, `baum.abstaende`, `baum.sichtlinie`).
+
+| ID | Bedeutung | Einheit / Format | Code-Ort |
+|---|---|---|---|
+| baum.hero | Manöver-Baum: Ort, Höhe, Kronenradius, Cluster, Blätter je Cluster, Steinring | m, Anzahl | `TREE_POS`, `BigTree` |
+| baum.nadelbaum | Nadelbäume: Höhe, Krone, Cluster, Form, Transluzenz | m, Anzahl | `KSugi` in `build()` |
+| baum.wald | Waldbereiche: Anzahl, x/y-Bereich, Ausschlüsse, Skalierung | Liste | `add_forest` |
+| baum.dorf | Bäume im Ort: Versuche, Abstand zu Gebäuden, Hauptgebäude, Straße; Skalierung | Anzahl, m | `build()` |
+| baum.buesche | Büsche an der Zufahrt: Anzahl, Bereich, Skalierung | Anzahl, m | `build()` |
+| baum.felsbewuchs | Bewuchs auf Felsbändern: Normalen-Schwelle, Mindesthöhe, Anzahl, Skalierung, Aussparung | Faktor, m, Anzahl | `build()` |
+| baum.streuung | Streuung per Geometry Nodes: Seed, Drehung, Größe, Punkte gesamt | Zahl, Anzahl | `nature.scatter_gn` |
+
+## S9. Wahrzeichen-Relief (Felswand, Monument)
+| ID | Bedeutung | Einheit / Format | Code-Ort |
+|---|---|---|---|
+| wahrzeichen.wand | Felswand: x-Bereich, y, z-Bereich, Auflösung, Seed, Panel | m | `CLIFF_Y`, `konoha.cliff_mesh` |
+| wahrzeichen.risse | Risse: Anzahl, Bereich, Tiefe, Breite | Anzahl, m | `konoha.add_cracks` |
+| wahrzeichen.gesichter | je Gesicht x, Höhenversatz, Haar; Skalierung, Grundhöhe, Kopfvorlage, Voxelgröße | m, Text | `HEADS`, `HEAD_S`, `HEAD_Z`, `hokage_head`, `fuse_parts` |
+| wahrzeichen.kinnlinie | Kinnlinie, Panel-Aussparung | Formel | `chin` in `cliff_mesh` |
+| wahrzeichen.details | Treppen, Geländer, Hütten, Kuppeln an der Wand | Liste | `cliff_details` |
+
+## S10. Kamera wie im Film
+Ergänzt Abschnitt 6 (`kamera.brennweite`, `kamera.sensor`, `kamera.wegpunkte`, `kamera.tempo` …).
+
+| ID | Bedeutung | Einheit / Format | Code-Ort |
+|---|---|---|---|
+| kamera.fov | Sichtfeld | ° | `fpv.make_camera(fov_deg)` |
+| kamera.blende | Blende, Fokusdistanz, Schärfentiefe an/aus | f, m | `cam.data.dof` |
+| kamera.clipping | Clip Start, Clip End | m | `cam.data.clip_start`, `clip_end` |
+| kamera.overscan | Overscan für Stabilisierung und Verzerrung im Comp | % | – |
+| kamera.manoever | je Manöver: Zeit, festes Objekt, Art (Tor, Kabel, Baum, Steigflug, Brüstung) | Liste | Kommentare in `CAM_KEYS` |
+| kamera.mindestabstand | kleinster Abstand zur Geometrie (Messwert) | m | – |
+| kamera.hook | Hook-Bild am Anfang: Inhalt, Dauer | Text, s | `ablauf.abschnitte` |
+| kamera.schlussbild | Schlussbild: Motiv, Blickwinkel | Text, ° | letzter Eintrag in `CAM_KEYS` |
+| kamera.loop | Loop oder fester Anfang und Ende | Text | – |
+
+## S11. Render-Setup in Kinoqualität
+Ergänzt Abschnitt 10 (`render.samples`, `render.adaptiv`, `render.denoiser`, `render.bounces`, `render.clamp`,
+`render.light_tree`, `render.persistent`, `render.motion_blur`, `render.paesse`, `render.seed` …).
+
+| ID | Bedeutung | Einheit / Format | Code-Ort |
+|---|---|---|---|
+| render.engine | Engine und Device | Text | `scene.render.engine`, `CONFIG["device"]` |
+| render.min_samples | Mindest-Samples beim adaptiven Sampling | Anzahl | `CONFIG["min_samples"]` |
+| render.kaustiken | Kaustiken reflektiv / refraktiv | an/aus | `scene.cycles.caustics_*` |
+| render.vector_pass | Vector-Pass (nur ohne Cycles-Motion-Blur) | an/aus | `CONFIG["vector_pass"]` |
+| render.cryptomatte | Object, Material, Asset; Tiefe | Text, Anzahl | `use_pass_cryptomatte_*`, `pass_cryptomatte_depth` |
+| render.mist | Mist Start, Tiefe, Abfall | m, Text | `CONFIG["mist_start"]`, `CONFIG["mist_depth"]` |
+| render.farbmanagement | View Transform, Look, Exposure, Gamma, Display | Text | `CONFIG["view_transform"]`, `CONFIG["look"]` |
+| render.ausgabe | Format, Bit-Tiefe, Codec, Bildsequenz, Pfadschema | Text | `CONFIG["exr_codec"]`, `CONFIG["exr_depth"]`, `output_root` |
+| render.fortsetzbar | Overwrite aus, Placeholders an, vorhandene Frames überspringen | an/aus | `use_overwrite`, `use_placeholder` |
+| render.vram | VRAM- und RAM-Spitze bei schweren Frames (Messwert) | GB | – |
+| render.testframes | Testframes in Endqualität: Frame, Sekunden | Liste | – |
+| render.hochrechnung | s pro Frame × Frames = Gesamtzeit, gegen Budget | s, h | `SEC_PER_FRAME`, `BUDGET_HOURS` |
+| render.preflight | Ergebnis des Preflight-Checks (Fehler, Warnungen) | Liste | `scripts/preflight_check.py` |
+
+## S12. Compositing (Kinolook)
+Ergänzt Abschnitt 11 (`post.bloom` für Glare/Fog Glow, `post.optik` für Dispersion, Vignette, Korn, `post.look`,
+`post.farbe`, `post.dunst` …).
+
+| ID | Bedeutung | Einheit / Format | Code-Ort |
+|---|---|---|---|
+| comp.linsenverzerrung | Linsenverzerrung (Distortion) | Faktor | Lens-Distortion-Node |
+| comp.halation | Halation an hellen Kanten | Faktor | Compositor |
+| comp.grading | Schwarzwert, Highlights, Lift/Gamma/Gain, Farbtrennung Schatten/Lichter | Faktoren, RGB | Compositor |
+| comp.cryptomatte_korrekturen | selektive Korrekturen (Fenster, Himmel, Wasser) | Liste | Compositor |
+| comp.shake | Kamerashake im Comp | Faktoren | Compositor |
+| comp.letterbox | Letterbox / Scope | Seitenverhältnis | Compositor |
+| comp.ki_variante | saubere Fassung ohne Korn, Glare, Verzerrung | Pfad | – |
+
+## S13. Video-zu-Video-KI
+Nur, wenn die Verwendung „Video-zu-Video-KI“ ist. Generiert wird erst nach ausdrücklicher Freigabe.
+
+| ID | Bedeutung | Einheit / Format | Code-Ort |
+|---|---|---|---|
+| ki.tool | Plattform und Modell | Text | – |
+| ki.einstellungen | Einstellungen der Generierung | Text | – |
+| ki.kosten | vorab genannte Kosten | Credits | – |
+| ki.freigabe | Freigabe: Datum, Zitat | Text | – |
+| ki.eingabe | Eingabevideo (saubere Fassung) | Pfad | `comp.ki_variante` |
+
+## S14. QC, Lieferung, Gates
+| ID | Bedeutung | Einheit / Format | Code-Ort |
+|---|---|---|---|
+| bewertung.gates | je Gate (A, A2, B, C, D, E): Datum, freigegeben ja/nein, Zitat | Liste | – |
+| qc.durchsicht | komplett in Originalgeschwindigkeit gesehen | ja/nein | – |
+| qc.frames | fehlende oder schwarze Frames, Fireflies | Anzahl, Liste | – |
+| qc.flackern | Flackern in Schatten, Lichtern, Wasser, Fenstern | Befund | – |
+| qc.textur | Kachelmuster, Texturstreckung, Z-Fighting | Befund | – |
+| qc.banding | Banding in Himmel und Nebel | Befund | – |
+| qc.zweitdisplay | auf Handy oder zweitem Display geprüft | ja/nein | – |
+| qc.anfang_ende | Anfang und Ende sauber (Loop, Fade) | Text | – |
+| lieferung.master | Master (EXR-Sequenz, ProRes oder MP4): Pfad, Größe | Text, MB | `videos/` |
+| lieferung.varianten | weitere Formate (9:16, 1:1, Webversion) | Liste | `web_version.sh` |
+| lieferung.dateiname | Dateiname mit Version und Datum | Text | – |
+| lieferung.archiv | archivierte Teile (Projekt, Texturen, Caches, Skripte), Ort | Liste | – |
+| lieferung.obsidian | ZIP-Paket für den Vault | Pfad | – |
+| lieferung.wiederverwendbar | Assets, Materialien, Node-Gruppen, Lichtrig, Kameraskript für die nächste Stadt | Liste | – |
+| lieferung.notiz | was beim nächsten Mal früher entschieden werden muss | Text | – |
+
+## S15. Kampf in der Stadt
+Hat die Stadt eine Handlung mit Figuren, gelten zusätzlich Abschnitt 7 bis 9. Diese IDs kommen dazu.
+
+| ID | Bedeutung | Einheit / Format | Code-Ort |
+|---|---|---|---|
+| kampf.ort | Kampfort (z. B. Dach): Mitte, Höhe, lokales Koordinatensystem | m | `C_ROOF`, `DECK_Z`, `roof()` |
+| fx.impact_klein | kleines Impact-Paket: Farbe, Licht, Ring, Funken, Seed | RGB, W, m, Anzahl | `impact_small` |
+| fx.bruch | Bruchstücke an Gebäudeteilen: Objekt, Zeit, Bruchhöhe, Stücke | s, m, Anzahl | `break_fx` |
+| fx.techniken | Signatur-Techniken (z. B. Rasengan, Chidori): Farbe, Radius, Licht, Zeiten | RGB, m, W, s | `fight_fx`, `BLUE` |
+
+---
+
+# Teil B: gemeinsame Parameter aller 3D-Welten
+Entstanden mit dem Namek-Video. Code-Orte beziehen sich auf die Namek-Umsetzung
+(`world_dragonball.py`); in einer Stadt heißen sie gleich oder stehen im Welt-Modul der Stadt
+(z. B. `SUN_ELEV`, `RIM`, `CAM_KEYS`, `HITS`, `SHAKES` in `world_naruto.py`, `params/naruto.py`).
 
 ## 1. Format und Ablauf
 | ID | Bedeutung | Einheit / Format | Code-Ort |

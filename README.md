@@ -231,6 +231,13 @@ Der Bot implementiert robuste Fehlerbehandlung:
 4. Push zum Branch (`git push origin feature/AmazingFeature`)
 5. Öffne einen Pull Request
 
+## Browser-Spiel: Damm Raider
+
+Im Ordner [`damm-raider/`](damm-raider/) liegt ein vom Trading-Bot unabhängiges Browser-Spiel – ein
+Extraction-Shooter nach dem Vorbild von Arc Raiders auf einer Staudamm-Karte. Zum Spielen
+`damm-raider/dist/damm-raider.html` im Browser öffnen; Details stehen in der
+[README des Spiels](damm-raider/README.md).
+
 ## Lizenz
 
 Dieses Projekt ist unter der MIT-Lizenz lizenziert - siehe die [LICENSE](LICENSE) Datei für Details.

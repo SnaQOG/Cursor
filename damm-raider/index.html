@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Damm Raider</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+<!-- @build:importmap -->
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js" } }
+</script>
+<!-- @build:end -->
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<!-- Ladebildschirm -->
+<div id="boot" class="screen">
+  <div class="bootbox">
+    <div class="logo"><span>DAMM</span><span>RAIDER</span></div>
+    <p id="boot-text">Wird geladen …</p>
+    <div class="bootbar"><i></i></div>
+  </div>
+</div>
+
+<!-- Hub: Speranza -->
+<div id="hub" class="screen" hidden>
+  <header class="hubbar">
+    <div class="logo small"><span>DAMM</span><span>RAIDER</span></div>
+    <div class="where">Speranza · Unterirdische Siedlung</div>
+    <div class="credits"><span>Credits</span><strong id="hub-credits">0</strong></div>
+  </header>
+  <nav id="hub-nav">
+    <button data-tab="einsatz" class="on">Einsatz</button>
+    <button data-tab="lager">Lager</button>
+    <button data-tab="haendler">Händler</button>
+    <button data-tab="ausbau">Ausbau</button>
+    <button data-tab="statistik">Statistik</button>
+    <button data-tab="optionen">Optionen</button>
+  </nav>
+  <main id="hub-body"></main>
+  <div id="hub-toast" hidden></div>
+  <p class="touchnote">Damm Raider braucht Tastatur und Maus.</p>
+</div>
+
+<!-- HUD -->
+<div id="hud" hidden>
+  <canvas id="compass" width="560" height="50"></canvas>
+  <div class="topright">
+    <div id="timer" class="timer">20:00</div>
+    <div class="timerlbl">bis die Aufzüge schließen</div>
+  </div>
+  <div id="toasts"></div>
+  <div id="dmgdirs"></div>
+  <div id="dmgnums"></div>
+  <div id="crosshair"><i></i><i></i><i></i><i></i><b></b></div>
+  <div id="hitmarker"></div>
+  <div id="prompt" hidden><span id="prompt-ring" class="ring"></span><span id="prompt-text"></span></div>
+  <div id="action" hidden><span id="action-text"></span><div class="bar"><i id="action-fill"></i></div></div>
+  <div id="tickwarn" hidden>Zecke am Rücken! <kbd>V</kbd> abschütteln</div>
+  <div id="extract" hidden><span id="extract-text"></span><div class="bar"><i id="extract-fill"></i></div></div>
+  <div class="vitals">
+    <div class="vrow" id="sh-row"><span class="vl">Schild</span><div class="vbar sh"><i id="sh-fill"></i></div><span id="sh-num" class="vn">0</span></div>
+    <div class="vrow"><span class="vl">Leben</span><div class="vbar hp"><i id="hp-fill"></i></div><span id="hp-num" class="vn">100</span></div>
+    <div class="vrow st"><div class="vbar st"><i id="st-fill"></i></div></div>
+  </div>
+  <div class="weapon">
+    <div class="ammo"><span id="w-mag">0</span><span class="sep">/</span><span id="w-res">0</span></div>
+    <div class="wname"><span id="w-name">–</span> · <span id="w-ammo" class="muted"></span></div>
+    <div class="wslots"><span id="slot1" class="wslot">—</span><span id="slot2" class="wslot">—</span></div>
+    <div class="quick">
+      <span><kbd>3</kbd>Verband <b id="q-bandage">0</b></span>
+      <span><kbd>4</kbd>Sanikit <b id="q-medkit">0</b></span>
+      <span><kbd>5</kbd>Schildlader <b id="q-shieldcell">0</b></span>
+      <span><kbd>G</kbd>Granate <b id="q-grenade">0</b></span>
+    </div>
+  </div>
+  <div id="vignette"></div>
+  <div id="toxic"></div>
+</div>
+
+<!-- Beutefenster -->
+<div id="loot" class="modal" hidden>
+  <div class="mbox">
+    <div class="mcols">
+      <section>
+        <div class="mhead"><h2 id="loot-title">Kiste</h2><button class="btn small" data-act="takeall">Alles nehmen</button></div>
+        <div id="loot-items" class="grid"></div>
+      </section>
+      <section>
+        <div class="mhead"><h2>Rucksack <span id="loot-cap" class="muted"></span></h2><span id="loot-value" class="muted"></span></div>
+        <div id="loot-bp" class="grid"></div>
+      </section>
+    </div>
+    <div class="mfoot"><span class="muted">Klick auf einen Gegenstand verschiebt ihn. Die ARC warten nicht, während du suchst.</span><button class="btn ghost small" data-act="close">Schließen <kbd>E</kbd></button></div>
+  </div>
+</div>
+
+<!-- Inventar -->
+<div id="inv" class="modal" hidden>
+  <div class="mbox">
+    <div class="mcols">
+      <section>
+        <div class="mhead"><h2>Rucksack <span id="inv-cap" class="muted"></span></h2><span id="inv-value" class="muted"></span></div>
+        <div id="inv-bp" class="grid"></div>
+        <div class="mhead"><h3>Sichere Tasche</h3><span class="muted">bleibt auch beim Tod erhalten</span></div>
+        <div id="inv-safe" class="grid"></div>
+      </section>
+      <section>
+        <div class="mhead"><h2>Ausrüstung</h2></div>
+        <div id="inv-eq" class="eqcol"></div>
+        <div id="inv-actions" class="invact"></div>
+      </section>
+    </div>
+    <div class="mfoot"><span class="muted"><kbd>Tab</kbd> schließt das Inventar</span><button class="btn ghost small" data-act="close">Schließen</button></div>
+  </div>
+</div>
+
+<!-- Karte -->
+<div id="mapview" class="modal" hidden>
+  <div class="mbox mapbox">
+    <div class="mhead"><h2>Der Damm</h2><button class="btn ghost small" data-act="close">Schließen <kbd>M</kbd></button></div>
+    <canvas id="map-canvas" width="640" height="640"></canvas>
+    <p id="map-info" class="muted"></p>
+  </div>
+</div>
+
+<!-- Pause -->
+<div id="pause" class="modal" hidden>
+  <div class="mbox narrowbox">
+    <h2>Pause</h2>
+    <p class="muted">Das Spiel läuft weiter – die ARC auch.</p>
+    <label class="opt" for="p-sens">Mausempfindlichkeit</label>
+    <input type="range" id="p-sens" min="0.3" max="2.5" step="0.05" value="1">
+    <label class="opt" for="p-vol">Lautstärke</label>
+    <input type="range" id="p-vol" min="0" max="1" step="0.05" value="0.7">
+    <div class="btnrow">
+      <button class="btn primary" data-act="resume">Weiter</button>
+      <button class="btn ghost" id="p-quit" data-act="quit">Raid aufgeben</button>
+    </div>
+  </div>
+</div>
+
+<!-- Auswertung -->
+<div id="results" class="screen" hidden>
+  <div class="resbox">
+    <div class="kicker">Einsatzbericht · Der Damm</div>
+    <h1 id="res-title">Extrahiert</h1>
+    <p id="res-sub" class="lead"></p>
+    <div id="res-stats" class="statgrid"></div>
+    <h3>Mitgebracht</h3>
+    <div id="res-items" class="grid"></div>
+    <div id="res-safe" hidden><h3>Aus der sicheren Tasche ins Lager</h3><div id="res-safe-items" class="grid"></div></div>
+    <button class="btn primary big" data-act="back">Zurück nach Speranza</button>
+  </div>
+</div>
+
+<div id="tooltip" hidden></div>
+
+<!-- @build:script -->
+<script type="module" src="src/main.js"></script>
+<!-- @build:end -->
+</body>
+</html>

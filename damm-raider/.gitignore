@@ -1,0 +1,3 @@
+node_modules/
+# Die spielbare Einzeldatei wird bewusst mit eingecheckt
+!dist/

@@ -1,5 +1,11 @@
 // Baukasten für Gebäude und Props. Jede Form landet im Batcher (Optik) und
-// optional in der Kollisionswelt.
+// optional in der Kollisionswelt. Wo ein Blender-Modell vorhanden ist, wird
+// dieses eingebacken; sonst entstehen einfache Grundformen.
+import * as THREE from 'three';
+import { materialClass } from './assets.js';
+
+const _Y = new THREE.Vector3(0, 1, 0);
+const SIDE_RY = { s: 0, n: Math.PI, e: Math.PI / 2, w: -Math.PI / 2 };
 
 export const COL = {
   concrete: 0xa7a296,
@@ -28,15 +34,51 @@ export const COL = {
 };
 
 export class Builder {
-  constructor(batcher, col, terrain) {
+  constructor(batcher, col, terrain, assets = null) {
     this.b = batcher;
     this.col = col;
     this.t = terrain;
+    this.assets = assets;
     this.spots = []; // mögliche Beute-Positionen {x,y,z,tier,poi}
     this.turretSpots = [];
+    this.rnd = 1;
   }
 
   ground(x, z) { return this.t.height(x, z); }
+
+  // deterministischer Zufall (gleiche Karte bei jedem Laden)
+  rand() {
+    this.rnd = (this.rnd * 16807) % 2147483647;
+    return (this.rnd - 1) / 2147483646;
+  }
+
+  has(name) { return !!(this.assets && this.assets.has(name)); }
+
+  // Blender-Modell einbacken. scale: Zahl oder [sx, sy, sz]; collide: 'box' = AABB aus den Modellgrenzen
+  model(name, x, y, z, ry = 0, { scale = 1, tint = null, collide = null, shrink = 1 } = {}) {
+    if (!this.has(name)) return false;
+    const sc = typeof scale === 'number' ? [scale, scale, scale] : scale;
+    const m = new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(_Y, ry), new THREE.Vector3(...sc));
+    this.b.addModel(this.assets.meshes(name), m, tint != null ? new THREE.Color(tint) : null, materialClass);
+    if (collide === 'box') {
+      const bb = this.assets.bounds(name).clone().applyMatrix4(m);
+      const cx = (bb.min.x + bb.max.x) / 2, cz = (bb.min.z + bb.max.z) / 2;
+      const hx = ((bb.max.x - bb.min.x) / 2) * shrink, hz = ((bb.max.z - bb.min.z) / 2) * shrink;
+      this.col.addBox(cx - hx, bb.min.y, cz - hz, cx + hx, bb.max.y, cz + hz);
+    }
+    return true;
+  }
+
+  // Nur Kollision (Box mit Unterkante y)
+  solidCol(x, y, z, w, h, d, ry = 0, shrink = 1) {
+    let hw = w / 2, hd = d / 2;
+    if (ry) {
+      const c = Math.abs(Math.cos(ry)), s = Math.abs(Math.sin(ry));
+      const nw = hw * c + hd * s, nd = hw * s + hd * c;
+      hw = nw * shrink; hd = nd * shrink;
+    }
+    this.col.addBox(x - hw, y, z - hd, x + hw, y + h, z + hd);
+  }
 
   // Box mit Unterkante y, Mittelpunkt x/z. ry nur in 90°-Schritten kollisionsgenau.
   solid(x, y, z, w, h, d, color, opts = {}) {
@@ -57,8 +99,10 @@ export class Builder {
     this.b.addPrim(prim, x, y, z, sx, sy, sz, color, opts);
   }
 
-  // Wand entlang X (bei z) oder Z (bei x) mit Öffnungen {c, w, y0, h}
-  wall(axis, a1, a2, fixed, y, h, t, color, openings = []) {
+  // Wand entlang X (bei z) oder Z (bei x) mit Öffnungen {c, w, y0, h}.
+  // side ('s','n','e','w') bestimmt, wohin Rahmen und Läden zeigen.
+  wall(axis, a1, a2, fixed, y, h, t, color, openings = [], side = null) {
+    const ry = side ? SIDE_RY[side] : axis === 'x' ? 0 : Math.PI / 2;
     const ops = openings.slice().sort((p, q) => p.c - q.c);
     const seg = (s0, s1, y0, y1) => {
       if (s1 - s0 < 0.05 || y1 - y0 < 0.05) return;
@@ -72,9 +116,20 @@ export class Builder {
       if (a > cur) seg(cur, a, 0, h);
       if (op.y0 > 0) seg(a, b2, 0, op.y0);
       if (op.y0 + op.h < h) seg(a, b2, op.y0 + op.h, h);
-      // Fensterbank
+      const mid = (a + b2) / 2;
+      const px = axis === 'x' ? mid : fixed, pz = axis === 'x' ? fixed : mid;
+      const ow = b2 - a;
+      let framed = false;
       if (op.y0 > 0.3) {
-        const mid = (a + b2) / 2;
+        framed = this.model('k_window', px, y + op.y0 + op.h / 2, pz, ry, { scale: [ow / 1.4, op.h / 1.3, t / 0.35] });
+        if (framed && this.rand() < 0.3) this.model('k_shutter', px, y + op.y0 + op.h / 2, pz, ry, { scale: [ow / 1.4, op.h / 1.3, 1] });
+      } else if (op.door) {
+        framed = ow >= 5
+          ? this.model('k_rolldoor', px, y, pz, ry, { scale: [ow / 8, op.h / 7, 1] })
+          : this.model('k_door', px, y, pz, ry, { scale: [ow / 1.8, op.h / 2.4, t / 0.35] });
+      }
+      // Fensterbank (ohne Modell)
+      if (!framed && op.y0 > 0.3) {
         if (axis === 'x') this.deco('box', mid, y + op.y0 - 0.06, fixed, b2 - a + 0.2, 0.12, t + 0.24, COL.trim);
         else this.deco('box', fixed, y + op.y0 - 0.06, mid, t + 0.24, 0.12, b2 - a + 0.2, COL.trim);
       }
@@ -169,10 +224,10 @@ export class Builder {
         }
         return ops;
       };
-      this.wall('x', x0, x1, z1 - t / 2, fy, wh, t, wall, mkOps(w, 's', x0));
-      this.wall('x', x0, x1, z0 + t / 2, fy, wh, t, wall, mkOps(w, 'n', x0));
-      this.wall('z', z0 + t, z1 - t, x1 - t / 2, fy, wh, t, wall, mkOps(d - 2 * t, 'e', z0 + t));
-      this.wall('z', z0 + t, z1 - t, x0 + t / 2, fy, wh, t, wall, mkOps(d - 2 * t, 'w', z0 + t));
+      this.wall('x', x0, x1, z1 - t / 2, fy, wh, t, wall, mkOps(w, 's', x0), 's');
+      this.wall('x', x0, x1, z0 + t / 2, fy, wh, t, wall, mkOps(w, 'n', x0), 'n');
+      this.wall('z', z0 + t, z1 - t, x1 - t / 2, fy, wh, t, wall, mkOps(d - 2 * t, 'e', z0 + t), 'e');
+      this.wall('z', z0 + t, z1 - t, x0 + t / 2, fy, wh, t, wall, mkOps(d - 2 * t, 'w', z0 + t), 'w');
       // Gesims
       this.deco('box', x, fy + wh - 0.1, z, w + 0.3, 0.25, d + 0.3, trim);
 
@@ -211,8 +266,12 @@ export class Builder {
       this.solid(x0 + 0.15, ry, z, 0.3, parapet, d - 0.6, wall);
       this.solid(x1 - 0.15, ry, z, 0.3, parapet, d - 0.6, wall);
     }
-    // Lüftungskasten auf dem Dach
-    if (w > 8) this.solid(x - w * 0.2, ry, z + d * 0.15, 2.2, 1.2, 1.6, COL.metal);
+    // Lüftung und Klimagerät auf dem Dach
+    if (w > 8) {
+      if (this.model('k_vent', x - w * 0.2, ry, z + d * 0.15, 0, { collide: 'box' })) {
+        if (w > 12) this.model('k_ac', x + w * 0.22, ry, z + d * 0.2, Math.PI, { collide: 'box' });
+      } else this.solid(x - w * 0.2, ry, z + d * 0.15, 2.2, 1.2, 1.6, COL.metal);
+    }
     if (roofAccess) this.spots.push({ x: x + w * 0.25, y: ry, z: z - d * 0.25, tier, poi, indoor: false });
     return { x0, x1, z0, z1, y, roofY: ry, fh };
   }
@@ -222,6 +281,10 @@ export class Builder {
     const gy = y ?? this.ground(x, z);
     const w = 6.1, h = 2.6, d = 2.45;
     const rot = Math.round(ry / (Math.PI / 2)) * (Math.PI / 2);
+    if (this.model('p_container', x, gy, z, rot, { tint: color })) {
+      this.solidCol(x, gy, z, w, h, d, rot);
+      return gy + h;
+    }
     this.solid(x, gy, z, w, h, d, color, { ry: rot });
     // Rippen
     const ca = Math.cos(rot), sa = Math.sin(rot);
@@ -234,6 +297,9 @@ export class Builder {
 
   car(x, z, ry, color) {
     const gy = this.ground(x, z);
+    const kind = this.rand() < 0.65 ? 'p_car_a' : 'p_car_b';
+    // Modelle zeigen nach -Z; die alten Autos lagen entlang X
+    if (this.model(kind, x, gy - 0.05, z, ry + Math.PI / 2, { tint: color, collide: 'box', shrink: 0.85 })) return;
     const ca = Math.cos(ry), sa = Math.sin(ry);
     this.solid(x, gy + 0.35, z, 4.2, 0.85, 1.8, color, { ry, shrink: 0.85 });
     this.deco('box', x - ca * 0.3, gy + 1.2, z + sa * 0.3, 2.2, 0.7, 1.6, color, { ry });
@@ -246,18 +312,27 @@ export class Builder {
 
   barrier(x, z, ry, color = COL.concreteLight) {
     const gy = this.ground(x, z);
+    if (this.model('p_barrier', x, gy, z, ry, { collide: 'box', shrink: 0.9 })) return;
     this.solid(x, gy, z, 3, 1.05, 0.7, color, { ry, shrink: 0.9 });
     this.deco('box', x, gy + 0.9, z, 3.05, 0.12, 0.72, COL.orange, { ry });
   }
 
   sandbags(x, z, len, ry) {
     const gy = this.ground(x, z);
+    if (this.model('p_sandbags', x, gy - 0.05, z, ry, { scale: [len / 2.8, 1, 1] })) {
+      this.solidCol(x, gy, z, len, 1.0, 1.0, ry, 0.9);
+      return;
+    }
     this.solid(x, gy, z, len, 1.1, 1.0, COL.sand, { ry, shrink: 0.9 });
     this.deco('box', x, gy + 1.1, z, len * 0.9, 0.25, 0.8, 0xa89a70, { ry });
   }
 
   crate(x, z, s = 1.2, y = null, color = COL.wood) {
     const gy = y ?? this.ground(x, z);
+    if (this.model('p_crate', x, gy, z, this.rand() * Math.PI, { scale: s / 1.2 })) {
+      this.solidCol(x, gy, z, s, s, s);
+      return;
+    }
     this.solid(x, gy, z, s, s, s, color);
     this.deco('box', x, gy + s / 2, z, s + 0.05, 0.12, s + 0.05, COL.woodDark);
   }
@@ -268,6 +343,13 @@ export class Builder {
     const base = 3.2, top = 1.0;
     const ca = Math.cos(ry), sa = Math.sin(ry);
     const legs = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+    if (this.model('p_pylon', x, gy - 0.1, z, ry, { scale: [1, h / 24, 1] })) {
+      for (const [lx, lz] of legs) {
+        const bx = x + (lx * ca + lz * sa) * base, bz = z + (-lx * sa + lz * ca) * base;
+        this.col.addBox(bx - 0.4, gy, bz - 0.4, bx + 0.4, gy + 3, bz + 0.4);
+      }
+      return;
+    }
     for (const [lx, lz] of legs) {
       const bx = x + (lx * ca + lz * sa) * base, bz = z + (-lx * sa + lz * ca) * base;
       const tx = x + (lx * ca + lz * sa) * top, tz = z + (-lx * sa + lz * ca) * top;
@@ -292,6 +374,10 @@ export class Builder {
 
   lamp(x, z, y = null, h = 6) {
     const gy = y ?? this.ground(x, z);
+    if (this.model('p_lamp', x, gy, z, 0, { scale: h / 6 })) {
+      this.col.addBox(x - 0.15, gy, z - 0.15, x + 0.15, gy + h, z + 0.15);
+      return;
+    }
     this.solid(x, gy, z, 0.25, h, 0.25, COL.metalDark);
     this.deco('box', x + 0.6, gy + h, z, 1.4, 0.18, 0.4, COL.metalDark);
     this.deco('box', x + 1.0, gy + h - 0.12, z, 0.5, 0.1, 0.3, 0xfff2c8, { mat: 'glow' });

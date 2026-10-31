@@ -1,6 +1,7 @@
 // Waffen-Laufzeitlogik und einfache Waffenmodelle.
 import * as THREE from 'three';
 import { WEAPONS, ITEMS } from './items.js';
+import { assets, Assets } from './assets.js';
 
 export class Gun {
   constructor(id, mag = null) {
@@ -84,8 +85,15 @@ export class Gun {
   }
 }
 
-// Kleine Waffenmodelle aus Boxen (Lauf zeigt nach -Z)
+// Waffenmodell: aus Blender, sonst kleine Boxen (Lauf zeigt nach -Z)
 export function makeGunModel(id) {
+  if (assets.has(id)) {
+    const g = assets.clone(id);
+    const n = Assets.nodes(g, id);
+    g.userData.muzzle = n.Muzzle ? n.Muzzle.position.clone() : new THREE.Vector3(0, 0.05, -0.5);
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    return g;
+  }
   const def = WEAPONS[id];
   const g = new THREE.Group();
   const dark = new THREE.MeshStandardMaterial({ color: 0x2b2d2f, roughness: 0.5, metalness: 0.6 });

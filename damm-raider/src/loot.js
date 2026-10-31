@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { Inventory } from './inventory.js';
 import { ITEMS } from './items.js';
 import { weighted, rand, randInt } from './util.js';
+import { assets } from './assets.js';
 
 // Einträge: [id, gewicht, [min,max]]
 const TABLES = {
@@ -112,46 +113,63 @@ export class LootSystem {
     const byType = {};
     for (const d of defs) (byType[d.type] ||= []).push(d);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3(1, 1, 1);
+    const Y = new THREE.Vector3(0, 1, 0);
     for (const [type, list] of Object.entries(byType)) {
       const look = TYPE_LOOK[type];
-      const geo = new THREE.BoxGeometry(...look.size);
-      geo.translate(0, look.size[1] / 2, 0);
-      const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7, metalness: type.startsWith('arc') ? 0.6 : 0.1 });
-      const im = new THREE.InstancedMesh(geo, mat, list.length);
-      im.castShadow = true;
-      im.receiveShadow = true;
-      const lampGeo = new THREE.BoxGeometry(look.size[0] * 0.5, 0.06, 0.06);
-      const lampMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-      const lamps = new THREE.InstancedMesh(lampGeo, lampMat, list.length);
-      const col = new THREE.Color();
+      const bodies = [];
+      let lamps = null;
+      let size = look.size;
+      let base = new THREE.Color(look.color), lampCol = new THREE.Color(look.lid);
+      const asset = 'c_' + type;
+      if (assets.has(asset)) {
+        const bb = assets.bounds(asset);
+        size = [bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z];
+        base = new THREE.Color(1, 1, 1);
+        for (const bm of assets.bakedMeshes(asset)) {
+          const isLamp = bm.name.includes('__Lamp');
+          const mat = isLamp ? new THREE.MeshBasicMaterial({ color: 0xffffff }) : bm.material;
+          const im = new THREE.InstancedMesh(bm.geometry, mat, list.length);
+          im.castShadow = !isLamp;
+          im.receiveShadow = true;
+          if (isLamp) {
+            lamps = im;
+            lampCol = bm.material.emissive.clone().multiplyScalar(Math.max(1, bm.material.emissiveIntensity * 0.5));
+          } else bodies.push(im);
+        }
+      } else {
+        const geo = new THREE.BoxGeometry(...look.size);
+        geo.translate(0, look.size[1] / 2, 0);
+        const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7, metalness: type.startsWith('arc') ? 0.6 : 0.1 });
+        const im = new THREE.InstancedMesh(geo, mat, list.length);
+        im.castShadow = true;
+        im.receiveShadow = true;
+        bodies.push(im);
+        const lampGeo = new THREE.BoxGeometry(look.size[0] * 0.5, 0.06, 0.06);
+        lampGeo.translate(0, look.size[1] + 0.03, 0);
+        lamps = new THREE.InstancedMesh(lampGeo, new THREE.MeshBasicMaterial({ color: 0xffffff }), list.length);
+      }
       list.forEach((d, i) => {
-        q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), d.ry || 0);
+        q.setFromAxisAngle(Y, d.ry || 0);
         p.set(d.x, d.y, d.z);
-        im.setMatrixAt(i, m.compose(p, q, s));
-        im.setColorAt(i, col.set(look.color));
-        const off = new THREE.Vector3(0, look.size[1] + 0.03, 0);
-        p.set(d.x + off.x, d.y + off.y, d.z + off.z);
-        lamps.setMatrixAt(i, m.compose(p, q, s));
-        lamps.setColorAt(i, col.set(look.lid));
-        const c = {
-          type, name: CONTAINER_NAMES[type], pos: new THREE.Vector3(d.x, d.y + look.size[1] * 0.5, d.z),
-          tier: d.tier || 1, inst: im, lamps, idx: i, searched: false, items: null, look,
-        };
-        this.containers.push(c);
+        m.compose(p, q, s);
+        for (const im of bodies) { im.setMatrixAt(i, m); im.setColorAt(i, base); }
+        if (lamps) { lamps.setMatrixAt(i, m); lamps.setColorAt(i, lampCol); }
+        this.containers.push({
+          type, name: CONTAINER_NAMES[type], pos: new THREE.Vector3(d.x, d.y + size[1] * 0.5, d.z),
+          tier: d.tier || 1, bodies, lamps, idx: i, searched: false, items: null, base, lampCol,
+        });
       });
-      im.instanceMatrix.needsUpdate = true;
-      im.instanceColor.needsUpdate = true;
-      lamps.instanceMatrix.needsUpdate = true;
-      lamps.instanceColor.needsUpdate = true;
-      im.computeBoundingSphere();
-      lamps.computeBoundingSphere();
-      this.game.scene.add(im);
-      this.game.scene.add(lamps);
-      this.inst[type] = im;
+      for (const im of lamps ? [...bodies, lamps] : bodies) {
+        im.instanceMatrix.needsUpdate = true;
+        im.instanceColor.needsUpdate = true;
+        im.computeBoundingSphere();
+        this.game.scene.add(im);
+      }
+      this.inst[type] = bodies;
       // Kollision (Oberseite begehbar)
       for (const d of list) {
-        const [w, h, dd] = look.size;
-        const rot = (d.ry || 0) % Math.PI !== 0;
+        const [w, h, dd] = size;
+        const rot = Math.abs(Math.sin(d.ry || 0)) > 0.5;
         const hw = (rot ? dd : w) / 2, hd = (rot ? w : dd) / 2;
         this.game.col.addBox(d.x - hw, d.y, d.z - hd, d.x + hw, d.y + h, d.z + hd);
       }
@@ -161,14 +179,10 @@ export class LootSystem {
   // Zu Raid-Beginn: alle Behälter zurücksetzen, Wracks und Beutel entfernen
   reset(lootMul) {
     this.lootMul = lootMul;
-    const col = new THREE.Color();
     for (const c of this.containers) {
       c.searched = false;
       c.items = null;
-      c.inst.setColorAt(c.idx, col.set(c.look.color));
-      c.lamps.setColorAt(c.idx, col.set(c.look.lid));
-      c.inst.instanceColor.needsUpdate = true;
-      c.lamps.instanceColor.needsUpdate = true;
+      this.paint(c, false);
     }
     for (const w of this.wrecks) {
       if (w.mesh) this.game.scene.remove(w.mesh);
@@ -178,15 +192,22 @@ export class LootSystem {
     this.bags.length = 0;
   }
 
-  markSearched(c) {
-    c.searched = true;
-    if (c.inst) {
-      const col = new THREE.Color(c.look.color).multiplyScalar(0.55);
-      c.inst.setColorAt(c.idx, col);
-      c.lamps.setColorAt(c.idx, new THREE.Color(0x222222));
-      c.inst.instanceColor.needsUpdate = true;
+  paint(c, searched) {
+    if (!c.bodies) return;
+    const body = searched ? c.base.clone().multiplyScalar(0.6) : c.base;
+    for (const im of c.bodies) {
+      im.setColorAt(c.idx, body);
+      im.instanceColor.needsUpdate = true;
+    }
+    if (c.lamps) {
+      c.lamps.setColorAt(c.idx, searched ? new THREE.Color(0x1a1a1a) : c.lampCol);
       c.lamps.instanceColor.needsUpdate = true;
     }
+  }
+
+  markSearched(c) {
+    c.searched = true;
+    this.paint(c, true);
   }
 
   generate(c) {

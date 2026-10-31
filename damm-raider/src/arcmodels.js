@@ -1,6 +1,7 @@
 // Modelle der ARC-Maschinen aus Grundformen. Jede Funktion liefert
 // { root, parts: [{name, obj, r, mult, armor, weak, hp?}], anim: {...} }
 import * as THREE from 'three';
+import { assets, Assets } from './assets.js';
 
 const M = {
   body: new THREE.MeshStandardMaterial({ color: 0x4d5155, roughness: 0.5, metalness: 0.45 }),
@@ -237,4 +238,41 @@ export function buildTurret() {
     { name: 'Gehäuse', obj: body, r: 0.75, mult: 1, armor: 0.7 },
     { name: 'Linse', obj: lens, r: 0.24, mult: 2.5, armor: 0, weak: true },
   ] };
+}
+
+// ---------------------------------------------------------------- Blender-Modelle
+
+// Baut ein ARC-Modell aus assets/models.glb. Trefferzonen kommen aus den
+// Custom Properties der Blender-Objekte (hit, r, mult, armor, hp, thruster).
+export function buildArcModel(type) {
+  const name = 'arc_' + type;
+  if (!assets.has(name)) return null;
+  const obj = assets.clone(name);
+  const root = new THREE.Group();
+  root.add(obj);
+  const n = Assets.nodes(obj, name);
+  const parts = [];
+  obj.traverse((o) => {
+    const u = o.userData;
+    if (!u || !u.hit) return;
+    const nm = o.name.slice(name.length + 2);
+    parts.push({
+      name: nm, obj: o, r: u.r, mult: u.mult ?? 1, armor: u.armor ?? 0, weak: u.hit === 'weak',
+      hp: u.hp, thruster: !!u.thruster, glow: n[nm + 'Glow'],
+    });
+  });
+  const list = (prefix) => {
+    const out = [];
+    for (let i = 0; n[prefix + i]; i++) out.push(n[prefix + i]);
+    return out;
+  };
+  const fans = Object.keys(n).filter((k) => k.endsWith('Fan')).map((k) => n[k]);
+  const model = {
+    root, parts, glb: true, fans,
+    legs: list('Leg'), thrusters: parts.filter((p) => p.thruster).map((p) => p.obj),
+    ball: n.Ball, light: n.Light, ring: n.Ring, beacon: n.Beacon, pods: list('Pod'), hull: n.Hull, guns: list('Gun'), head: n.Head,
+  };
+  for (const k of ['hull', 'ball']) if (model[k]) model[k].userData.restY = model[k].position.y;
+  obj.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  return model;
 }

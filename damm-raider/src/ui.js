@@ -1,5 +1,6 @@
 // Menüs: Hub (Speranza), Beutefenster, Inventar, Karte, Pause, Auswertung.
 import { ITEMS, RARITY, CATEGORY, WEAPONS, iconSvg } from './items.js';
+import { assets } from './assets.js';
 import { Inventory } from './inventory.js';
 import { POIS, EXTRACTS, MAP } from './config.js';
 import { BACKPACK_LEVELS, STASH_LEVELS, UPGRADE_COST, freeLoadout, writeSave, wipeSave } from './save.js';
@@ -24,12 +25,20 @@ const CONTROLS = [
   ['4', 'Sanitätskit'], ['5', 'Schildlader'], ['G', 'Granate'], ['Tab', 'Inventar'], ['M', 'Karte'], ['Esc', 'Pause'],
 ];
 
+// Gerendertes Blender-Icon, sonst SVG-Symbol der Kategorie
+export function itemIcon(id, extraAttr = '') {
+  const d = ITEMS[id];
+  const st = assets.iconStyle(id);
+  if (st) return `<span class="ic img" style="${st}" ${extraAttr}></span>`;
+  return `<span class="ic" ${extraAttr}>${iconSvg(d.cat, RARITY[d.rarity].color)}</span>`;
+}
+
 export function tileHTML(slot, extra = '') {
   if (!slot) return `<button class="tile empty" ${extra} tabindex="-1"></button>`;
   const d = ITEMS[slot.id];
   const col = RARITY[d.rarity].color;
   return `<button class="tile" style="--rc:${col}" data-id="${slot.id}" ${extra}>
-    <span class="ic">${iconSvg(d.cat, col)}</span>
+    ${itemIcon(slot.id)}
     <span class="nm">${esc(d.name)}</span>
     ${slot.qty > 1 ? `<span class="qty">${slot.qty}</span>` : ''}
   </button>`;
@@ -73,7 +82,8 @@ export class UI {
         <dt>Durchschlag</dt><dd>${Math.round(w.pen * 100)} %</dd>
         <dt>Munition</dt><dd>${ITEMS[w.ammo].name}</dd></dl>`;
     }
-    this.tooltip.innerHTML = `<div class="tname" style="color:${RARITY[d.rarity].color}">${esc(d.name)}</div>
+    const big = assets.iconStyle(id);
+    this.tooltip.innerHTML = `${big ? `<div class="tpic" style="${big};--rc:${RARITY[d.rarity].color}"></div>` : ''}<div class="tname" style="color:${RARITY[d.rarity].color}">${esc(d.name)}</div>
       <div class="tmeta">${RARITY[d.rarity].name} · ${CATEGORY[d.cat]}</div>
       <p>${esc(d.desc)}</p>${stats}
       <div class="tval">Wert: ${formatNum(d.value)} Cr${d.stack > 1 ? ' / Stück' : ''}</div>`;
@@ -155,11 +165,11 @@ export class UI {
       if (!g) return `<div class="eqslot empty"><span class="lbl">Waffe ${i + 1}</span><span class="val">leer</span></div>`;
       const d = ITEMS[g.id];
       return `<button class="eqslot" style="--rc:${RARITY[d.rarity].color}" data-id="${g.id}" ${interactive ? `data-act="unequip-w" data-i="${i}"` : ''}>
-        <span class="lbl">Waffe ${i + 1}</span><span class="ic">${iconSvg('weapon', RARITY[d.rarity].color)}</span><span class="val">${esc(d.name)}</span></button>`;
+        <span class="lbl">Waffe ${i + 1}</span>${itemIcon(g.id)}<span class="val">${esc(d.name)}</span></button>`;
     };
     const sh = L.shield
       ? `<button class="eqslot" style="--rc:${RARITY[ITEMS[L.shield.id].rarity].color}" data-id="${L.shield.id}" ${interactive ? 'data-act="unequip-s"' : ''}>
-          <span class="lbl">Schild</span><span class="ic">${iconSvg('shield', RARITY[ITEMS[L.shield.id].rarity].color)}</span><span class="val">${esc(ITEMS[L.shield.id].name)}</span></button>`
+          <span class="lbl">Schild</span>${itemIcon(L.shield.id)}<span class="val">${esc(ITEMS[L.shield.id].name)}</span></button>`
       : '<div class="eqslot empty"><span class="lbl">Schild</span><span class="val">keiner</span></div>';
     const bp = L.backpack.map((sl, i) => tileHTML(sl, interactive ? `data-act="to-stash" data-i="${i}"` : '')).join('');
     return `<div class="eqrow">${w(0)}${w(1)}${sh}</div>
@@ -221,7 +231,7 @@ export class UI {
       const d = ITEMS[id];
       const can = s.credits >= price;
       return `<div class="shoprow" style="--rc:${RARITY[d.rarity].color}">
-        <span class="ic" data-id="${id}">${iconSvg(d.cat, RARITY[d.rarity].color)}</span>
+        ${itemIcon(id, `data-id="${id}"`)}
         <span class="sname">${esc(d.name)}${qty > 1 ? ` <em>×${qty}</em>` : ''}</span>
         <span class="price">${formatNum(price)} Cr</span>
         <button class="btn small" data-act="buy" data-i="${i}" ${can ? '' : 'disabled'}>Kaufen</button></div>`;
@@ -578,12 +588,12 @@ export class UI {
       if (!g) return `<div class="eqslot empty"><span class="lbl">${label}</span><span class="val">leer</span></div>`;
       const d = ITEMS[g.id];
       return `<div class="eqslot${idx === p.active ? ' on' : ''}" style="--rc:${RARITY[d.rarity].color}" data-id="${g.id}">
-        <span class="lbl">${label}</span><span class="ic">${iconSvg('weapon', RARITY[d.rarity].color)}</span>
+        <span class="lbl">${label}</span>${itemIcon(g.id)}
         <span class="val">${esc(d.name)} · ${g.mag}/${g.def.mag}</span></div>`;
     };
     const sh = p.shield
       ? `<div class="eqslot" style="--rc:${RARITY[ITEMS[p.shield.id].rarity].color}" data-id="${p.shield.id}"><span class="lbl">Schild</span>
-          <span class="ic">${iconSvg('shield', RARITY[ITEMS[p.shield.id].rarity].color)}</span>
+          ${itemIcon(p.shield.id)}
           <span class="val">${esc(ITEMS[p.shield.id].name)} · ${Math.ceil(p.shield.charge)}/${ITEMS[p.shield.id].cap}</span></div>`
       : '<div class="eqslot empty"><span class="lbl">Schild</span><span class="val">keiner</span></div>';
     $('inv-eq').innerHTML = eq('Waffe 1', p.guns[0], 0) + eq('Waffe 2', p.guns[1], 1) + sh;

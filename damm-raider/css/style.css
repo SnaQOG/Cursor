@@ -168,14 +168,17 @@ button.eqslot:hover { border-color: var(--text); border-bottom-color: var(--rc);
 .eqslot.on { outline: 1px solid var(--accent); }
 .eqslot .lbl { grid-column: 1 / -1; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
 .eqslot .ic { width: 30px; height: 30px; }
+.eqslot .ic.img { width: 48px; height: 48px; margin: -8px 0; }
+.eqslot:has(.ic.img) { grid-template-columns: 48px minmax(0, 1fr); }
 .eqslot .ic svg { width: 100%; height: 100%; }
 .eqslot .val { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eqslot:has(.ic.img) .val { white-space: normal; line-height: 1.1; }
 .eqslot.empty { grid-template-columns: 1fr; opacity: 0.6; }
 
 .gridhead { display: flex; align-items: center; gap: 12px; }
 .gridhead span:first-child { font-family: var(--display); font-weight: 800; font-size: 18px; text-transform: uppercase; letter-spacing: 0.04em; }
 .gridhead .btn { margin-left: auto; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); gap: 6px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); gap: 6px; align-items: start; }
 .grid.stash { max-height: 52vh; overflow: auto; padding-right: 4px; }
 
 .tile {
@@ -183,12 +186,15 @@ button.eqslot:hover { border-color: var(--text); border-bottom-color: var(--rc);
   display: grid; grid-template-rows: 1fr auto; justify-items: center; align-items: center;
   border: 1px solid var(--line); border-bottom: 3px solid var(--rc, transparent);
   background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--rc, #000) 18%, transparent), transparent 70%), #151b1e;
-  cursor: pointer; overflow: hidden;
+  cursor: pointer; overflow: clip;
 }
 .tile:hover { border-color: var(--text); border-bottom-color: var(--rc); }
 .tile[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: -2px; }
 .tile.empty { background: rgba(0, 0, 0, 0.25); border-style: dashed; border-color: rgba(239, 230, 210, 0.08); cursor: default; }
 .tile .ic { width: 28px; height: 28px; }
+.ic.img { display: block; background-image: var(--icons); background-repeat: no-repeat; }
+.tile .ic.img { width: 88%; height: auto; aspect-ratio: 1; margin-top: -2px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55)); }
+.tile { grid-template-rows: minmax(0, 1fr) auto; }
 .tile .ic svg { width: 100%; height: 100%; }
 .tile .nm { font-size: 11px; line-height: 1.1; text-align: center; max-width: 100%; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: #d9d1bd; }
 .tile .qty { position: absolute; top: 3px; right: 5px; font: 600 12px var(--mono); color: var(--text); }
@@ -196,6 +202,8 @@ button.eqslot:hover { border-color: var(--text); border-bottom-color: var(--rc);
 .shop { display: grid; gap: 4px; max-height: 62vh; overflow: auto; }
 .shoprow { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 6px 8px; border-left: 3px solid var(--rc); background: rgba(0, 0, 0, 0.22); }
 .shoprow .ic { width: 26px; height: 26px; display: block; }
+.shoprow .ic.img { width: 40px; height: 40px; margin: -6px 0; }
+.shoprow:has(.ic.img) { grid-template-columns: 40px minmax(0, 1fr) auto auto; }
 .shoprow .ic svg { width: 100%; height: 100%; }
 .shoprow em { color: var(--muted); font-style: normal; }
 .price { font: 600 14px var(--mono); color: var(--warn); font-variant-numeric: tabular-nums; }
@@ -339,6 +347,10 @@ select { background: var(--panel-2); color: var(--text); border: 1px solid var(-
 }
 #tooltip p { margin: 0; color: #d8d0bd; }
 .tname { font: 800 20px var(--display); text-transform: uppercase; letter-spacing: 0.03em; }
+.tpic { width: 100%; aspect-ratio: 16 / 9; background-color: transparent; background-image: var(--icons); background-repeat: no-repeat;
+  background-origin: content-box; padding: 4px 30%; box-sizing: border-box;
+  border-bottom: 2px solid var(--rc); background-clip: content-box;
+  box-shadow: inset 0 -40px 60px -30px color-mix(in srgb, var(--rc) 35%, transparent); }
 .tmeta { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
 .tval { font: 600 13px var(--mono); color: var(--warn); }
 .tstats { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0; font-size: 13px; }

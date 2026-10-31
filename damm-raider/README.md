@@ -4,13 +4,14 @@ Ein Extraction-Shooter für den Browser, inspiriert von **Arc Raiders**. Du stei
 Siedlung Speranza an die Oberfläche, plünderst die Karte **„Der Damm“**, kämpfst gegen ARC-Maschinen und
 musst es rechtzeitig zu einem Aufzug schaffen – sonst ist deine Ausrüstung weg.
 
-Fanprojekt ohne Verbindung zu Embark Studios. Alle Modelle, Sounds und Texturen werden zur Laufzeit
-erzeugt; es gibt keine externen Assets.
+Fanprojekt ohne Verbindung zu Embark Studios. Alle 3D-Modelle und Inventar-Icons werden per Skript in
+**Blender** gebaut (siehe unten), Sounds und Texturen entstehen zur Laufzeit.
 
 ## Spielen
 
 **Einfachste Variante:** `dist/damm-raider.html` im Browser öffnen (Doppelklick). Die Datei enthält
-alles – auch three.js – und läuft ohne Server und ohne Internet (nur die Schriften kommen von Google Fonts).
+alles – three.js, alle Blender-Modelle und den Icon-Atlas – und läuft ohne Server und ohne Internet
+(nur die Schriften kommen von Google Fonts).
 
 **Entwicklung (ohne Build):**
 
@@ -20,7 +21,9 @@ npm install        # nur nötig für den Build
 npm run dev        # startet http://localhost:8080
 ```
 
-`index.html` lädt die ES-Module aus `src/` direkt und three.js über eine Import-Map vom CDN.
+`index.html` lädt die ES-Module aus `src/` direkt, three.js über eine Import-Map vom CDN und die
+Modelle aus `assets/`. Über `file://` geöffnet fällt das Spiel auf einfache Formen zurück, weil der
+Browser dann keine Dateien nachladen darf – dafür gibt es die Einzeldatei.
 
 **Build der Einzeldatei:**
 
@@ -91,14 +94,48 @@ Der Spielstand wird im `localStorage` des Browsers gespeichert.
 
 Zerstörte ARC hinterlassen Wracks mit wertvollen Teilen.
 
+## 3D-Modelle mit Blender
+
+Alle Modelle entstehen reproduzierbar per Python-Skript in Blender (`blender/`):
+
+| Datei | Inhalt |
+| --- | --- |
+| `kit.py` | Modellier-Baukasten (gefaste Boxen, Zylinder, Profile, Drehkörper), Materialpalette, Export |
+| `m_weapons.py` | die neun Waffen, jeweils mit Mündungspunkt |
+| `m_items.py` | Beutebehälter und Modelle für alle 50 Inventar-Icons |
+| `m_arc.py` | die neun ARC-Maschinen mit Gelenken, Rotoren und Trefferzonen |
+| `m_world.py` | Container, Autos, Strommasten, Fensterrahmen, Türen, Portalkran, Turbinen, Radar, Königinnen-Wrack, Aufzug, Bäume, Felsen, Gras, der Raider |
+| `build.py` | baut alles, exportiert `assets/models.glb` und rendert `assets/icons.webp` mit Cycles |
+
+Neu bauen (die fertigen Dateien liegen im Repo, für das Spielen ist Blender nicht nötig):
+
+```bash
+python3 -m venv .venv-blender
+.venv-blender/bin/pip install bpy==4.5.14      # Blender 4.5 LTS als Python-Modul (Python 3.11)
+.venv-blender/bin/python blender/build.py      # oder: blender -b -P blender/build.py
+npm run build                                   # Einzeldatei neu erzeugen
+```
+
+Konventionen, die das Spiel auswertet:
+
+- Blender-Achsen: Z oben, **+Y vorne** (wird im Spiel zu -Z).
+- Benannte Knoten `asset__Name` (z. B. `arc_wasp__Rotor0`, `ch_raider__ArmL`) werden animiert.
+- Trefferzonen stehen als Custom Properties an den Objekten: `hit`, `r`, `mult`, `armor`, `hp`, `thruster`.
+- Lackflächen in Magenta (`key`) werden im Spiel pro Platzierung umgefärbt (Container, Autos).
+- Matte und metallische Materialien werden beim Export in Vertexfarben gebacken, damit das Spiel
+  mit wenigen Materialien und Draw-Calls auskommt; leuchtende Teile behalten ihr Material.
+
 ## Projektstruktur
 
 ```
 damm-raider/
+├── blender/            Blender-Skripte für alle Modelle und Icons
+├── assets/             exportierte Modelle (models.glb) und Icon-Atlas
 ├── index.html          HTML-Gerüst (Hub, HUD, Fenster)
 ├── css/style.css       Oberfläche
 ├── src/
 │   ├── main.js         Einstieg
+│   ├── assets.js       lädt models.glb, liefert Klone und Instanz-Geometrie
 │   ├── game.js         Spielablauf, Treffer, Explosionen, Extraktion
 │   ├── world.js        Szene, Licht, Wetter, Wasser, Vegetation
 │   ├── terrain.js      Höhenfeld (Tal, Plateau, Stausee, Fluss, Sumpf)

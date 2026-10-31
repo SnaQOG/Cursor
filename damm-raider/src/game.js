@@ -15,6 +15,7 @@ import { Inventory } from './inventory.js';
 import { ITEMS } from './items.js';
 import { MAP, POIS, PLAYER_SPAWNS, RAID_TIME, CONDITIONS } from './config.js';
 import { loadSave, writeSave, BACKPACK_LEVELS } from './save.js';
+import { assets } from './assets.js';
 import { weighted, pick, rand, clamp, TAU } from './util.js';
 
 const _v = new THREE.Vector3();
@@ -67,9 +68,13 @@ export class Game {
   }
 
   async init() {
+    this.ui.bootProgress('Blender-Modelle werden geladen …');
+    await nextFrame();
+    await assets.load();
+    if (assets.icons) document.documentElement.style.setProperty('--icons', `url("${assets.icons.url}")`);
     this.ui.bootProgress('Staumauer wird gegossen …');
     await nextFrame();
-    this.world = new World(this.renderer, this.save.settings.quality);
+    this.world = new World(this.renderer, this.save.settings.quality, assets);
     this.scene = this.world.scene;
     this.col = this.world.col;
     this.terrain = this.world.terrain;

@@ -1,9 +1,36 @@
 // Einfaches, prozedural animiertes Raider-Modell.
 import * as THREE from 'three';
 import { makeGunModel } from './weapons.js';
+import { assets, Assets } from './assets.js';
 
 export class Humanoid {
   constructor(colors = {}) {
+    if (assets.has('ch_raider')) this.fromModel();
+    else this.buildPrims(colors);
+    this.gun = null;
+    this.gunId = null;
+    this.phase = 0;
+    this.muzzleWorld = new THREE.Vector3();
+  }
+
+  // Raider aus Blender: gleiche Knotenstruktur wie die einfache Figur
+  fromModel() {
+    const m = assets.clone('ch_raider');
+    this.root = new THREE.Group();
+    this.root.add(m);
+    const n = Assets.nodes(m, 'ch_raider');
+    this.body = n.Body;
+    this.hips = n.Hips;
+    this.torso = n.Torso;
+    this.head = n.Head;
+    this.legs = [{ pivot: n.LegL, knee: n.KneeL }, { pivot: n.LegR, knee: n.KneeR }];
+    this.arms = [n.ArmL, n.ArmR];
+    for (const a of this.arms) a.rotation.order = 'YXZ';
+    this.gunPivot = n.GunMount;
+    m.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  }
+
+  buildPrims(colors) {
     const c = {
       jacket: 0xd9a33a, pants: 0x3c4b4a, pack: 0xc8502c, helmet: 0xe6dfcf, visor: 0x1c2a30, skin: 0xc49a78, boots: 0x2c2522,
       ...colors,
@@ -70,10 +97,6 @@ export class Humanoid {
     this.gunPivot = new THREE.Group();
     this.gunPivot.position.set(0.24, 0.42, -0.3);
     this.torso.add(this.gunPivot);
-    this.gun = null;
-    this.gunId = null;
-    this.phase = 0;
-    this.muzzleWorld = new THREE.Vector3();
   }
 
   setGun(id) {

@@ -81,6 +81,44 @@ export class Batcher {
     }
   }
 
+  // Blender-Modell einbacken. meshes: Liste aus Assets.meshes(), matrix: Platzierung,
+  // tint: Farbe für die "key"-Lackflächen (lineare THREE.Color)
+  addModel(meshes, matrix, tint, classify) {
+    const px = matrix.elements[12], pz = matrix.elements[14];
+    for (const m of meshes) {
+      const g = m.geometry;
+      const mat = classify(m.material);
+      const b = this.bucket(mat, px, pz);
+      _m.multiplyMatrices(matrix, m.matrix);
+      _n.getNormalMatrix(_m);
+      const P = g.attributes.position, N = g.attributes.normal, C = g.attributes.color;
+      const idx = g.index;
+      const count = idx ? idx.count : P.count;
+      const base = mat === 'glow' ? m.material.emissive : m.material.color;
+      for (let k = 0; k < count; k++) {
+        const i = idx ? idx.getX(k) : k;
+        _v.fromBufferAttribute(P, i).applyMatrix4(_m);
+        _nv.fromBufferAttribute(N, i).applyMatrix3(_n).normalize();
+        b.pos.push(_v.x, _v.y, _v.z);
+        b.nor.push(_nv.x, _nv.y, _nv.z);
+        let r = base.r, gg = base.g, bl = base.b;
+        if (C && mat !== 'glow') {
+          r *= C.getX(i); gg *= C.getY(i); bl *= C.getZ(i);
+          // Lackflächen umfärben: Magenta = Lack, dunkles Magenta = dunkler Lack
+          if (tint && gg < 0.05 && Math.abs(r - bl) < 0.02) {
+            if (r > 0.9) { r = tint.r; gg = tint.g; bl = tint.b; }
+            else if (r > 0.15 && r < 0.3) { r = tint.r * 0.7; gg = tint.g * 0.7; bl = tint.b * 0.7; }
+          }
+        }
+        b.col.push(r, gg, bl);
+        const ax = Math.abs(_nv.x), ay = Math.abs(_nv.y), az = Math.abs(_nv.z);
+        if (ay >= ax && ay >= az) b.uv.push(_v.x / 4, _v.z / 4);
+        else if (ax >= az) b.uv.push(_v.z / 4, _v.y / 4);
+        else b.uv.push(_v.x / 4, _v.y / 4);
+      }
+    }
+  }
+
   // Box mit Unterkante bei y
   box(x, y, z, w, h, d, color, opts) {
     this.addPrim('box', x, y + h / 2, z, w, h, d, color, opts);

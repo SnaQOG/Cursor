@@ -25,9 +25,10 @@ const CONDITION_LOOK = {
 };
 
 export class World {
-  constructor(renderer, quality) {
+  constructor(renderer, quality, assets = null) {
     this.renderer = renderer;
     this.quality = quality;
+    this.assets = assets && assets.ready ? assets : null;
     this.scene = new THREE.Scene();
     this.time = 0;
     this.lightning = 0;
@@ -45,13 +46,14 @@ export class World {
 
     const mats = {
       world: new THREE.MeshStandardMaterial({ vertexColors: true, map: this.grunge, roughness: 0.88, metalness: 0.04 }),
+      metal: new THREE.MeshStandardMaterial({ vertexColors: true, map: this.grunge, roughness: 0.5, metalness: 0.5 }),
       glass: new THREE.MeshStandardMaterial({ vertexColors: true, transparent: true, opacity: 0.28, roughness: 0.05, metalness: 0.3, depthWrite: false }),
       frame: new THREE.MeshStandardMaterial({ vertexColors: true, wireframe: true, roughness: 0.6, metalness: 0.4 }),
       fence: new THREE.MeshStandardMaterial({ vertexColors: true, transparent: true, opacity: 0.35, roughness: 0.8, depthWrite: false, side: THREE.DoubleSide }),
       glow: new THREE.MeshBasicMaterial({ vertexColors: true }),
     };
     this.batcher = new Batcher(mats);
-    this.mapData = buildMap(this.batcher, this.col, this.terrain);
+    this.mapData = buildMap(this.batcher, this.col, this.terrain, this.assets);
     this.plantVegetation();
     this.batcher.build(this.scene);
     this.buildWater();
@@ -277,6 +279,10 @@ export class World {
       rocks.push({ x, z, y: T.height(x, z), s: 0.8 + rnd() * rnd() * 3.5, r: rnd() * 6, t: rnd() * 6 });
     }
 
+    if (this.assets) {
+      this.plantModels(trees, bushes, rocks, rnd, blocked, n);
+      return;
+    }
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3(), e = new THREE.Euler();
     const c = new THREE.Color();
     const mkInst = (geo, color, count) => {
@@ -341,6 +347,82 @@ export class World {
       if (im.instanceColor) im.instanceColor.needsUpdate = true;
       im.computeBoundingSphere();
     }
+  }
+
+  // Vegetation aus den Blender-Modellen als InstancedMesh
+  plantModels(trees, bushes, rocks, rnd, blocked, n) {
+    const T = this.terrain;
+    const q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3(), e = new THREE.Euler();
+    const m = new THREE.Matrix4();
+    const c = new THREE.Color();
+    // In Kacheln aufteilen, damit Frustum- und Schatten-Culling greifen
+    const CH = 110;
+    const inst = (name, all, place, { shadow = true, tint = null, doubleSide = false } = {}) => {
+      if (!all.length) return;
+      const chunks = new Map();
+      for (const it of all) {
+        const key = `${Math.floor((it.x + 330) / CH)}|${Math.floor((it.z + 330) / CH)}`;
+        if (!chunks.has(key)) chunks.set(key, []);
+        chunks.get(key).push(it);
+      }
+      const mats = this.assets.bakedMeshes(name).map((bm) => {
+        const mat = bm.material.clone();
+        if (doubleSide) mat.side = THREE.DoubleSide;
+        return { geo: bm.geometry, mat };
+      });
+      for (const list of chunks.values()) {
+        for (const { geo, mat } of mats) {
+          const im = new THREE.InstancedMesh(geo, mat, list.length);
+          im.castShadow = shadow;
+          im.receiveShadow = true;
+          list.forEach((it, i) => {
+            place(it);
+            im.setMatrixAt(i, m.compose(p, q, sc));
+            if (tint) im.setColorAt(i, tint(it, c));
+          });
+          im.instanceMatrix.needsUpdate = true;
+          if (im.instanceColor) im.instanceColor.needsUpdate = true;
+          im.computeBoundingSphere();
+          this.scene.add(im);
+        }
+      }
+    };
+    const leafTint = (it, col) => {
+      const v = 0.82 + (it.r % 1) * 0.3;
+      return col.setRGB(v * (0.94 + (it.r % 0.37) * 0.3), v, v * (0.85 + (it.r % 0.53) * 0.25));
+    };
+    const pines = trees.filter((t) => t.pine), leafy = trees.filter((t) => !t.pine);
+    for (const t of trees) this.col.addCyl(t.x, t.z, 0.3 * t.s, t.y - 1, t.y + 7 * t.s, { tree: true });
+    inst('v_pine', pines, (t) => { p.set(t.x, t.y - 0.1, t.z); q.setFromEuler(e.set(0, t.r, 0)); sc.set(t.s, t.s * (0.9 + (t.r % 0.4)), t.s); }, { tint: leafTint });
+    inst('v_tree', leafy, (t) => { p.set(t.x, t.y - 0.1, t.z); q.setFromEuler(e.set(0, t.r, 0)); sc.setScalar(t.s); }, { tint: leafTint });
+    inst('v_bush', bushes, (b) => { p.set(b.x, b.y - 0.05, b.z); q.setFromEuler(e.set(0, b.r * 3, 0)); sc.set(b.s, b.s * 0.9, b.s); }, { shadow: false, tint: leafTint });
+    for (let k = 0; k < 3; k++) {
+      const list = rocks.filter((_, i) => i % 3 === k);
+      inst(`v_rock${k}`, list, (r) => { p.set(r.x, r.y - r.s * (0.15 + Math.min(0.6, T.slope(r.x, r.z) * 0.45)), r.z); q.setFromEuler(e.set(0, r.r, 0)); sc.setScalar(r.s * 0.8); }, {
+        tint: (r, col) => { const v = 0.85 + (r.t % 1) * 0.3; return col.setRGB(v, v, v); },
+      });
+    }
+    for (const r of rocks) if (r.s > 1.1) this.col.addCyl(r.x, r.z, r.s * 0.95, r.y - 2, r.y + r.s * 0.8, { rock: true });
+    // Grasbüschel auf den Wiesen
+    const grass = [];
+    const maxGrass = { niedrig: 0, mittel: 7000, hoch: 14000 }[this.quality] ?? 7000;
+    for (let i = 0; i < maxGrass * 7 && grass.length < maxGrass; i++) {
+      const x = (rnd() * 2 - 1) * 290, z = (rnd() * 2 - 1) * 290;
+      if (n.fbm(x * 0.03 - 4, z * 0.03 + 2, 2) < -0.05) continue;
+      if (T.slope(x, z) > 0.6) continue;
+      const w = T.waterAt(x, z);
+      const h = T.height(x, z);
+      if (w && h < w.level + 0.2) continue;
+      if (Math.abs(z - MAP.DAM_Z) < 12 && Math.abs(x) < MAP.DAM_HALF_X + 4) continue;
+      let bad = false;
+      for (const pd of PADS) if (Math.hypot(x - pd.x, z - pd.z) < pd.r * 0.8) { bad = true; break; }
+      if (bad) continue;
+      for (const rd of ROADS) if (distToPolyline(x, z, rd) < 3.5) { bad = true; break; }
+      if (bad) continue;
+      grass.push({ x, z, y: h, s: 0.7 + rnd() * 0.8, r: rnd() * 6 });
+    }
+    inst('v_grass', grass, (g) => { p.set(g.x, g.y - 0.05, g.z); q.setFromEuler(e.set(0, g.r, 0)); sc.setScalar(g.s); }, { shadow: false, doubleSide: true, tint: leafTint });
+    void blocked;
   }
 
   buildRain() {

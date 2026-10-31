@@ -4,8 +4,8 @@ import { Builder, COL } from './structures.js';
 import { MAP } from './config.js';
 import { mulberry32 } from './util.js';
 
-export function buildMap(batcher, col, terrain) {
-  const B = new Builder(batcher, col, terrain);
+export function buildMap(batcher, col, terrain, assets = null) {
+  const B = new Builder(batcher, col, terrain, assets);
   const rnd = mulberry32(99);
   const R = (a, b) => a + rnd() * (b - a);
   const enemySpawns = []; // {type, x, z, y?, poi, patrol}
@@ -51,13 +51,17 @@ export function buildMap(batcher, col, terrain) {
   for (let x = -11.25; x <= 11.25; x += 7.5) B.deco('box', x, top - 4, dz0 - 0.2, 5.6, 8, 0.6, COL.rust);
   B.deco('box', 0, 14, dz1 + 0.1, 24, 30, 0.4, COL.concreteLight);
   // Portalkran über dem Überlauf
-  for (const sx of [-18, 18]) {
-    B.solid(sx, top, dz0 + 2, 1.2, 12, 1.2, COL.orange);
-    B.solid(sx, top, dz1 - 2, 1.2, 12, 1.2, COL.orange);
-    B.deco('box', sx, top + 12, dz, 1.4, 1.2, dt, COL.orange);
+  if (B.model('l_crane', 0, top, dz, 0)) {
+    for (const sx of [-18, 18]) for (const sz of [dz - 6, dz + 6]) B.col.addBox(sx - 0.7, top, sz - 0.7, sx + 0.7, top + 12, sz + 0.7);
+  } else {
+    for (const sx of [-18, 18]) {
+      B.solid(sx, top, dz0 + 2, 1.2, 12, 1.2, COL.orange);
+      B.solid(sx, top, dz1 - 2, 1.2, 12, 1.2, COL.orange);
+      B.deco('box', sx, top + 12, dz, 1.4, 1.2, dt, COL.orange);
+    }
+    B.deco('box', 0, top + 12.6, dz, 38, 1.4, 1.6, COL.orange);
+    B.deco('box', 4, top + 11.2, dz, 3, 1.6, 2.4, COL.trim);
   }
-  B.deco('box', 0, top + 12.6, dz, 38, 1.4, 1.6, COL.orange);
-  B.deco('box', 4, top + 11.2, dz, 3, 1.6, 2.4, COL.trim);
   // Torhäuser auf der Krone
   for (const gx of [-70, 70]) {
     const g = B.building({ x: gx, z: dz, w: 9, d: 8, floors: 2, fh: 3.3, baseY: top, wall: COL.paleDark, doors: { e: [0.5], w: [0.5] }, tier: 2, poi: 'krone' });
@@ -81,16 +85,23 @@ export function buildMap(batcher, col, terrain) {
     });
     // Turbinen
     for (const tx of [42, 60, 78]) {
-      B.tank(tx, kz - 2, 3.4, 4.5, COL.teal, gy + 0.15);
-      B.deco('cyl16', tx, gy + 5.2, kz - 2, 2, 1.4, 2, COL.metalDark);
-      B.deco('box', tx, gy + 0.9, kz + 4.2, 1.2, 1.5, 1.2, COL.yellow);
+      if (B.model('l_turbine', tx, gy + 0.15, kz - 2, Math.PI)) {
+        B.col.addCyl(tx, kz - 2, 3.5, gy - 1, gy + 4.6);
+        B.col.addBox(tx - 0.7, gy, kz + 1.8, tx + 0.7, gy + 1.8, kz + 2.8);
+      } else {
+        B.tank(tx, kz - 2, 3.4, 4.5, COL.teal, gy + 0.15);
+        B.deco('cyl16', tx, gy + 5.2, kz - 2, 2, 1.4, 2, COL.metalDark);
+        B.deco('box', tx, gy + 0.9, kz + 4.2, 1.2, 1.5, 1.2, COL.yellow);
+      }
       // Druckrohre vom Damm
       B.pipe(tx, 16, dz1 - 0.5, tx, 8, kz - d / 2 + 0.2, 1.5, COL.rust, true);
     }
     // Galerie an der Nordwand
     const my = gy + 0.15 + 6;
     B.solid(kx, my - 0.3, kz - d / 2 + 2.6, w - 2, 0.3, 4.4, COL.metal, {});
-    for (let x = kx - w / 2 + 6; x < kx + w / 2 - 2; x += 4) B.deco('box', x + 2, my + 0.5, kz - d / 2 + 4.7, 3.8, 0.08, 0.08, COL.yellow);
+    for (let x = kx - w / 2 + 6; x < kx + w / 2 - 2; x += 2) {
+      if (!B.model('k_railing', x + 1, my, kz - d / 2 + 4.75, 0) && (x - kx) % 4 === 0) B.deco('box', x + 2, my + 0.5, kz - d / 2 + 4.7, 3.8, 0.08, 0.08, COL.yellow);
+    }
     B.stairs(kx - w / 2 + 4, kz - d / 2 + 4.8 + 3.4, gy + 0.15, my, 'n', 1.5, COL.metal);
     for (const sx of [kx - 20, kx, kx + 20]) {
       B.spots.push({ x: sx, y: my, z: kz - d / 2 + 1.8, tier: 3, poi: 'kraftwerk', indoor: true });
@@ -121,8 +132,19 @@ export function buildMap(batcher, col, terrain) {
     });
     // Brücke
     B.solid(tx, top - 0.4, (t.z0 + dz1) / 2, 2.8, 0.4, t.z0 - dz1 + 0.4, COL.metal);
-    B.solid(tx - 1.45, top, (t.z0 + dz1) / 2, 0.1, 1.0, t.z0 - dz1, COL.orange);
-    B.solid(tx + 1.45, top, (t.z0 + dz1) / 2, 0.1, 1.0, t.z0 - dz1, COL.orange);
+    const bl = t.z0 - dz1;
+    if (B.has('k_railing')) {
+      for (let k = 0; k < Math.floor(bl / 2); k++) {
+        const zz = dz1 + 1 + k * 2;
+        B.model('k_railing', tx - 1.45, top, zz, Math.PI / 2);
+        B.model('k_railing', tx + 1.45, top, zz, Math.PI / 2);
+      }
+      B.col.addBox(tx - 1.5, top, dz1, tx - 1.4, top + 1, t.z0);
+      B.col.addBox(tx + 1.4, top, dz1, tx + 1.5, top + 1, t.z0);
+    } else {
+      B.solid(tx - 1.45, top, (t.z0 + dz1) / 2, 0.1, 1.0, bl, COL.orange);
+      B.solid(tx + 1.45, top, (t.z0 + dz1) / 2, 0.1, 1.0, bl, COL.orange);
+    }
     turrets.push({ x: tx, y: t.roofY, z: tz });
     E('snitch', tx, tz, 1, 10, { y: top + 20, poi: 'turm' });
     E('tick', tx, tz, 2, 3, { poi: 'turm', indoor: true });
@@ -151,8 +173,11 @@ export function buildMap(batcher, col, terrain) {
     B.building({ x: fx - 24, z: fz + 24, w: 7, d: 6, floors: 1, fh: 3, wall: COL.teal, doors: { e: [0.5] }, roofAccess: false, tier: 1, poi: 'forschung' });
     // Radarschüssel auf dem Dach
     const ry = B.ground(fx, fz) + 0.15 + 3 * 3.5;
-    B.solid(fx - 8, ry, fz - 3, 1.2, 3, 1.2, COL.metalDark);
-    B.deco('dome', fx - 8, ry + 3.6, fz - 3, 3.2, 1.2, 3.2, COL.concreteLight, { rx: 2.2 });
+    if (B.model('l_radar', fx - 8, ry, fz - 3, 0.6)) B.col.addBox(fx - 8.6, ry, fz - 3.6, fx - 7.4, ry + 3.4, fz - 2.4);
+    else {
+      B.solid(fx - 8, ry, fz - 3, 1.2, 3, 1.2, COL.metalDark);
+      B.deco('dome', fx - 8, ry + 3.6, fz - 3, 3.2, 1.2, 3.2, COL.concreteLight, { rx: 2.2 });
+    }
     // Parkplatz
     for (let i = 0; i < 5; i++) B.car(fx - 12 + i * 5.5, fz + 16, Math.PI / 2 + R(-0.15, 0.15), [0x8a8f7a, 0x6d4a3a, 0x496070, 0x8c7a4a, 0x5a5a5a][i]);
     B.fence(fx - 30, fz - 22, fx + 30, fz - 22);
@@ -225,9 +250,11 @@ export function buildMap(batcher, col, terrain) {
     B.building({ x: ax - 4, z: az + 22, w: 24, d: 11, floors: 4, fh: 3.1, wall: COL.pale, trim: COL.orange, doors: { n: [0.25, 0.75] }, tier: 2, poi: 'wohn' });
     for (let i = 0; i < 6; i++) B.car(ax - 30 + i * 11 + R(-2, 2), az + 5 + R(-2, 2), R(-0.3, 0.3) + (i % 2 ? Math.PI : 0), [0x9a6b3a, 0x566b7a, 0x7a7a70, 0x8a3b30, 0x4a6040, 0xb0a890][i]);
     // Bushaltestelle
-    B.solid(ax + 30, B.ground(ax + 30, az + 10), az + 10, 4, 0.1, 1.6, COL.teal, { noCol: true });
-    B.deco('box', ax + 30, B.ground(ax + 30, az + 10) + 2.5, az + 10, 4.2, 0.12, 1.8, COL.teal);
-    B.deco('box', ax + 30, B.ground(ax + 30, az + 10) + 1.25, az + 10.8, 4, 2.5, 0.08, COL.glass, { mat: 'glass' });
+    if (!B.model('p_busstop', ax + 30, B.ground(ax + 30, az + 10), az + 10, Math.PI)) {
+      B.solid(ax + 30, B.ground(ax + 30, az + 10), az + 10, 4, 0.1, 1.6, COL.teal, { noCol: true });
+      B.deco('box', ax + 30, B.ground(ax + 30, az + 10) + 2.5, az + 10, 4.2, 0.12, 1.8, COL.teal);
+      B.deco('box', ax + 30, B.ground(ax + 30, az + 10) + 1.25, az + 10.8, 4, 2.5, 0.08, COL.glass, { mat: 'glass' });
+    }
     for (let i = 0; i < 4; i++) B.lamp(ax - 30 + i * 18, az + 12);
     for (const [bx, bz] of [[ax - 10, az + 6], [ax + 8, az + 3], [ax + 34, az - 30]]) B.barrier(bx, bz, R(0, Math.PI));
     barrels.push({ x: ax + 5, z: az + 9 }, { x: ax - 34, z: az - 4 });
@@ -276,25 +303,31 @@ export function buildMap(batcher, col, terrain) {
     const ox = 195, oz = 158;
     const gy = B.ground(ox, oz);
     // Riesiges Wrack einer Königin: Wirbelsäule, Rippen, Kopf
-    const dark = 0x3d3f42, plate = 0x6c6a64;
-    for (let i = 0; i < 10; i++) {
-      const x = ox - 22 + i * 4.6, y = gy + 4 + Math.sin(i * 0.4) * 3;
-      B.deco('sphere', x, y, oz, 2.4, 2.1, 2.4, dark);
-      if (i > 1 && i < 9) {
-        for (const side of [-1, 1]) {
-          B.deco('box', x, y - 2 + 3, oz + side * 5, 1.1, 9, 1.2, plate, { rx: side * 0.9 });
-          B.deco('box', x, gy + 0.5, oz + side * 9.5, 1.1, 3.5, 1.2, plate, { rx: side * 0.2 });
+    if (B.model('l_queen', ox, gy - 1.2, oz, 0)) {
+      B.col.addBox(ox - 25, gy - 1, oz - 2.5, ox + 23, gy + 7.5, oz + 2.5);
+      B.col.addCyl(ox + 29, oz - 2, 5, gy - 1, gy + 9);
+      for (const [lx, lz] of [[-12, 9], [6, -11], [16, 12], [-20, -10]]) B.col.addCyl(ox + lx, oz + lz, 1.4, gy - 1, gy + 4);
+    } else {
+      const dark = 0x3d3f42, plate = 0x6c6a64;
+      for (let i = 0; i < 10; i++) {
+        const x = ox - 22 + i * 4.6, y = gy + 4 + Math.sin(i * 0.4) * 3;
+        B.deco('sphere', x, y, oz, 2.4, 2.1, 2.4, dark);
+        if (i > 1 && i < 9) {
+          for (const side of [-1, 1]) {
+            B.deco('box', x, y - 2 + 3, oz + side * 5, 1.1, 9, 1.2, plate, { rx: side * 0.9 });
+            B.deco('box', x, gy + 0.5, oz + side * 9.5, 1.1, 3.5, 1.2, plate, { rx: side * 0.2 });
+          }
         }
       }
-    }
-    B.col.addBox(ox - 25, gy - 1, oz - 3, ox + 23, gy + 6.5, oz + 3);
-    // Kopf
-    B.deco('sphere', ox + 27, gy + 5, oz + 2, 5, 4, 4.5, dark);
-    B.deco('sphere', ox + 31, gy + 5.5, oz + 2, 1.4, 1.4, 1.4, 0x5a2a20);
-    B.col.addCyl(ox + 27, oz + 2, 5, gy - 1, gy + 8.5);
-    // Beine
-    for (const [lx, lz, rx2, rz2] of [[-10, -10, 0.6, 0.4], [4, 11, -0.5, -0.3], [14, -12, 0.7, -0.2], [-18, 9, -0.6, 0.5]]) {
-      B.deco('box', ox + lx, gy + 6, oz + lz, 1.6, 16, 1.6, dark, { rx: rx2, rz: rz2 });
+      B.col.addBox(ox - 25, gy - 1, oz - 3, ox + 23, gy + 6.5, oz + 3);
+      // Kopf
+      B.deco('sphere', ox + 27, gy + 5, oz + 2, 5, 4, 4.5, dark);
+      B.deco('sphere', ox + 31, gy + 5.5, oz + 2, 1.4, 1.4, 1.4, 0x5a2a20);
+      B.col.addCyl(ox + 27, oz + 2, 5, gy - 1, gy + 8.5);
+      // Beine
+      for (const [lx, lz, rx2, rz2] of [[-10, -10, 0.6, 0.4], [4, 11, -0.5, -0.3], [14, -12, 0.7, -0.2], [-18, 9, -0.6, 0.5]]) {
+        B.deco('box', ox + lx, gy + 6, oz + lz, 1.6, 16, 1.6, dark, { rx: rx2, rz: rz2 });
+      }
     }
     // Schützengräben & Sandsäcke
     for (let i = 0; i < 8; i++) {
@@ -304,6 +337,7 @@ export function buildMap(batcher, col, terrain) {
     // Panzerwracks
     for (const [px, pz, r2] of [[ox - 30, oz - 20, 0.5], [ox + 20, oz + 30, 2.1], [ox - 12, oz + 34, -0.4]]) {
       const pg = B.ground(px, pz);
+      if (B.model('p_tank', px, pg - 0.2, pz, r2 + Math.PI / 2, { collide: 'box', shrink: 0.8 })) continue;
       B.solid(px, pg, pz, 7, 2, 3.6, 0x4f5540, { ry: r2, shrink: 0.9 });
       B.deco('box', px, pg + 2.5, pz, 3, 1.2, 2.6, 0x464b39, { ry: r2 + 0.3 });
       B.deco('box', px + Math.cos(r2 + 0.3) * 3, pg + 2.6, pz - Math.sin(r2 + 0.3) * 3, 4.5, 0.35, 0.35, 0x3a3e30, { ry: r2 + 0.3 });
@@ -326,7 +360,9 @@ export function buildMap(batcher, col, terrain) {
     for (const [cx, cz, r] of [[226, -136, 11], [252, -168, 10], [228, -196, 11]]) {
       B.deco('cyl24open', cx, gy + 0.6, cz, r + 0.2, 1.2, r + 0.2, COL.concreteLight);
       B.deco('dome', cx, gy + 1.1, cz, r, r * 0.85, r, COL.glass, { mat: 'glass' });
-      B.deco('dome', cx, gy + 1.1, cz, r + 0.06, r * 0.85 + 0.06, r + 0.06, COL.metalDark, { mat: 'frame' });
+      if (!B.model('l_dome', cx, gy + 1.1, cz, 0, { scale: [r + 0.06, r * 0.85 + 0.06, r + 0.06] })) {
+        B.deco('dome', cx, gy + 1.1, cz, r + 0.06, r * 0.85 + 0.06, r + 0.06, COL.metalDark, { mat: 'frame' });
+      }
       for (let k = -2; k <= 2; k++) B.deco('box', cx + k * 3.5, gy + 0.9, cz, 1.8, 0.8, r * 1.2, COL.green);
       B.col.addCyl(cx, cz, r * 0.96, gy - 1, gy + r * 0.6);
       B.col.addCyl(cx, cz, r * 0.6, gy + r * 0.6, gy + r * 0.85);

@@ -65,7 +65,7 @@ export class Enemy {
       tick: AM.buildTick, pop: AM.buildPop, wasp: AM.buildWasp, hornet: AM.buildHornet, snitch: AM.buildSnitch,
       rocketeer: AM.buildRocketeer, leaper: AM.buildLeaper, bastion: AM.buildBastion, turret: AM.buildTurret,
     };
-    this.model = builders[this.type]();
+    this.model = AM.buildArcModel(this.type) || builders[this.type]();
     this.root = this.model.root;
     this.parts = this.model.parts;
     this.flashMats = [];
@@ -498,7 +498,7 @@ class Pop extends Enemy {
     }
     this.roll += moved / 0.5;
     ball.rotation.x = -this.roll;
-    ball.position.y = 0.5 + Math.abs(Math.sin(this.roll * 0.5)) * 0.12;
+    ball.position.y = (ball.userData.restY ?? 0.5) + Math.abs(Math.sin(this.roll * 0.5)) * 0.12;
   }
   onHit() {
     if (this.hp <= 0) return;
@@ -579,8 +579,9 @@ class Drone extends Enemy {
       this.flyTo(dt, this.waypoint.x, this.waypoint.y + Math.sin(this.bob) * 0.8, this.waypoint.z, sp * 0.35, 1.5);
       if (Math.hypot(this.vel.x, this.vel.z) > 0.5) this.yaw = turnTowards(this.yaw, Math.atan2(-this.vel.x, -this.vel.z), dt * 2);
     }
-    // leichte Neigung + Düsenglühen
+    // leichte Neigung + Düsenglühen + drehende Propeller
     this.root.rotation.x = clamp(-this.vel.z * 0.03, -0.3, 0.3);
+    if (this.model.fans) for (const f of this.model.fans) f.rotation.y += dt * 40;
     if (Math.random() < dt * 10) {
       const t = pick(this.model.thrusters);
       if (t.visible) this.game.effects.thrusterTrail(t.getWorldPosition(_a));
@@ -604,7 +605,7 @@ class Snitch extends Enemy {
   think(dt) {
     const p = this.game.player;
     this.alarmCd -= dt;
-    this.model.ring.rotation.z += dt * (this.charge > 0 ? 12 : 2);
+    this.model.ring.rotation[this.model.glb ? 'y' : 'z'] += dt * (this.charge > 0 ? 12 : 2);
     this.model.beacon.visible = this.charge > 0 ? Math.sin(this.t * 20) > 0 : Math.sin(this.t * 3) > 0.6;
     if (this.state === 'attack' && p.alive) {
       if (this.seesTarget && this.alarmCd <= 0) {
@@ -649,6 +650,7 @@ class Rocketeer extends Enemy {
   think(dt) {
     const p = this.game.player;
     const sp = this.def.speed;
+    if (this.model.fans) for (const f of this.model.fans) f.rotation.y += dt * 30;
     this.laser.visible = false;
     if (this.state === 'attack' && p.alive) {
       this.orbit += dt * 0.12;
@@ -721,12 +723,13 @@ class Leaper extends Enemy {
   think(dt) {
     const p = this.game.player;
     const hull = this.model.hull;
+    const hb = hull.userData.restY ?? 2.2;
     const legs = this.model.legs;
     this.leapCd -= dt;
     this.clawCd -= dt;
     if (this.mode === 'windup') {
       this.modeT += dt;
-      hull.position.y = 2.2 - Math.min(1, this.modeT / 0.7) * 0.9;
+      hull.position.y = hb - Math.min(1, this.modeT / 0.7) * 0.9;
       this.faceTowards(dt, p.pos.x, p.pos.z, 4);
       if (this.modeT > 0.7) {
         this.mode = 'leap';
@@ -744,7 +747,7 @@ class Leaper extends Enemy {
       const k = Math.min(1, this.modeT / T);
       this.pos.lerpVectors(this.leapFrom, this.leapTo, k);
       this.pos.y += Math.sin(k * Math.PI) * 9;
-      hull.position.y = 2.2 + Math.sin(k * Math.PI) * 0.4;
+      hull.position.y = hb + Math.sin(k * Math.PI) * 0.4;
       for (const l of legs) l.rotation.x = -0.5;
       if (k >= 1) {
         this.mode = 'recover';
@@ -756,7 +759,7 @@ class Leaper extends Enemy {
     }
     if (this.mode === 'recover') {
       this.modeT += dt;
-      hull.position.y = lerp(1.3, 2.2, Math.min(1, this.modeT / 1.3));
+      hull.position.y = lerp(hb - 0.9, hb, Math.min(1, this.modeT / 1.3));
       for (const l of legs) l.rotation.x = 0;
       if (this.modeT > 1.4) { this.mode = 'walk'; this.leapCd = rand(2.5, 4.5); }
       return;
@@ -796,7 +799,7 @@ class Leaper extends Enemy {
     }
     this.gait = (this.gait || 0) + moved * 1.2;
     for (let i = 0; i < legs.length; i++) legs[i].rotation.x = Math.sin(this.gait + (i % 2) * Math.PI) * 0.35;
-    hull.position.y = 2.2 + Math.abs(Math.sin(this.gait)) * 0.1;
+    hull.position.y = hb + Math.abs(Math.sin(this.gait)) * 0.1;
   }
 }
 
@@ -826,7 +829,7 @@ class Bastion extends Enemy {
       }
       if (this.cycle === 'stomp') {
         this.cycleT += dt;
-        M.hull.position.y = 4.2 + Math.sin(Math.min(1, this.cycleT) * Math.PI) * 1.2;
+        M.hull.position.y = (M.hull.userData.restY ?? 4.2) + Math.sin(Math.min(1, this.cycleT) * Math.PI) * 1.2;
         if (this.cycleT > 1) {
           this.game.stomp(this.pos, 7, 45, this);
           this.cycle = 'cool';

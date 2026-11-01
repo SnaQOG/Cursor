@@ -234,7 +234,8 @@ Der Bot implementiert robuste Fehlerbehandlung:
 ## Browser-Spiel: Damm Raider
 
 Im Ordner [`damm-raider/`](damm-raider/) liegt ein vom Trading-Bot unabhängiges Browser-Spiel – ein
-Extraction-Shooter nach dem Vorbild von Arc Raiders auf einer Staudamm-Karte. Zum Spielen
+Extraction-Shooter nach dem Vorbild von Arc Raiders mit zwei Karten: einem Staudamm und der
+Fantasy-Stadt Weltenbrück mit begehbaren Häusern. Zum Spielen
 `damm-raider/dist/damm-raider.html` im Browser öffnen; Details stehen in der
 [README des Spiels](damm-raider/README.md).
 

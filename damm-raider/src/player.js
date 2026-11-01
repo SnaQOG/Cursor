@@ -5,7 +5,6 @@ import { Gun } from './weapons.js';
 import { ITEMS } from './items.js';
 import { Inventory } from './inventory.js';
 import { clamp, lerp, rand, angleDiff } from './util.js';
-import { MAP } from './config.js';
 
 const RADIUS = 0.38;
 const STEP = 0.45;
@@ -294,7 +293,7 @@ export class Player {
     this.pos.z += this.vel.z * dt;
 
     // Kartenrand
-    const B = MAP.BOUND;
+    const B = this.game.map.bound;
     this.pos.x = clamp(this.pos.x, -B, B);
     this.pos.z = clamp(this.pos.z, -B, B);
 
@@ -556,19 +555,36 @@ export class Player {
       cam.updateProjectionMatrix();
       this.game.effects.setViewport(this.game.viewH);
     }
-    const dist = lerp(3.3, 1.6, aimK);
-    this.camDist = lerp(this.camDist, dist, Math.min(1, dt * 10));
-    const shoulder = lerp(0.62, 0.5, aimK);
+    const col = this.game.col;
     const pivotY = this.pos.y + (this.crouch ? 1.2 : 1.62) + (this.alive ? 0 : -0.8);
+    // In Innenräumen (niedrige Decke) näher heranrücken
+    const ceil = col.ceilingAt(this.pos.x, this.pos.z, 0.2, this.pos.y + 1.0, this.pos.y + 6);
+    const indoor = ceil < this.pos.y + 4.2;
+    const dist = indoor ? lerp(2.1, 1.3, aimK) : lerp(3.3, 1.6, aimK);
+    this.camDist = lerp(this.camDist, dist, Math.min(1, dt * 10));
     const cp = Math.cos(this.camPitch), sp = Math.sin(this.camPitch);
     const fx = -Math.sin(this.camYaw) * cp, fy = sp, fz = -Math.cos(this.camYaw) * cp;
     const rx = Math.cos(this.camYaw), rz = -Math.sin(this.camYaw);
-    const pivot = new THREE.Vector3(this.pos.x + rx * shoulder, pivotY, this.pos.z + rz * shoulder);
-    // Kamera hinter dem Pivot, gegen Wände abgesichert
+    // Schulterversatz nicht in die Wand schieben
+    const head = new THREE.Vector3(this.pos.x, pivotY, this.pos.z);
+    const side = new THREE.Vector3(rx, 0, rz);
+    let shoulder = lerp(indoor ? 0.45 : 0.62, 0.5, aimK);
+    const hs = col.raycast(head, side, shoulder + 0.3, 1);
+    if (hs) shoulder = Math.max(0, Math.min(shoulder, hs.t - 0.3));
+    const pivot = head.clone().addScaledVector(side, shoulder);
+    // Kamera hinter dem Pivot, gegen Wände abgesichert. Mehrere Strahlen,
+    // damit sie nicht durch Fenster und Türspalten nach draußen rutscht.
     const back = new THREE.Vector3(-fx, -fy + 0.12, -fz).normalize();
-    const hit = this.game.col.raycast(pivot, back, this.camDist + 0.3, 1);
+    const up = new THREE.Vector3(0, 1, 0);
+    const right = new THREE.Vector3().crossVectors(back, up).normalize();
     let d = this.camDist;
-    if (hit) d = Math.max(0.3, Math.min(d, hit.t - 0.3));
+    const o = new THREE.Vector3();
+    for (const [a, b] of [[0, 0], [0.22, 0], [-0.22, 0], [0, 0.2], [0, -0.2]]) {
+      o.copy(pivot).addScaledVector(right, a).addScaledVector(up, b);
+      const hit = col.raycast(o, back, this.camDist + 0.3, 1);
+      if (hit) d = Math.min(d, hit.t - 0.3);
+    }
+    d = Math.max(0.3, d);
     cam.position.copy(pivot).addScaledVector(back, d);
     // Kamerawackeln
     const sh = this.game.effects.shake;

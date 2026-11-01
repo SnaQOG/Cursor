@@ -2,7 +2,6 @@
 import * as THREE from 'three';
 import * as AM from './arcmodels.js';
 import { rand, clamp, angleDiff, turnTowards, lerp, pick, TAU } from './util.js';
-import { MAP } from './config.js';
 
 export const ENEMY_DEFS = {
   tick: { name: 'Zecke', hp: 28, sight: 18, fov: 3.5, react: 0.2, radius: 0.4, height: 0.6, air: false, speed: 8.5, loot: 'tick', big: 0.4 },
@@ -260,7 +259,7 @@ export class Enemy {
       this.pos.y = lerp(this.pos.y, floor, Math.min(1, dt * 6));
       if (this.vel.y < 0) this.vel.y = 0;
     }
-    const lim = MAP.BOUND + 10;
+    const lim = this.game.map.bound + 10;
     this.pos.x = clamp(this.pos.x, -lim, lim);
     this.pos.z = clamp(this.pos.z, -lim, lim);
   }
@@ -284,7 +283,7 @@ export class Enemy {
       this.pos.x = ox; this.pos.z = oz;
     }
     col.pushOut(this.pos, this.def.radius, this.def.height, 0.5);
-    const B = MAP.BOUND;
+    const B = this.game.map.bound;
     this.pos.x = clamp(this.pos.x, -B, B);
     this.pos.z = clamp(this.pos.z, -B, B);
     const g = col.groundAt(this.pos.x, this.pos.z, this.def.radius * 0.5, this.pos.y, 0.6);

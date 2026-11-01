@@ -106,7 +106,7 @@ export class LootSystem {
     // Zusätzlich zufällig an Beute-Spots in Gebäuden
     const types = [['drawer', 4], ['locker', 4], ['crate', 3], ['medical', 2], ['toolbox', 2], ['weapon', 1]];
     for (const s of mapData.spots) {
-      if (Math.random() > (s.indoor ? 0.62 : 0.5)) continue;
+      if (Math.random() > (s.indoor ? (mapData.spotChance ?? 0.62) : 0.5)) continue;
       const type = s.indoor ? weighted(types) : weighted([['crate', 3], ['toolbox', 1], ['weapon', 0.5]]);
       defs.push({ type, x: s.x, y: s.y, z: s.z, tier: s.tier || 1, ry: Math.random() < 0.5 ? 0 : Math.PI / 2 });
     }

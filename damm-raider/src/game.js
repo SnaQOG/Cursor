@@ -13,7 +13,8 @@ import { createEnemy } from './enemies.js';
 import { createElevators, Barrel } from './props.js';
 import { Inventory } from './inventory.js';
 import { ITEMS } from './items.js';
-import { MAP, POIS, PLAYER_SPAWNS, RAID_TIME, CONDITIONS } from './config.js';
+import { RAID_TIME, CONDITIONS } from './config.js';
+import { MAPS } from './maps/index.js';
 import { loadSave, writeSave, BACKPACK_LEVELS } from './save.js';
 import { assets } from './assets.js';
 import { weighted, pick, rand, clamp, TAU } from './util.js';
@@ -50,7 +51,8 @@ export class Game {
     this.enemies = [];
     this.transient = [];
     this.barrels = [];
-    this.poiList = POIS;
+    this.poiList = [];
+    this.mapId = MAPS[this.save.map] ? this.save.map : 'damm';
     this.marker = null;
     this.raidTime = RAID_TIME;
     this.stats = { kills: 0, looted: 0 };
@@ -72,15 +74,39 @@ export class Game {
     await nextFrame();
     await assets.load();
     if (assets.icons) document.documentElement.style.setProperty('--icons', `url("${assets.icons.url}")`);
-    this.ui.bootProgress('Staumauer wird gegossen …');
+    await this.loadMap(this.mapId);
+    this.ui.hideBoot();
+    this.toHub();
+    this.last = performance.now();
+    requestAnimationFrame((t) => this.loop(t));
+  }
+
+  // Karte (neu) aufbauen: Welt, Beute, Aufzüge, Fässer und Spielerfigur
+  async loadMap(id) {
+    const def = MAPS[id] || MAPS.damm;
+    this.building = true;
+    this.ui.bootProgress(def.loading);
     await nextFrame();
-    this.world = new World(this.renderer, this.save.settings.quality, assets);
+    if (this.world) {
+      this.cleanupRaidObjects();
+      this.world.dispose();
+    }
+    this.map = def;
+    this.mapId = def.id;
+    this.poiList = def.pois;
+    this.enemies = [];
+    this.transient = [];
+    this.barrels = [];
+    this.marker = null;
+    this.world = new World(this.renderer, this.save.settings.quality, assets, def);
     this.scene = this.world.scene;
     this.col = this.world.col;
     this.terrain = this.world.terrain;
     this.ui.bootProgress('ARC-Signale werden kalibriert …');
     await nextFrame();
-    this.effects = new Effects(this.scene, this.camera, document.getElementById('dmgnums'));
+    const dmg = document.getElementById('dmgnums');
+    dmg.replaceChildren();
+    this.effects = new Effects(this.scene, this.camera, dmg);
     this.projectiles = new Projectiles(this);
     this.loot = new LootSystem(this);
     this.loot.setup(this.world.mapData);
@@ -91,15 +117,28 @@ export class Game {
     this.ui.bootProgress('Karte wird gezeichnet …');
     await nextFrame();
     this.mapImage = this.renderMapImage(640);
-    this.world.applyCondition('tag');
+    this.world.applyCondition('daemmerung');
     this.applySettings();
     this.resize();
     // Shader vorkompilieren, damit der erste Raid-Frame nicht ruckelt
     this.renderer.compile(this.scene, this.camera);
-    this.ui.hideBoot();
-    this.toHub();
-    this.last = performance.now();
-    requestAnimationFrame((t) => this.loop(t));
+    this.building = false;
+  }
+
+  // Im Hub eine andere Karte wählen
+  async selectMap(id) {
+    if (id === this.mapId || !MAPS[id] || this.loadingMap) return;
+    this.loadingMap = true;
+    this.ui.showBoot();
+    try {
+      await this.loadMap(id);
+      this.save.map = id;
+      writeSave(this.save);
+    } finally {
+      this.loadingMap = false;
+      this.ui.hideBoot();
+      this.toHub();
+    }
   }
 
   applySettings() {
@@ -142,21 +181,15 @@ export class Game {
   // =========================================================== Übersichtskarte
   renderMapImage(size) {
     const T = this.terrain;
-    const c = T.renderMapImage(size, (x, z, h) => {
-      const w = T.waterAt(x, z);
-      if (w && h < w.level) {
-        const depth = Math.min(1, (w.level - h) / 6);
-        return w.toxic ? [96, 120, 40] : [Math.round(60 - depth * 30), Math.round(96 - depth * 30), Math.round(110 - depth * 20)];
-      }
-      const e = 0.8;
-      const shade = clamp(0.75 + (T.height(x - e, z - e) - T.height(x + e, z + e)) * 0.25, 0.45, 1.25);
-      const k = clamp((h - 0) / 60, 0, 1);
-      const base = [128 - k * 30, 132 - k * 20, 100 - k * 10];
-      return base.map((v) => Math.round(clamp(v * shade, 0, 255)));
-    });
+    const V = this.map.mapHalf;
+    const c = T.renderMapImage(size, (x, z, h) => this.map.terrain.mapColor(T, x, z, h), V);
     const g = c.getContext('2d');
-    const toPx = (v) => ((v + MAP.HALF) / (MAP.HALF * 2)) * size;
-    const k = size / (MAP.HALF * 2);
+    const toPx = (v) => ((v + V) / (V * 2)) * size;
+    const k = size / (V * 2);
+    if (this.map.drawMap) {
+      this.map.drawMap(g, size, toPx, k);
+      return c;
+    }
     for (const s of this.col.shapes) {
       if (s.maxY - s.minY < 2.2) continue;
       if (s.kind === 'box') {
@@ -174,7 +207,7 @@ export class Game {
     // Raster
     g.strokeStyle = 'rgba(20,24,26,0.18)';
     g.lineWidth = 1;
-    for (let v = -MAP.HALF; v <= MAP.HALF; v += 80) {
+    for (let v = -V; v <= V; v += 80) {
       g.beginPath(); g.moveTo(toPx(v), 0); g.lineTo(toPx(v), size); g.stroke();
       g.beginPath(); g.moveTo(0, toPx(v)); g.lineTo(size, toPx(v)); g.stroke();
     }
@@ -230,7 +263,7 @@ export class Game {
     for (const t of this.world.mapData.turrets) this.enemies.push(createEnemy(this, 'turret', { x: t.x, y: t.y, z: t.z }));
     if (cond.id === 'sturm') {
       for (let i = 0; i < 5; i++) {
-        const poi = pick(POIS);
+        const poi = pick(this.map.pois);
         this.enemies.push(createEnemy(this, pick(['wasp', 'hornet', 'wasp']), { x: poi.x + rand(-30, 30), z: poi.z + rand(-30, 30), roam: true }));
       }
     }
@@ -244,7 +277,7 @@ export class Game {
       if (need > 0) g.mag += p.inv.remove(g.def.ammo, need);
     }
     this.startValue = p.inv.value();
-    const [sx, sz] = pick(PLAYER_SPAWNS);
+    const [sx, sz] = pick(this.map.spawns);
     p.spawn(sx + rand(-4, 4), sz + rand(-4, 4));
     p.model.root.visible = true;
     this.raidTime = RAID_TIME;
@@ -259,7 +292,7 @@ export class Game {
     this.input.reset();
     this.input.enabled = true;
     this.input.requestLock();
-    this.hud.toast(`Der Damm · ${cond.name}. ${cond.desc}`, 'info');
+    this.hud.toast(`${this.map.name} · ${cond.name}. ${cond.desc}`, 'info');
     this.hud.toast('Finde Beute und erreiche einen Aufzug (grüne Pfeile im Kompass).', 'info');
   }
 
@@ -461,8 +494,9 @@ export class Game {
     const a = rand(0, TAU);
     for (let i = 0; i < n; i++) {
       const type = i === 0 && Math.random() < 0.55 ? 'hornet' : 'wasp';
-      const x = clamp(target.x + Math.cos(a) * 95 + rand(-10, 10), -MAP.BOUND, MAP.BOUND);
-      const z = clamp(target.z + Math.sin(a) * 95 + rand(-10, 10), -MAP.BOUND, MAP.BOUND);
+      const B = this.map.bound;
+      const x = clamp(target.x + Math.cos(a) * 95 + rand(-10, 10), -B, B);
+      const z = clamp(target.z + Math.sin(a) * 95 + rand(-10, 10), -B, B);
       const e = this.spawnEnemy(type, { x, z, y: this.terrain.height(x, z) + 25 });
       e.hear(target, true);
       e.searchT = 25;
@@ -476,9 +510,11 @@ export class Game {
     const dt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
     try {
-      if (this.state === 'raid') this.updateRaid(dt);
-      else this.updateMenu(dt);
-      this.renderer.render(this.scene, this.camera);
+      if (!this.building) {
+        if (this.state === 'raid') this.updateRaid(dt);
+        else this.updateMenu(dt);
+        this.renderer.render(this.scene, this.camera);
+      }
     } catch (err) {
       console.error(err);
     }
@@ -497,11 +533,12 @@ export class Game {
   updateMenu(dt) {
     this.hubT += dt;
     const a = this.hubT * 0.035 + 0.6;
-    const cx = 0, cz = -30;
-    this.camera.position.set(cx + Math.cos(a) * 200, 85 + Math.sin(this.hubT * 0.1) * 8, cz + Math.sin(a) * 200);
-    this.camera.lookAt(cx, 18, cz);
+    const mc = this.map.menuCamera;
+    const cx = mc.x, cz = mc.z;
+    this.camera.position.set(cx + Math.cos(a) * mc.r, mc.h + Math.sin(this.hubT * 0.1) * 8, cz + Math.sin(a) * mc.r);
+    this.camera.lookAt(cx, mc.lookY, cz);
     if (this.camera.fov !== 60) { this.camera.fov = 60; this.camera.updateProjectionMatrix(); }
-    this.world.update(dt, _v.set(cx, 20, cz), null);
+    this.world.update(dt, _v.set(cx, mc.lookY + 2, cz), null);
     this.effects.update(dt, this.width, this.height);
   }
 

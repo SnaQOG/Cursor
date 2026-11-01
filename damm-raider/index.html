@@ -125,7 +125,7 @@
 <!-- Karte -->
 <div id="mapview" class="modal" hidden>
   <div class="mbox mapbox">
-    <div class="mhead"><h2>Der Damm</h2><button class="btn ghost small" data-act="close">Schließen <kbd>M</kbd></button></div>
+    <div class="mhead"><h2 id="map-title">Der Damm</h2><button class="btn ghost small" data-act="close">Schließen <kbd>M</kbd></button></div>
     <canvas id="map-canvas" width="640" height="640"></canvas>
     <p id="map-info" class="muted"></p>
   </div>
@@ -150,7 +150,7 @@
 <!-- Auswertung -->
 <div id="results" class="screen" hidden>
   <div class="resbox">
-    <div class="kicker">Einsatzbericht · Der Damm</div>
+    <div class="kicker" id="res-kicker">Einsatzbericht · Der Damm</div>
     <h1 id="res-title">Extrahiert</h1>
     <p id="res-sub" class="lead"></p>
     <div id="res-stats" class="statgrid"></div>

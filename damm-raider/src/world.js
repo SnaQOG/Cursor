@@ -1,13 +1,10 @@
 // Szene, Licht, Wetter, Wasser, Vegetation und statische Karte.
 import * as THREE from 'three';
-import { MAP } from './config.js';
 import { Terrain } from './terrain.js';
 import { CollisionWorld } from './collision.js';
 import { Batcher } from './batcher.js';
-import { buildMap } from './map.js';
-import { makeGrungeTexture, makeSignTexture, makeSoftDot } from './textures.js';
-import { mulberry32, Noise2D, clamp, smoothstep, distToPolyline } from './util.js';
-import { ROADS, PADS } from './config.js';
+import { makeGrungeTexture, makeSignTexture } from './textures.js';
+import { Noise2D, clamp } from './util.js';
 
 const CONDITION_LOOK = {
   tag: {
@@ -25,7 +22,8 @@ const CONDITION_LOOK = {
 };
 
 export class World {
-  constructor(renderer, quality, assets = null) {
+  constructor(renderer, quality, assets = null, def) {
+    this.def = def;
     this.renderer = renderer;
     this.quality = quality;
     this.assets = assets && assets.ready ? assets : null;
@@ -35,13 +33,13 @@ export class World {
     this.nextLightning = 8;
 
     this.grunge = makeGrungeTexture();
-    this.terrain = new Terrain();
+    this.terrain = new Terrain(def.terrain);
     this.col = new CollisionWorld(this.terrain);
 
     this.setupLights();
     this.setupSky();
 
-    const terrainMesh = this.terrain.buildMesh(this.grunge);
+    const terrainMesh = this.terrain.buildMesh(def.groundTexture ? def.groundTexture() : this.grunge);
     this.scene.add(terrainMesh);
 
     const mats = {
@@ -52,13 +50,39 @@ export class World {
       fence: new THREE.MeshStandardMaterial({ vertexColors: true, transparent: true, opacity: 0.35, roughness: 0.8, depthWrite: false, side: THREE.DoubleSide }),
       glow: new THREE.MeshBasicMaterial({ vertexColors: true }),
     };
+    if (def.materials) Object.assign(mats, def.materials(this));
     this.batcher = new Batcher(mats);
-    this.mapData = buildMap(this.batcher, this.col, this.terrain, this.assets);
+    this.mapData = def.build({ batcher: this.batcher, col: this.col, terrain: this.terrain, assets: this.assets, world: this });
     this.plantVegetation();
-    this.batcher.build(this.scene);
-    this.buildWater();
+    this.staticMeshes = this.batcher.build(this.scene);
+    // Innenräume (Treppen, Möbel …) nur in der Nähe zeichnen
+    this.interiorMeshes = this.staticMeshes.filter((m) => m.userData.layer === 'in');
+    // Kleinkram (Rahmen, Läden, Efeu …) nur bis mittlere Entfernung
+    this.detailMeshes = this.staticMeshes.filter((m) => m.userData.layer === 'det');
+    this.waterMats = [];
+    this.waterNormal = makeWaterNormal();
+    this.waterNormal.wrapS = this.waterNormal.wrapT = THREE.RepeatWrapping;
+    if (def.decorate) def.decorate(this);
     this.buildSigns();
     this.buildRain();
+  }
+
+  // Alles freigeben (Kartenwechsel)
+  dispose() {
+    const seen = new Set();
+    this.scene.traverse((o) => {
+      if (o.geometry && !seen.has(o.geometry)) { seen.add(o.geometry); o.geometry.dispose(); }
+      const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+      for (const m of mats) {
+        if (seen.has(m)) continue;
+        seen.add(m);
+        for (const k of ['map', 'normalMap', 'emissiveMap']) if (m[k] && !seen.has(m[k])) { seen.add(m[k]); m[k].dispose(); }
+        m.dispose();
+      }
+    });
+    if (this.envRT) this.envRT.dispose();
+    if (this.pmrem) this.pmrem.dispose();
+    this.scene.clear();
   }
 
   setupLights() {
@@ -161,126 +185,22 @@ export class World {
     this.scene.environmentIntensity = intensity;
   }
 
-  buildWater() {
-    const normalTex = makeWaterNormal();
-    normalTex.wrapS = normalTex.wrapT = THREE.RepeatWrapping;
-    this.waterNormal = normalTex;
-    const mk = (color, opacity, rep) => {
-      const t = normalTex.clone();
-      t.needsUpdate = true;
-      t.repeat.set(rep, rep);
-      return new THREE.MeshStandardMaterial({ color, roughness: 0.12, metalness: 0.15, transparent: true, opacity, normalMap: t, normalScale: new THREE.Vector2(0.6, 0.6), depthWrite: false });
-    };
-    this.waterMats = [];
-    // Stausee
-    const L = MAP.LAKE;
-    const lakeMat = mk(0x2c5a66, 0.9, 30);
-    const lake = new THREE.Mesh(new THREE.PlaneGeometry(L.hx * 2 + 6, L.hz * 2 + 4), lakeMat);
-    lake.rotation.x = -Math.PI / 2;
-    lake.position.set(0, MAP.LAKE_LEVEL, (L.cz - L.hz + MAP.DAM_Z) / 2);
-    lake.scale.set(1, (MAP.DAM_Z - (L.cz - L.hz)) / (L.hz * 2 + 4), 1);
-    this.scene.add(lake);
-    // Tal-Wasser (Fluss, Tümpel)
-    const valMat = mk(0x3c5f55, 0.82, 60);
-    const val = new THREE.Mesh(new THREE.PlaneGeometry(640, 400), valMat);
-    val.rotation.x = -Math.PI / 2;
-    val.position.set(0, MAP.VALLEY_WATER, MAP.DAM_Z + 6 + 200);
-    this.scene.add(val);
-    // Giftsumpf
-    const S = MAP.SWAMP;
-    const swMat = mk(0x7c9a2a, 0.85, 18);
-    swMat.emissive = new THREE.Color(0x3a4a08);
-    swMat.emissiveIntensity = 0.6;
-    const sw = new THREE.Mesh(new THREE.CircleGeometry(S.r + S.blend + 10, 48), swMat);
-    sw.rotation.x = -Math.PI / 2;
-    sw.position.set(S.x, MAP.SWAMP_WATER, S.z);
-    this.scene.add(sw);
-    this.waterMats.push(lakeMat, valMat, swMat);
-
-    // Wasserfall am Überlauf
-    const c = document.createElement('canvas');
-    c.width = 64; c.height = 256;
-    const g = c.getContext('2d');
-    for (let i = 0; i < 90; i++) {
-      g.fillStyle = `rgba(255,255,255,${0.15 + Math.random() * 0.5})`;
-      g.fillRect(Math.random() * 64, Math.random() * 256, 1 + Math.random() * 3, 20 + Math.random() * 60);
-    }
-    const ft = new THREE.CanvasTexture(c);
-    ft.wrapS = ft.wrapT = THREE.RepeatWrapping;
-    ft.repeat.set(3, 2);
-    this.fallTex = ft;
-    const fallMat = new THREE.MeshBasicMaterial({ map: ft, color: 0xcfe8ec, transparent: true, opacity: 0.75, depthWrite: false, side: THREE.DoubleSide });
-    const fall = new THREE.Mesh(new THREE.PlaneGeometry(22, 30), fallMat);
-    fall.position.set(0, 15.5, MAP.DAM_Z + MAP.DAM_THICK / 2 + 0.6);
-    this.scene.add(fall);
-    // Gischt
-    const dot = makeSoftDot();
-    const mistMat = new THREE.SpriteMaterial({ map: dot, color: 0xe8f2f2, transparent: true, opacity: 0.35, depthWrite: false });
-    this.mist = [];
-    for (let i = 0; i < 14; i++) {
-      const s = new THREE.Sprite(mistMat);
-      s.position.set(-10 + Math.random() * 20, 1.5 + Math.random() * 3, MAP.DAM_Z + 10 + Math.random() * 6);
-      s.scale.setScalar(6 + Math.random() * 6);
-      s.userData.phase = Math.random() * 6;
-      this.scene.add(s);
-      this.mist.push(s);
-    }
-  }
-
   buildSigns() {
-    for (const l of this.mapData.labels) {
-      const tex = makeSignTexture(l.text);
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.5), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 }));
+    for (const l of this.mapData.labels || []) {
+      const tex = makeSignTexture(l.text, l.bg, l.fg);
+      const w = l.w || 6, h = l.h || 1.5;
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 }));
       m.position.set(l.x, l.y, l.z);
       m.rotation.y = l.ry;
       this.scene.add(m);
     }
-    // Großer Schriftzug auf der Staumauer
-    const tex = makeSignTexture('TALSPERRE 7', '#b9b3a3', '#3b3a35');
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(40, 10), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, transparent: true, opacity: 0.85 }));
-    m.position.set(-60, 24, MAP.DAM_Z + MAP.DAM_THICK / 2 + 0.05);
-    this.scene.add(m);
   }
 
   plantVegetation() {
-    const rnd = mulberry32(2024);
-    const T = this.terrain;
-    const n = new Noise2D(77);
-    const trees = [], bushes = [], rocks = [];
-    const blocked = (x, z, r) => {
-      if (Math.abs(x) > 300 || Math.abs(z) > 300) return true;
-      const w = T.waterAt(x, z);
-      const h = T.height(x, z);
-      if (w && h < w.level + 0.4) return true;
-      if (Math.abs(z - MAP.DAM_Z) < 14 && Math.abs(x) < MAP.DAM_HALF_X + 6) return true;
-      for (const p of PADS) if (Math.hypot(x - p.x, z - p.z) < p.r * 0.9 + r) return true;
-      for (const rd of ROADS) if (distToPolyline(x, z, rd) < 4 + r) return true;
-      if (this.col.query(x - r, z - r, x + r, z + r).length) return true;
-      return false;
-    };
-    for (let i = 0; i < 9000 && trees.length < 1100; i++) {
-      const x = (rnd() * 2 - 1) * 300, z = (rnd() * 2 - 1) * 300;
-      const dens = n.fbm(x * 0.012, z * 0.012, 3) + (z < -90 ? 0.15 : 0) + smoothstep(220, 290, Math.max(Math.abs(x), Math.abs(z))) * 0.4;
-      if (dens < 0.08 + rnd() * 0.25) continue;
-      if (T.slope(x, z) > 0.8 || blocked(x, z, 1.5)) continue;
-      trees.push({ x, z, y: T.height(x, z), s: 0.8 + rnd() * 0.7, pine: rnd() < (z < -90 || Math.abs(x) > 240 ? 0.75 : 0.35), r: rnd() * 6 });
-    }
-    for (let i = 0; i < 12000 && bushes.length < 1800; i++) {
-      const x = (rnd() * 2 - 1) * 300, z = (rnd() * 2 - 1) * 300;
-      if (n.fbm(x * 0.02 + 9, z * 0.02, 2) < -0.1 + rnd() * 0.2) continue;
-      if (blocked(x, z, 0.5)) continue;
-      bushes.push({ x, z, y: T.height(x, z), s: 0.6 + rnd() * 1.0, r: rnd() * 6 });
-    }
-    for (let i = 0; i < 4000 && rocks.length < 420; i++) {
-      const x = (rnd() * 2 - 1) * 300, z = (rnd() * 2 - 1) * 300;
-      if (blocked(x, z, 2)) continue;
-      const sl = T.slope(x, z);
-      if (rnd() > 0.25 + sl) continue;
-      rocks.push({ x, z, y: T.height(x, z), s: 0.8 + rnd() * rnd() * 3.5, r: rnd() * 6, t: rnd() * 6 });
-    }
-
+    const v = this.def.vegetation ? this.def.vegetation(this) : { trees: [], bushes: [], rocks: [], grass: [] };
+    const { trees, bushes, rocks } = v;
     if (this.assets) {
-      this.plantModels(trees, bushes, rocks, rnd, blocked, n);
+      this.plantModels(v);
       return;
     }
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3(), e = new THREE.Euler();
@@ -350,7 +270,7 @@ export class World {
   }
 
   // Vegetation aus den Blender-Modellen als InstancedMesh
-  plantModels(trees, bushes, rocks, rnd, blocked, n) {
+  plantModels({ trees, bushes, rocks, grass = [], extra = [] }) {
     const T = this.terrain;
     const q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3(), e = new THREE.Euler();
     const m = new THREE.Matrix4();
@@ -361,7 +281,7 @@ export class World {
       if (!all.length) return;
       const chunks = new Map();
       for (const it of all) {
-        const key = `${Math.floor((it.x + 330) / CH)}|${Math.floor((it.z + 330) / CH)}`;
+        const key = `${Math.floor((it.x + 1000) / CH)}|${Math.floor((it.z + 1000) / CH)}`;
         if (!chunks.has(key)) chunks.set(key, []);
         chunks.get(key).push(it);
       }
@@ -403,26 +323,9 @@ export class World {
       });
     }
     for (const r of rocks) if (r.s > 1.1) this.col.addCyl(r.x, r.z, r.s * 0.95, r.y - 2, r.y + r.s * 0.8, { rock: true });
-    // Grasbüschel auf den Wiesen
-    const grass = [];
-    const maxGrass = { niedrig: 0, mittel: 7000, hoch: 14000 }[this.quality] ?? 7000;
-    for (let i = 0; i < maxGrass * 7 && grass.length < maxGrass; i++) {
-      const x = (rnd() * 2 - 1) * 290, z = (rnd() * 2 - 1) * 290;
-      if (n.fbm(x * 0.03 - 4, z * 0.03 + 2, 2) < -0.05) continue;
-      if (T.slope(x, z) > 0.6) continue;
-      const w = T.waterAt(x, z);
-      const h = T.height(x, z);
-      if (w && h < w.level + 0.2) continue;
-      if (Math.abs(z - MAP.DAM_Z) < 12 && Math.abs(x) < MAP.DAM_HALF_X + 4) continue;
-      let bad = false;
-      for (const pd of PADS) if (Math.hypot(x - pd.x, z - pd.z) < pd.r * 0.8) { bad = true; break; }
-      if (bad) continue;
-      for (const rd of ROADS) if (distToPolyline(x, z, rd) < 3.5) { bad = true; break; }
-      if (bad) continue;
-      grass.push({ x, z, y: h, s: 0.7 + rnd() * 0.8, r: rnd() * 6 });
-    }
     inst('v_grass', grass, (g) => { p.set(g.x, g.y - 0.05, g.z); q.setFromEuler(e.set(0, g.r, 0)); sc.setScalar(g.s); }, { shadow: false, doubleSide: true, tint: leafTint });
-    void blocked;
+    // weitere Modelle der Karte (z. B. Riesenbäume): { name, list, place(it, p, q, sc, e), opts }
+    for (const ex of extra) inst(ex.name, ex.list, (it) => ex.place(it, p, q, sc, e), ex.opts || {});
   }
 
   buildRain() {
@@ -455,11 +358,16 @@ export class World {
       mat.normalMap.offset.x += dt * 0.01;
       mat.normalMap.offset.y += dt * 0.006;
     }
-    this.fallTex.offset.y += dt * 1.6;
-    for (const s of this.mist) {
-      s.userData.phase += dt;
-      s.material.opacity = 0.3;
-      s.position.y = 1.5 + Math.sin(s.userData.phase) * 0.8;
+    if (this.def.updateDecor) this.def.updateDecor(this, dt, focus);
+    for (const m of this.interiorMeshes) {
+      const c = m.userData.center;
+      const dx = c.x - focus.x, dz = c.z - focus.z;
+      m.visible = dx * dx + dz * dz < 95 * 95 && Math.abs(c.y - focus.y) < 80;
+    }
+    for (const m of this.detailMeshes) {
+      const c = m.userData.center;
+      const dx = c.x - focus.x, dz = c.z - focus.z;
+      m.visible = dx * dx + dz * dz < 135 * 135;
     }
     if (this.rain.visible) {
       this.rainOffset = (this.rainOffset + dt * 30) % 40;

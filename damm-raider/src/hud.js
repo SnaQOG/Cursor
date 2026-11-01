@@ -1,7 +1,6 @@
 // HUD während eines Raids (DOM + ein kleiner Kompass-Canvas).
 import { ITEMS } from './items.js';
 import { formatTime } from './util.js';
-import { POIS, EXTRACTS } from './config.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -231,7 +230,7 @@ export class Hud {
       const off = Math.abs(r.x - W / 2);
       if (off < 70 && (!focus || off < focus.off)) focus = { off, x: r.x, color, label: `${text} · ${Math.round(dist)} m` };
     };
-    for (const poi of POIS) {
+    for (const poi of this.game.map.pois) {
       if (Math.hypot(poi.x - p.pos.x, poi.z - p.pos.z) < 25) continue;
       mark(poi.x, poi.z, '#d9d2bf', poi.name, 'dia');
     }
@@ -250,4 +249,3 @@ export class Hud {
   }
 }
 
-export { EXTRACTS };

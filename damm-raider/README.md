@@ -1,8 +1,9 @@
 # Damm Raider
 
 Ein Extraction-Shooter für den Browser, inspiriert von **Arc Raiders**. Du steigst aus der unterirdischen
-Siedlung Speranza an die Oberfläche, plünderst die Karte **„Der Damm“**, kämpfst gegen ARC-Maschinen und
-musst es rechtzeitig zu einem Aufzug schaffen – sonst ist deine Ausrüstung weg.
+Siedlung Speranza an die Oberfläche, plünderst eine der Karten **„Der Damm“** oder **„Weltenbrück“**,
+kämpfst gegen ARC-Maschinen und musst es rechtzeitig zu einem Aufzug schaffen – sonst ist deine
+Ausrüstung weg.
 
 Fanprojekt ohne Verbindung zu Embark Studios. Alle 3D-Modelle und Inventar-Icons werden per Skript in
 **Blender** gebaut (siehe unten), Sounds und Texturen entstehen zur Laufzeit.
@@ -55,9 +56,9 @@ Benötigt wird ein Desktop-Browser mit WebGL, Tastatur und Maus.
 
 ## Spielablauf
 
-1. **Speranza (Hub):** Ausrüstung zusammenstellen, im Lager verwalten, bei Händlerin Celeste kaufen und
-   verkaufen, Rucksack und Lager ausbauen.
-2. **Raid:** 20 Minuten auf dem Damm. Zufällige Bedingung: klarer Tag, Dämmerung oder Elektrosturm
+1. **Speranza (Hub):** Einsatzgebiet wählen, Ausrüstung zusammenstellen, im Lager verwalten, bei
+   Händlerin Celeste kaufen und verkaufen, Rucksack und Lager ausbauen.
+2. **Raid:** 20 Minuten an der Oberfläche. Zufällige Bedingung: klarer Tag, Dämmerung oder Elektrosturm
    (schlechte Sicht, mehr ARC, bessere Beute).
 3. **Extraktion:** An einem der vier Aufzüge die Konsole bedienen, 25 Sekunden durchhalten (der Lärm lockt
    ARC an), dann einsteigen und 5 Sekunden in der Kabine bleiben.
@@ -77,6 +78,33 @@ Der Spielstand wird im `localStorage` des Browsers gespeichert.
 - **Altes Schlachtfeld** mit dem Wrack einer riesigen ARC-Königin
 - **Hydrokuppeln** und **Pumpstation** auf dem Plateau am See
 - Vier Aufzüge: West, Süd, Ost und auf dem Damm
+
+## Die Karte: Weltenbrück
+
+![Kartenentwurf Weltenbrück](docs/weltenbrueck-entwurf.png)
+
+Eine Fantasy-Stadt aus deutscher Architektur: früher eine freie Handelsstadt mit vier Gilden (Seefahrer,
+Schattenläufer, Erfinder, Wächter), heute verlassen, überwuchert und von ARC besetzt. Etappe 1 umfasst
+den **Kreuzmarkt** und die **Waldsiedlung**; Weiße Stadt, Turmstadt und Hafenviertel liegen vorerst als
+Kulisse hinter der Stadtmauer.
+
+- **Kreuzmarkt-Viertel:** Labyrinth aus engen Gassen (2–4 m), Fachwerk-, Stein- und Backsteinhäusern
+  mit 2–7 Geschossen, Läden mit Schildern und Markisen, versteckte Innenhöfe, Ruinen
+- **Kreuzmarkt** mit Brunnen und Marktständen, **Altes Rathaus** mit Treppengiebeln und Uhrtürmchen
+- **Dom zu Weltenbrück:** begehbares Kirchenschiff mit Bleiglas, Säulen und Chor; der Turm ist bis zur
+  Galerie besteigbar, darüber der **Erfinderturm** mit pulsierendem Energiekern
+- **Waldsiedlung** auf vier Terrassen (je 5 m höher) mit Stützmauern und Treppengassen,
+  Schwarzwaldhäusern und Wohntürmen mit Wassertanks
+- **Riesenbäume** mit Plattformen, Baumhütten und Hängebrücken zu den Dächern der Wohntürme
+- **Gründerfelsen** mit den Gesichtern der vier Gildengründer; über den **Felsensteig** erreicht man das
+  Felsband vor den Gesichtern
+- **Jedes Haus ist begehbar:** Türen auf allen offenen Seiten, Treppenhaus über alle Geschosse,
+  Zwischenwand mit Durchgang, Möbel, Beuteplätze; Fenster sind echte Öffnungen
+- Vier Aufzüge, die Stadttore sind vorerst verschlossen
+
+Die Stadt entsteht bei jedem Laden gleich aus einem Generator (`src/maps/weltenbrueck/`):
+`layout.js` legt Straßen, Gassen, Plätze, Terrassen und Grundstücke fest, `house.js` baut daraus die
+Häuser, `build.js` die Sonderbauten, `index.js` Terrain, Materialien und Vegetation.
 
 ## ARC-Gegner
 
@@ -131,6 +159,7 @@ Konventionen, die das Spiel auswertet:
 damm-raider/
 ├── blender/            Blender-Skripte für alle Modelle und Icons
 ├── assets/             exportierte Modelle (models.glb) und Icon-Atlas
+├── docs/               Kartenentwurf Weltenbrück
 ├── index.html          HTML-Gerüst (Hub, HUD, Fenster)
 ├── css/style.css       Oberfläche
 ├── src/
@@ -138,7 +167,8 @@ damm-raider/
 │   ├── assets.js       lädt models.glb, liefert Klone und Instanz-Geometrie
 │   ├── game.js         Spielablauf, Treffer, Explosionen, Extraktion
 │   ├── world.js        Szene, Licht, Wetter, Wasser, Vegetation
-│   ├── terrain.js      Höhenfeld (Tal, Plateau, Stausee, Fluss, Sumpf)
+│   ├── terrain.js      Höhenfeld (Form kommt aus der Kartendefinition)
+│   ├── maps/           Kartendefinitionen: damm.js, weltenbrueck/ (Stadtgenerator)
 │   ├── map.js          Aufbau der Dammkarte
 │   ├── structures.js   Gebäude-Baukasten
 │   ├── batcher.js      Zusammenfassen statischer Geometrie

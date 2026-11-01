@@ -2,7 +2,7 @@
 import { ITEMS, RARITY, CATEGORY, WEAPONS, iconSvg } from './items.js';
 import { assets } from './assets.js';
 import { Inventory } from './inventory.js';
-import { POIS, EXTRACTS, MAP } from './config.js';
+import { MAPS, MAP_ORDER } from './maps/index.js';
 import { BACKPACK_LEVELS, STASH_LEVELS, UPGRADE_COST, freeLoadout, writeSave, wipeSave } from './save.js';
 import { formatNum, formatTime } from './util.js';
 import { ENEMY_DEFS } from './enemies.js';
@@ -100,6 +100,10 @@ export class UI {
     $('boot').hidden = true;
   }
 
+  showBoot() {
+    $('boot').hidden = false;
+  }
+
   // ================================================================ Hub
   bindHub() {
     for (const b of document.querySelectorAll('#hub-nav button')) {
@@ -182,7 +186,8 @@ export class UI {
     const L = s.loadout;
     const hasGun = L.weapons.some(Boolean);
     const risk = this.loadoutValue();
-    const pois = POIS.map((p) => `<li><span class="tier t${p.tier}">${'◆'.repeat(p.tier)}</span>${esc(p.name)}</li>`).join('');
+    const map = this.game.map;
+    const pois = map.pois.map((p) => `<li><span class="tier t${p.tier}">${'◆'.repeat(p.tier)}</span>${esc(p.name)}</li>`).join('');
     return `<div class="deploy">
       <section class="panel loadout">
         <h2>Ausrüstung</h2>
@@ -191,13 +196,17 @@ export class UI {
         <p class="hint">Klick auf einen Gegenstand legt ihn ins Lager. Ausrüsten kannst du im Lager.</p>
       </section>
       <section class="panel mission">
-        <div class="kicker">Oberfläche · Einsatzgebiet</div>
-        <h2 class="mapname">Der Damm</h2>
-        <p class="lead">Talsperre 7 staut den Fluss noch immer. Unter der Mauer liegen Kraftwerk, Forschungsanlage und die Wohnblöcke – bewacht von ARC-Maschinen. Hol dir, was du tragen kannst, und schaff es zu einem Aufzug, bevor die Zeit abläuft.</p>
+        <div class="mappick" role="radiogroup" aria-label="Einsatzgebiet">${MAP_ORDER.map((id) => `
+          <button class="mapcard${id === map.id ? ' on' : ''}" role="radio" aria-checked="${id === map.id}" data-act="map" data-map="${id}">
+            <span class="mk">${esc(MAPS[id].tag || '')}</span><span class="mn">${esc(MAPS[id].name)}</span></button>`).join('')}
+        </div>
+        <div class="kicker">${esc(map.kicker)}</div>
+        <h2 class="mapname">${esc(map.name)}</h2>
+        <p class="lead">${esc(map.lead)}</p>
         <ul class="poilist">${pois}</ul>
         <div class="facts">
           <div><span>Einsatzzeit</span><strong>20:00</strong></div>
-          <div><span>Aufzüge</span><strong>${EXTRACTS.length}</strong></div>
+          <div><span>Aufzüge</span><strong>${map.extracts.length}</strong></div>
           <div><span>Bedingung</span><strong>zufällig</strong></div>
         </div>
         ${!hasGun ? `<div class="warnbox">Du hast keine Waffe dabei. Nimm eine aus dem Lager oder die Gratis-Ausrüstung.
@@ -355,6 +364,9 @@ export class UI {
     switch (act) {
       case 'deploy':
         this.game.startRaid();
+        return;
+      case 'map':
+        this.game.selectMap(b.dataset.map);
         return;
       case 'free':
         s.loadout = freeLoadout();
@@ -679,6 +691,7 @@ export class UI {
   openMap() {
     this.openPanel('map');
     $('mapview').hidden = false;
+    $('map-title').textContent = this.game.map.name;
     this.drawMap();
   }
 
@@ -688,9 +701,10 @@ export class UI {
     const S = cv.width;
     const g = this.game;
     ctx.drawImage(g.mapImage, 0, 0, S, S);
-    const toPx = (x, z) => [((x + MAP.HALF) / (MAP.HALF * 2)) * S, ((z + MAP.HALF) / (MAP.HALF * 2)) * S];
+    const V = g.map.mapHalf;
+    const toPx = (x, z) => [((x + V) / (V * 2)) * S, ((z + V) / (V * 2)) * S];
     ctx.textAlign = 'center';
-    for (const poi of POIS) {
+    for (const poi of g.map.pois) {
       const [px, py] = toPx(poi.x, poi.z);
       ctx.fillStyle = 'rgba(20,24,26,0.75)';
       ctx.font = '600 13px "Barlow Semi Condensed", sans-serif';
@@ -741,8 +755,9 @@ export class UI {
     const cv = $('map-canvas');
     if (e.target !== cv) return;
     const r = cv.getBoundingClientRect();
-    const x = ((e.clientX - r.left) / r.width) * MAP.HALF * 2 - MAP.HALF;
-    const z = ((e.clientY - r.top) / r.height) * MAP.HALF * 2 - MAP.HALF;
+    const V = this.game.map.mapHalf;
+    const x = ((e.clientX - r.left) / r.width) * V * 2 - V;
+    const z = ((e.clientY - r.top) / r.height) * V * 2 - V;
     const g = this.game;
     g.marker = g.marker && Math.hypot(g.marker.x - x, g.marker.z - z) < 10 ? null : { x, z };
     this.drawMap();
@@ -780,6 +795,7 @@ export class UI {
     $('results').hidden = false;
     const titles = { extrahiert: 'Extrahiert', gefallen: 'Gefallen', verschollen: 'Verschollen', aufgegeben: 'Aufgegeben' };
     const good = r.outcome === 'extrahiert';
+    $('res-kicker').textContent = `Einsatzbericht · ${this.game.map.name}`;
     $('res-title').textContent = titles[r.outcome];
     $('res-title').className = good ? 'good' : 'bad';
     $('res-sub').textContent = good ? `Über ${r.via} zurück nach Speranza.` : r.reason;

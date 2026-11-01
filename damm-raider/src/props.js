@@ -1,6 +1,5 @@
 // Extraktions-Aufzüge und explosive Fässer.
 import * as THREE from 'three';
-import { EXTRACTS } from './config.js';
 import { makeHazardTexture } from './textures.js';
 import { assets, Assets } from './assets.js';
 
@@ -16,8 +15,8 @@ export class Elevator {
     this.id = def.id;
     const gy = game.col.groundAt(def.x, def.z, 3, 999, 0);
     this.base = new THREE.Vector3(def.x, gy, def.z);
-    // Zur Kartenmitte ausrichten (Tür zeigt zur Mitte)
-    this.yaw = Math.atan2(-def.x, -def.z) + Math.PI;
+    // Zur Kartenmitte ausrichten (Tür zeigt zur Mitte), sofern nicht vorgegeben
+    this.yaw = def.yaw ?? Math.atan2(-def.x, -def.z) + Math.PI;
     const g = new THREE.Group();
     g.position.copy(this.base);
     g.rotation.y = this.yaw;
@@ -195,7 +194,7 @@ export class Elevator {
 }
 
 export function createElevators(game) {
-  return EXTRACTS.map((d) => new Elevator(game, d));
+  return game.map.extracts.map((d) => new Elevator(game, d));
 }
 
 export class Barrel {

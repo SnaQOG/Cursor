@@ -3,3 +3,4 @@ __pycache__/
 .venv-blender/
 # Die spielbare Einzeldatei wird bewusst mit eingecheckt
 !dist/
+blender/preview/

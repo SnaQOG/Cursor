@@ -171,6 +171,12 @@ Was nicht aus Blender kommt: Wände, Böden, Treppen und Dächer der Stadthäuse
 dem Stadtplan, weil jedes Haus genau auf sein Grundstück passen und begehbar sein muss. Alles, was eine
 feste Form hat, kommt aus Blender.
 
+## Tests
+
+Browser-Tests mit Playwright liegen in `tools/tests/` (Ladezeit, Bewegung durch Türen und Treppen,
+Raids, Detailbilder), Blender-Vorschaubilder erzeugt `blender/preview.py`. Stand, Konventionen und
+nächste Schritte stehen in [`docs/weiterarbeiten.md`](docs/weiterarbeiten.md).
+
 ## Projektstruktur
 
 ```

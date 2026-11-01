@@ -18,6 +18,10 @@ export const PAL = {
   frameDark: 0x2c2420,
   moss: 0x4f6234,
   ivy: [0x34502a, 0x3e5c2e, 0x2c4424],
+  shingle: [0x6e6258, 0x5d5249, 0x7a6a58, 0x665a4e, 0x857664],
+  zinc: [0x6e6a62, 0x7a776f, 0x8a5a3a],
+  bloom: [0xc8322a, 0xd8507a, 0xe8e2d8, 0x9a4ac0, 0xe07a2a, 0xc8322a],
+  rug: [0x7a2e26, 0x2e4a6a, 0x6a5a2a, 0x4a3a5a, 0x3a5a3e],
   rubble: [0x8f877a, 0x7d766a, 0x9c9384],
 };
 
@@ -172,7 +176,84 @@ export class HouseKit {
     const dx = q[0] - p[0], dy = q[1] - p[1];
     const l = Math.hypot(dx, dy) || 1;
     const nx = (-dy / l) * width / 2, ny = (dx / l) * width / 2;
-    this.quad([wp(w, p[0] - nx, p[1] - ny, d), wp(w, q[0] - nx, q[1] - ny, d), wp(w, q[0] + nx, q[1] + ny, d), wp(w, p[0] + nx, p[1] + ny, d)], OUTN[w.side], color, { shade: false });
+    this.quad([wp(w, p[0] - nx, p[1] - ny, d), wp(w, q[0] - nx, q[1] - ny, d), wp(w, q[0] + nx, q[1] + ny, d), wp(w, p[0] + nx, p[1] + ny, d)], OUTN[w.side], color, { shade: false, mat: 'timber' });
+  }
+
+  // Fassadenleiste: Vorderfläche plus Ober- und Unterseite (für Gesimse, Schwellen, Sockel)
+  ledge(w, a0, a1, y0, y1, depth, color, mat = 'world', layer = '') {
+    const o = OUTN[w.side];
+    this.quad([wp(w, a0, y0, -depth), wp(w, a1, y0, -depth), wp(w, a1, y1, -depth), wp(w, a0, y1, -depth)], o, color, { mat, layer });
+    this.quad([wp(w, a0, y1, -depth), wp(w, a1, y1, -depth), wp(w, a1, y1, 0), wp(w, a0, y1, 0)], [0, 1, 0], color, { mat, layer });
+    this.quad([wp(w, a0, y0, -depth), wp(w, a1, y0, -depth), wp(w, a1, y0, 0), wp(w, a0, y0, 0)], [0, -1, 0], darker(color, 0.7), { mat, layer });
+  }
+
+  // Details einer Fassadenseite (nach der Wand gebaut)
+  facade(lot, w, f, y, h, fy, ops, runs, c) {
+    if (!runs.length) return;
+    const k = w.side, out = OUTN[k];
+    const ry = yawFront(out[0], out[2]);
+    const rnd = c.rnd;
+    const stone = lot.style === 'stein' || lot.style === 'backstein';
+    // Sockel aus Naturstein (Putz- und Backsteinhäuser)
+    if (f === 0 && stone) {
+      for (const [r0, r1] of runs) {
+        let cur = r0;
+        const cuts = ops.filter((o) => o.kind === 'door' && o.a1 > r0 && o.a0 < r1).sort((p, q) => p.a0 - q.a0);
+        for (const o of [...cuts, { a0: r1, a1: r1 }]) {
+          if (o.a0 - cur > 0.1) this.ledge(w, cur, o.a0, y, y + 0.6, 0.04, c.plinth, 'stone');
+          cur = Math.max(cur, o.a1);
+        }
+      }
+    }
+    // Eckquader
+    if (lot.style === 'stein') {
+      for (const [r0, r1] of runs) {
+        for (const [edge, dir] of [[w.a0, 1], [w.a1, -1]]) {
+          if (Math.abs((dir > 0 ? r0 : r1) - edge) > 0.3) continue;
+          for (let yy = y + (f === 0 ? 0.6 : 0), i = 0; yy < y + h - 0.05; yy += 0.36, i++) {
+            const wdt = i % 2 ? 0.3 : 0.5, hh = Math.min(0.33, y + h - yy);
+            const a0 = dir > 0 ? edge : edge - wdt, a1 = dir > 0 ? edge + wdt : edge;
+            this.quad([wp(w, a0, yy, -0.03), wp(w, a1, yy, -0.03), wp(w, a1, yy + hh, -0.03), wp(w, a0, yy + hh, -0.03)], out, c.quoin, { mat: 'stone', layer: 'det' });
+          }
+        }
+      }
+    }
+    for (const o of ops) {
+      const Y0 = y + o.y0, Y1 = y + o.y1, m = (o.a0 + o.a1) / 2, ow = o.a1 - o.a0;
+      if (o.kind === 'win' && lot.style === 'stein' && ow <= 2.2) {
+        // Faschen und Verdachung
+        const b = 0.14, d = -0.015, fc = c.fasche, det = { layer: 'det' };
+        this.quad([wp(w, o.a0 - b, Y0 - 0.06, d), wp(w, o.a0, Y0 - 0.06, d), wp(w, o.a0, Y1 + b, d), wp(w, o.a0 - b, Y1 + b, d)], out, fc, det);
+        this.quad([wp(w, o.a1, Y0 - 0.06, d), wp(w, o.a1 + b, Y0 - 0.06, d), wp(w, o.a1 + b, Y1 + b, d), wp(w, o.a1, Y1 + b, d)], out, fc, det);
+        this.quad([wp(w, o.a0, Y1, d), wp(w, o.a1, Y1, d), wp(w, o.a1, Y1 + b, d), wp(w, o.a0, Y1 + b, d)], out, fc, det);
+        if (f > 0) this.ledge(w, o.a0 - b - 0.12, o.a1 + b + 0.12, Y1 + b + 0.04, Y1 + b + 0.18, 0.14, c.fasche, 'stone', 'det');
+      }
+      // Blumenkästen unter Fenstern der Obergeschosse
+      if (o.kind === 'win' && f > 0 && ow <= 2.2 && lot.style !== 'turm' && lot.style !== 'dom' && rnd() < 0.22) {
+        this.model('kc_flowerbox', wp(w, m, Y0 - 0.02, 0), ry, [ow + 0.1, 1, 1], { tint: pick(rnd, PAL.bloom), layer: 'det' });
+      }
+      // Türgewände und Stufe
+      if (o.kind === 'door') {
+        const b = stone ? 0.2 : 0.12, d = -0.03, gc = stone ? c.fasche : c.timber;
+        const gm = stone ? 'stone' : 'timber';
+        this.quad([wp(w, o.a0 - b, Y0, d), wp(w, o.a0, Y0, d), wp(w, o.a0, Y1 + b, d), wp(w, o.a0 - b, Y1 + b, d)], out, gc, { mat: gm });
+        this.quad([wp(w, o.a1, Y0, d), wp(w, o.a1 + b, Y0, d), wp(w, o.a1 + b, Y1 + b, d), wp(w, o.a1, Y1 + b, d)], out, gc, { mat: gm });
+        this.ledge(w, o.a0 - b, o.a1 + b, Y1, Y1 + b + (stone ? 0.08 : 0), stone ? 0.08 : 0.05, gc, gm);
+        if (stone) this.ledge(w, m - 0.13, m + 0.13, Y1 - 0.05, Y1 + b + 0.12, 0.12, darker(gc, 0.92), 'stone');
+        if (f === 0) {
+          const p0 = wp(w, o.a0 - 0.15, y, -0.45), p1 = wp(w, o.a1 + 0.15, y, 0);
+          const bx0 = Math.min(p0[0], p1[0]), bx1 = Math.max(p0[0], p1[0]), bz0 = Math.min(p0[2], p1[2]), bz1 = Math.max(p0[2], p1[2]);
+          this.box((bx0 + bx1) / 2, y, (bz0 + bz1) / 2, bx1 - bx0, 0.15, bz1 - bz0, c.step, { mat: 'stone' });
+        }
+      }
+    }
+    // Fachwerk: vorstehende Schwelle mit Balkenköpfen an jeder Geschossgrenze
+    if (lot.style === 'fachwerk' && f > 0) {
+      for (const [r0, r1] of runs) {
+        this.ledge(w, r0, r1, y - 0.04, y + 0.2, 0.1, c.timber, 'timber');
+        for (let a = r0 + 0.4; a < r1 - 0.3; a += 0.8) this.model('kc_beamhead', wp(w, a, y - 0.24, 0), ry, 1, { tint: c.timber, layer: 'det' });
+      }
+    }
   }
 
   // Ist die Außenseite an Stelle (x,z) für ein Geschoss mit Unterkante y offen?
@@ -267,6 +348,12 @@ export class HouseKit {
     let baseMat = lot.style === 'fachwerk' || lot.style === 'schwarzwald' || lot.style === 'turm' ? 'stone' : wallMat;
     let upperMat = lot.style === 'schwarzwald' ? 'wood' : lot.style === 'turm' ? 'wood' : wallMat;
     let baseColor = baseCol, upperColor = upperCol, frameColor = frameCol, shutters = shutterCol;
+    // Schwarzwald: Hälfte der Häuser mit Schindelfassade
+    if (lot.style === 'schwarzwald' && rnd() < 0.5) { upperMat = 'shingle'; upperColor = pick(rnd, PAL.shingle); }
+    const facadeCtx = {
+      rnd, timber, plinth: darker(pick(rnd, PAL.stone), 0.85), quoin: pick(rnd, PAL.stone),
+      fasche: lot.style === 'backstein' ? PAL.frameLight : mix(pick(rnd, PAL.stone), 0xffffff, 0.25), step: pick(rnd, PAL.stone),
+    };
     const hook = this.styleHook && this.styleHook(lot);
     if (hook) {
       baseColor = hook.base; upperColor = hook.wall; baseMat = upperMat = hook.mat; frameColor = hook.frame; shutters = null;
@@ -317,6 +404,7 @@ export class HouseKit {
 
     const shopSide = lot.shop ? doors[0]?.side : null;
     lot.doors = doors;
+    lot.sideA = sideA;
     if (canStairs && floors > 1) {
       const fu = uS0 - 0.55, fv = T + sw / 2;
       lot.stair0 = { x: toX(fu, fv), z: toZ(fu, fv), dx: toX(fu + 1, fv) - toX(fu, fv), dz: toZ(fu + 1, fv) - toZ(fu, fv), y: yG, fh };
@@ -367,6 +455,7 @@ export class HouseKit {
           }
         }
         this.wall(w, yw0, hw, ops, col, { mat, inner: innerRect, frameCol: frameColor, shutterCol: shutters, rnd });
+        this.facade(lot, w, f, yw0, hw, fy, ops, runs, facadeCtx);
         const anyOpen = runs.length > 0;
         // Fachwerk auf offenen Seiten der Obergeschosse
         if (lot.style === 'fachwerk' && f > 0 && anyOpen) this.timberFrame(w, yw0, hw, ops, runs, timber, rnd);
@@ -389,7 +478,9 @@ export class HouseKit {
           const w = sides[d.side], axv = AXIS[d.side];
           const shop = shopSide === d.side && d === doors[0];
           const dw = shop ? 1.6 : DOOR_W;
-          this.model('kc_door', wp(w, d.a - dw / 2, fy, T + 0.05), yawX(-axv[0], -axv[2]), [dw, DOOR_H, 1], { tint: pick(rnd, PAL.door), layer: 'det' });
+          if (this.model('kc_door', wp(w, d.a - dw / 2, fy, T + 0.05), yawX(-axv[0], -axv[2]), [dw, DOOR_H, 1], { tint: pick(rnd, PAL.door), layer: 'det' })) {
+            (lot.leaves ||= []).push({ side: d.side, a0: d.a - dw / 2 - dw - 0.15, a1: d.a - dw / 2 + 0.1 });
+          }
         }
       }
       // Böden
@@ -416,7 +507,7 @@ export class HouseKit {
       // Zwischenwand mit Durchgang
       if (hasPart) this.partition(rectUV, uPart, S, fy, fh, upperColor, innerRect);
       // Möbel und Beuteplätze im vorderen Zimmer
-      this.furnish(lot, rnd, rectUV, toX, toZ, frontRoomEnd, S, fy, f, sw, doors, aOfU, aOfV, sideB, front, innerRect);
+      this.furnish(lot, rnd, rectUV, toX, toZ, frontRoomEnd, S, fy, f, sw, doors, aOfU, aOfV, sideB, front, innerRect, hasPart);
     }
 
     // Dach
@@ -536,7 +627,7 @@ export class HouseKit {
     }
   }
 
-  furnish(lot, rnd, rectUV, toX, toZ, uEnd, S, fy, f, sw, doors, aOfU, aOfV, sideB, front, inner) {
+  furnish(lot, rnd, rectUV, toX, toZ, uEnd, S, fy, f, sw, doors, aOfU, aOfV, sideB, front, inner, backWall = false) {
     const roomL = uEnd - T;
     if (roomL < 2.2) return;
     const wood = pick(rnd, PAL.wood);
@@ -547,12 +638,33 @@ export class HouseKit {
       if (d.side === sideB) return v > S - T - 1.4 && Math.abs(aOfU(u) - d.a) < 1.1;
       return v < T + 1.4 && Math.abs(aOfU(u) - d.a) < 1.1;
     });
+    // offener Türflügel an der Innenwand (Vorderseite oder Seite A) im Weg?
+    const leafAt = (u, v) => f === 0 && (lot.leaves || []).some((l) => (l.side === front && u < T + 0.7 && aOfV(v) > l.a0 && aOfV(v) < l.a1)
+      || (l.side === lot.sideA && v < T + 0.7 && aOfU(u) > l.a0 && aOfU(u) < l.a1));
     const du = [toX(1, 0) - toX(0, 0), toZ(1, 0) - toZ(0, 0)];
     const dv = [toX(0, 1) - toX(0, 0), toZ(0, 1) - toZ(0, 0)];
     const at = (u, v) => [toX(u, v), fy, toZ(u, v)];
     const mopts = { layer: 'in', shade: 0.62 };
-    // Tisch mit Stühlen an Seite A
-    if (S >= 4.6 && roomL >= 3.0) {
+    // Stube: Eckbank mit Tisch in der vorderen Ecke an Seite A
+    let eck = false;
+    const rustic = lot.style === 'fachwerk' || lot.style === 'schwarzwald';
+    if (S >= 4.6 && roomL >= 3.8 && this.inst && this.inst.has('kc_eckbank') && rnd() < (rustic ? 0.6 : 0.3)
+      && [[T + 0.3, T + 0.3], [T + 0.3, T + 1.9], [T + 2.0, T + 0.3], [T + 1.3, T + 1.0], [T + 1.3, T + 1.8]].every(([u, v]) => !nearDoor(u, v))
+      && [0.1, 0.6, 1.1, 1.6, 2.0].every((k) => !leafAt(T + 0.3, T + k) && !leafAt(T + k, T + 0.3))) {
+      // Modellarme liegen auf lokal +X und +Z; Drehung je nach Händigkeit von (u, v)
+      const ax = du[0] * dv[1] - du[1] * dv[0] > 0 ? du : dv;
+      this.model('kc_eckbank', at(T, T), yawX(ax[0], ax[1]), 1, { ...mopts, tint: pick(rnd, PAL.awning) });
+      for (const r of [rectUV(T, T + 0.5, T, T + 1.9), rectUV(T, T + 1.9, T, T + 0.5)]) this.col.addBox(r.x0, fy, r.z0, r.x1, fy + 0.48, r.z1);
+      const u = T + 1.3, v = T + 1.0;
+      this.model('kc_table', at(u, v), yawX(du[0], du[1]), 1, mopts);
+      const r = rectUV(u - 0.7, u + 0.7, v - 0.4, v + 0.4);
+      this.col.addBox(r.x0, fy, r.z0, r.x1, fy + 0.76, r.z1);
+      if (rnd() < 0.8) this.model('kc_chair', at(u + (rnd() - 0.5) * 0.4, v + 0.68), yawFront(-dv[0], -dv[1]) + (rnd() - 0.5) * 0.3, 1, mopts);
+      eck = true;
+      (lot.decor ||= []).push({ kind: 'eckbank', x: toX(T + 1.3, T + 1.0), y: fy, z: toZ(T + 1.3, T + 1.0) });
+    }
+    // sonst Tisch mit Stühlen an Seite A
+    if (!eck && S >= 4.6 && roomL >= 3.0) {
       const u = Math.min(T + roomL * 0.5, uEnd - 1.9), v = T + 0.75;
       if (u > T + 0.9 && !nearDoor(u, v)) {
         const r = rectUV(u - 0.7, u + 0.7, v - 0.4, v + 0.4);
@@ -583,8 +695,24 @@ export class HouseKit {
       const u = uEnd - 0.75, v = S - T - 0.6;
       if (!nearDoor(u, v)) this.B.spots.push({ x: toX(u, v), y: fy, z: toZ(u, v), tier: lot.tier, poi: lot.poi, indoor: true });
     }
+    // Teppich in der Raummitte
+    if (!eck && rnd() < 0.55 && roomL >= 3.0 && S >= 4.2) {
+      const hu = Math.min(1.3, roomL / 2 - 0.6), hv = Math.min(0.85, S / 2 - T - 0.5);
+      const uc = T + roomL / 2, vc = S / 2, rc = pick(rnd, PAL.rug);
+      const flat = (u0, u1, v0, v1, yy, c) => {
+        const r = rectUV(u0, u1, v0, v1);
+        this.quad([[r.x0, yy, r.z0], [r.x1, yy, r.z0], [r.x1, yy, r.z1], [r.x0, yy, r.z1]], [0, 1, 0], c, { inner, layer: 'in', mat: 'cloth' });
+      };
+      flat(uc - hu, uc + hu, vc - hv, vc + hv, fy + 0.012, darker(rc, 0.65));
+      flat(uc - hu + 0.13, uc + hu - 0.13, vc - hv + 0.13, vc + hv - 0.13, fy + 0.018, rc);
+    }
+    // Kuckucksuhr an der Zwischenwand der Stube
+    if (backWall && f === 0 && rnd() < (lot.style === 'schwarzwald' ? 0.75 : lot.style === 'fachwerk' ? 0.35 : 0.1)) {
+      const v = S - T - 0.45;
+      this.model('kc_cuckoo', [toX(uEnd + 0.01, v), fy + 1.75, toZ(uEnd + 0.01, v)], yawFront(-du[0], -du[1]), 1, mopts);
+    }
     // Regal oder Kachelofen an der Vorderwand (Seite A)
-    if (rnd() < 0.5 && S >= 5) {
+    if (!eck && rnd() < 0.5 && S >= 5) {
       const stove = rnd() < 0.35;
       const dep = stove ? 0.42 : 0.21, v = T + (stove ? 1.0 : 0.85);
       const u = T + dep;
@@ -633,6 +761,17 @@ export class HouseKit {
     // Traufkante
     this.quad([M(P0 - g, yE - 0.14, Q0 - e), M(P1 + g, yE - 0.14, Q0 - e), M(P1 + g, yE, Q0 - e), M(P0 - g, yE, Q0 - e)], N(0, 0, -1), darker(color, 0.7));
     this.quad([M(P0 - g, yE - 0.14, Q1 + e), M(P1 + g, yE - 0.14, Q1 + e), M(P1 + g, yE, Q1 + e), M(P0 - g, yE, Q1 + e)], N(0, 0, 1), darker(color, 0.7));
+    this.eaves(lot, alongX, M, P0, P1, Q0, Q1, e, g, yE, rnd);
+    // Ortgangbretter an den Giebelkanten
+    if (!stepped) {
+      const vb = lot.style === 'fachwerk' ? timber : lot.style === 'stein' ? 0x5d6266 : darker(pick(rnd, PAL.wood), 0.9);
+      const vm = lot.style === 'stein' ? 'metal' : 'wood';
+      for (const [p, s] of [[P0 - g - 0.02, -1], [P1 + g + 0.02, 1]]) {
+        for (const qa of [Q0 - e, Q1 + e]) {
+          this.quad([M(p, yE - 0.24, qa), M(p, yr - 0.24, qc), M(p, yr + 0.06, qc), M(p, yE + 0.06, qa)], N(s, 0, 0), vb, { mat: vm, layer: 'det' });
+        }
+      }
+    }
     // Firstziegel
     const rp = M((P0 + P1) / 2, yr - 0.05, qc);
     this.b.box(rp[0], rp[1], rp[2], alongX ? P1 - P0 + 2 * g + 0.1 : 0.32, 0.22, alongX ? 0.32 : P1 - P0 + 2 * g + 0.1, darker(color, 0.75), { mat });
@@ -692,6 +831,36 @@ export class HouseKit {
     const c1 = [M(P0, ye, Q0 + hs * 0.2), M(P1, ye + rise * 0.55, Q1 - hs * 0.2)];
     const c2 = [M(P0, ye + rise * 0.55, qc - hs * 0.35), M(P1, ye + rise * 0.9, qc + hs * 0.35)];
     for (const [a, b] of [c1, c2]) this.col.addBox(Math.min(a[0], b[0]), a[1], Math.min(a[2], b[2]), Math.max(a[0], b[0]), b[1], Math.max(a[2], b[2]));
+  }
+
+  // Regenrinnen an beiden Traufen, Fallrohr an einer freien Hausecke ohne Tür
+  eaves(lot, alongX, M, P0, P1, Q0, Q1, e, g, yE, rnd) {
+    const zc = pick(rnd, PAL.zinc);
+    const det = { mat: 'metal', layer: 'det' };
+    const L = P1 - P0 + 2 * g;
+    for (const [qw, sq] of [[Q0, -1], [Q1, 1]]) {
+      const qg = qw + sq * (e + 0.02);
+      const gc = M((P0 + P1) / 2, 0, qg);
+      this.b.box(gc[0], yE - 0.27, gc[2], alongX ? L : 0.15, 0.13, alongX ? 0.15 : L, zc, det);
+      // Fallrohre nur an Wohnhäusern (Sonderbauten wie der Dom haben kein lot.level)
+      if (rnd() < 0.2 || lot.level == null) continue;
+      const side = alongX ? (sq < 0 ? 'n' : 's') : (sq < 0 ? 'w' : 'e');
+      const pA = rnd() < 0.5 ? P0 + 0.3 : P1 - 0.3;
+      const probe = M(pA, 0, qw + sq * 0.7);
+      if ((lot.doors || []).some((d) => d.side === side && Math.abs(d.a - pA) < 1.1)) continue;
+      if (!this.openAt(probe[0], probe[2], lot.level + 0.15, lot.id)) continue;
+      const qp = qw + sq * 0.2, y0 = lot.level + 0.12, y1 = yE - 0.42;
+      const pc = M(pA, 0, qp);
+      this.b.addPrim('cyl8', pc[0], (y0 + y1) / 2, pc[2], 0.055, y1 - y0, 0.055, zc, det);
+      // Bogen zur Rinne und kurzer Stutzen
+      const bc = M(pA, 0, (qp + qg) / 2), dq = Math.abs(qg - qp) + 0.1;
+      this.b.box(bc[0], y1 - 0.05, bc[2], alongX ? 0.1 : dq, 0.1, alongX ? dq : 0.1, zc, det);
+      const sc = M(pA, 0, qg);
+      this.b.box(sc[0], y1 - 0.05, sc[2], 0.1, yE - 0.22 - y1, 0.1, zc, det);
+      // Auslauf am Boden
+      const oc = M(pA, 0, qp + sq * 0.12);
+      this.b.box(oc[0], y0, oc[2], alongX ? 0.11 : 0.32, 0.09, alongX ? 0.32 : 0.11, zc, det);
+    }
   }
 
   hipRoof(lot, alongX, ye, pitch, color) {
@@ -778,16 +947,35 @@ export class HouseKit {
     }
   }
 
+  // Efeu: von einem Wurzelpunkt aus wachsende Ranken aus vielen kleinen Blattbüscheln
   ivy(w, y, h, rnd) {
-    const a0 = w.a0 + 0.3 + rnd() * (w.a1 - w.a0) * 0.5;
-    const width = 1 + rnd() * 2.5;
-    let yy = y;
-    const col = pick(rnd, PAL.ivy);
-    while (yy < y + h) {
-      const ww = width * (0.6 + rnd() * 0.5), hh = 0.6 + rnd() * 1.2;
-      const a = a0 + (rnd() - 0.5) * 0.8;
-      this.quad([wp(w, a, yy, -0.06), wp(w, Math.min(w.a1, a + ww), yy, -0.06), wp(w, Math.min(w.a1, a + ww * 0.8), yy + hh, -0.06), wp(w, a + ww * 0.15, yy + hh, -0.06)], OUTN[w.side], col, { shade: false, layer: 'det' });
-      yy += hh * 0.8;
+    const o = OUTN[w.side];
+    const span = w.a1 - w.a0;
+    const root = w.a0 + 0.4 + rnd() * Math.max(0.1, span - 0.8);
+    const det = { shade: false, layer: 'det' };
+    const greens = PAL.ivy;
+    const leaf = (a, yy, s, d) => {
+      if (a < w.a0 + 0.05 || a > w.a1 - 0.05) return;
+      const j = () => (rnd() - 0.5) * s * 0.5;
+      const c = mix(pick(rnd, greens), rnd() < 0.3 ? 0x6a7a3a : 0x22341c, rnd() * 0.25);
+      this.quad([wp(w, a - s / 2 + j(), yy + j(), -d), wp(w, a + j(), yy - s / 2 + j(), -d - 0.02), wp(w, a + s / 2 + j(), yy + j(), -d), wp(w, a + j(), yy + s / 2 + j(), -d + 0.01)], o, c, det);
+    };
+    // mehrere Triebe, die sich nach oben auffächern
+    const shoots = 3 + Math.floor(rnd() * 4);
+    for (let k = 0; k < shoots; k++) {
+      let a = root + (rnd() - 0.5) * 0.4, yy = y + 0.1;
+      const top = y + h * (0.45 + rnd() * 0.55);
+      const drift = (rnd() - 0.5) * 0.5;
+      // Stamm der Ranke
+      this.quad([wp(w, a - 0.025, yy, -0.04), wp(w, a + 0.025, yy, -0.04), wp(w, a + drift * (top - yy) * 0.3 + 0.02, top, -0.04), wp(w, a + drift * (top - yy) * 0.3 - 0.02, top, -0.04)], o, 0x3a2e22, det);
+      while (yy < top) {
+        const s = 0.32 + rnd() * 0.35;
+        const spread = 0.25 + (yy - y) / Math.max(1, h) * 0.9;
+        leaf(a + (rnd() - 0.5) * spread, yy, s, 0.05 + rnd() * 0.06);
+        if (rnd() < 0.6) leaf(a + (rnd() - 0.5) * spread * 1.6, yy + s * 0.3, s * 0.8, 0.06 + rnd() * 0.05);
+        a += drift * 0.3 * s + (rnd() - 0.5) * 0.12;
+        yy += s * 0.55;
+      }
     }
   }
 

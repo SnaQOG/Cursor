@@ -60,7 +60,7 @@ export class World {
     // Innenräume (Treppen, Möbel …) nur in der Nähe zeichnen
     this.interiorMeshes = this.staticMeshes.filter((m) => m.userData.layer === 'in');
     // Kleinkram (Rahmen, Läden, Efeu …) nur bis mittlere Entfernung
-    this.detailMeshes = this.staticMeshes.filter((m) => m.userData.layer === 'det');
+    this.detailMeshes = [...this.staticMeshes.filter((m) => m.userData.layer === 'det'), ...(this.vegDetail || [])];
     this.waterMats = [];
     this.waterNormal = makeWaterNormal();
     this.waterNormal.wrapS = this.waterNormal.wrapT = THREE.RepeatWrapping;
@@ -278,9 +278,11 @@ export class World {
     const m = new THREE.Matrix4();
     const c = new THREE.Color();
     // In Kacheln aufteilen, damit Frustum- und Schatten-Culling greifen
-    const CH = 110;
-    const inst = (name, all, place, { shadow = true, tint = null, doubleSide = false } = {}) => {
+    // Bodendecker (Gras, Blumen) in kleineren Kacheln, die ab mittlerer Entfernung ausgeblendet werden
+    this.vegDetail = [];
+    const inst = (name, all, place, { shadow = true, tint = null, doubleSide = false, cull = false } = {}) => {
       if (!all.length) return;
+      const CH = cull ? 40 : 110;
       const chunks = new Map();
       for (const it of all) {
         const key = `${Math.floor((it.x + 1000) / CH)}|${Math.floor((it.z + 1000) / CH)}`;
@@ -295,6 +297,7 @@ export class World {
       for (const list of chunks.values()) {
         for (const { geo, mat } of mats) {
           const im = new THREE.InstancedMesh(geo, mat, list.length);
+          im.name = name;
           im.castShadow = shadow;
           im.receiveShadow = true;
           list.forEach((it, i) => {
@@ -305,6 +308,13 @@ export class World {
           im.instanceMatrix.needsUpdate = true;
           if (im.instanceColor) im.instanceColor.needsUpdate = true;
           im.computeBoundingSphere();
+          if (cull) {
+            let cx = 0, cy = 0, cz = 0;
+            for (const it of list) { cx += it.x; cy += it.y; cz += it.z; }
+            im.userData.layer = 'det';
+            im.userData.center = new THREE.Vector3(cx / list.length, cy / list.length, cz / list.length);
+            this.vegDetail.push(im);
+          }
           this.scene.add(im);
         }
       }
@@ -325,7 +335,7 @@ export class World {
       });
     }
     for (const r of rocks) if (r.s > 1.1) this.col.addCyl(r.x, r.z, r.s * 0.95, r.y - 2, r.y + r.s * 0.8, { rock: true });
-    inst('v_grass', grass, (g) => { p.set(g.x, g.y - 0.05, g.z); q.setFromEuler(e.set(0, g.r, 0)); sc.setScalar(g.s); }, { shadow: false, doubleSide: true, tint: leafTint });
+    inst('v_grass', grass, (g) => { p.set(g.x, g.y - 0.05, g.z); q.setFromEuler(e.set(0, g.r, 0)); sc.setScalar(g.s); }, { shadow: false, doubleSide: true, tint: leafTint, cull: true });
     // weitere Modelle der Karte (z. B. Riesenbäume): { name, list, place(it, p, q, sc, e), opts }
     for (const ex of extra) inst(ex.name, ex.list, (it) => ex.place(it, p, q, sc, e), ex.opts || {});
   }

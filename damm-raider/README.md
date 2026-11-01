@@ -100,6 +100,14 @@ Kulisse hinter der Stadtmauer.
   Felsband vor den Gesichtern
 - **Jedes Haus ist begehbar:** Türen auf allen offenen Seiten, Treppenhaus über alle Geschosse,
   Zwischenwand mit Durchgang, Möbel, Beuteplätze; Fenster sind echte Öffnungen
+- **Fassaden im Detail:** Fachwerk mit vorkragender Schwelle und Balkenköpfen, Andreaskreuzen und
+  Riegeln; Putzhäuser mit Natursteinsockel, Eckquadern, Fensterfaschen und Verdachungen;
+  Türgewände mit Schlussstein und Trittstufe; Blumenkästen mit Geranien; Regenrinnen mit Fallrohren,
+  Ortgangbretter am Giebel; Schwarzwaldhäuser teils mit Holzschindel-Fassade; Efeu in Ranken
+- **Stuben:** Eckbank mit Herzausschnitten und Bauerntisch, Brettstühle, Teppiche, Bauernbett mit
+  bemaltem Kopfteil, grüner Kachelofen mit Ofenbank und Trockenstange, Kuckucksuhr
+- **Wiesen** in Höfen und Gärten: Gräser, Klee, Löwenzahn, Gänseblümchen; Gartenbeete mit Mohn,
+  Kornblumen, Margeriten und Ringelblumen
 - Vier Aufzüge, die Stadttore sind vorerst verschlossen
 
 Die Stadt entsteht bei jedem Laden gleich aus einem Generator (`src/maps/weltenbrueck/`):
@@ -132,8 +140,8 @@ Alle Modelle entstehen reproduzierbar per Python-Skript in Blender (`blender/`):
 | `m_weapons.py` | die neun Waffen, jeweils mit Mündungspunkt |
 | `m_items.py` | Beutebehälter und Modelle für alle 50 Inventar-Icons |
 | `m_arc.py` | die neun ARC-Maschinen mit Gelenken, Rotoren und Trefferzonen |
-| `m_world.py` | Container, Autos, Strommasten, Fensterrahmen, Türen, Portalkran, Turbinen, Radar, Königinnen-Wrack, Aufzug, Bäume, Felsen, Gras, der Raider |
-| `m_city.py` | Weltenbrück: die vier Gründergesichter (verwitterter Stein mit Moos), Fenster, Fensterläden, Türen, Gauben, Schornsteine, Ladenschilder, Markisen, Möbel (Tisch, Stuhl, Bett, Regal, Kachelofen), Truhe/Schrank/Kommode als Beutebehälter, Laternen, Bänke, Marktstände, Karren, Wassertanks, Marktbrunnen, Ziehbrunnen, Zunftbaum, Fialen, Erfinderturm-Spitze, Uhrtürmchen, Riesenbaum, Linde, Birke, Blumen, Unkraut |
+| `m_world.py` | Container, verlassene Autos (Limousine der 70er und Kastenwagen mit Rost, Chrom, runden Scheinwerfern, Plattfuß), Strommasten, Fensterrahmen, Türen, Portalkran, Turbinen, Radar, Königinnen-Wrack, Aufzug, Laubbaum, Fichte, Büsche, Felsen, Gras mit Ähren, der Raider |
+| `m_city.py` | Weltenbrück: die vier Gründergesichter (verwitterter Stein mit Moos), Fenster, Fensterläden, Türen, Gauben, Schornsteine, Ladenschilder, Markisen, Blumenkästen, Balkenköpfe, Möbel (Bauerntisch mit gedrechselten Beinen, Brettstuhl, Eckbank, Bauernbett, Regal, Kachelofen, Kuckucksuhr), Truhe/Schrank/Kommode als Beutebehälter, Laternen, Bänke, Marktstände, Karren, Wassertanks, Marktbrunnen, Ziehbrunnen, Zunftbaum, Fialen, Erfinderturm-Spitze, Uhrtürmchen, Riesenbaum, Linde, Birke, Gartenblumen, Wiesenbüschel, Unkraut |
 | `build.py` | baut alles, exportiert `assets/models.glb` und rendert `assets/icons.webp` mit Cycles |
 
 Neu bauen (die fertigen Dateien liegen im Repo, für das Spielen ist Blender nicht nötig):
@@ -155,9 +163,9 @@ Konventionen, die das Spiel auswertet:
   mit wenigen Materialien und Draw-Calls auskommt; leuchtende Teile behalten ihr Material.
 - Stadt-Modelle (`m_city.py`) zeigen mit der Vorderseite nach **-Y**, damit Fassadenteile mit derselben
   Drehung wie ihre Wand nach außen zeigen. Teile namens `__Paint` werden pro Instanz eingefärbt
-  (Fensterrahmen, Läden, Türen, Markisen, Schilder, Bettdecken).
+  (Fensterrahmen, Läden, Türen, Markisen, Schilder, Bettdecken, Geranien, Sitzkissen, Balkenköpfe).
 - Wiederholte Modelle (Fenster, Läden, Möbel, Laternen …) zeichnet das Spiel als Instanzen
-  (`src/instancer.js`); Fassadendetails nur bis etwa 100 m, Möbel nur in der Nähe.
+  (`src/instancer.js`); Fassadendetails, Gras und Blumen nur bis etwa 100 m, Möbel nur in der Nähe.
 
 Was nicht aus Blender kommt: Wände, Böden, Treppen und Dächer der Stadthäuser entstehen im Spiel aus
 dem Stadtplan, weil jedes Haus genau auf sein Grundstück passen und begehbar sein muss. Alles, was eine

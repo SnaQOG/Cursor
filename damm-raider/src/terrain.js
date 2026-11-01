@@ -58,6 +58,8 @@ export class Terrain {
     const uv = new Float32Array(N * N * 2);
     const c = new THREE.Color();
     const uvScale = this.def.uvScale ?? 6;
+    const set = detailTex && !detailTex.isTexture ? detailTex : null;
+    const gmix = set && this.def.grassMix ? new Float32Array(N * N) : null;
 
     for (let iz = 0; iz < N; iz++) {
       for (let ix = 0; ix < N; ix++) {
@@ -68,6 +70,7 @@ export class Terrain {
         uv[i * 2] = x / uvScale; uv[i * 2 + 1] = z / uvScale;
         this.def.groundColor(this, x, z, h, this.slope(x, z), c);
         col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
+        if (gmix) gmix[i] = this.def.grassMix(this, x, z, h);
       }
     }
 
@@ -84,16 +87,41 @@ export class Terrain {
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    if (gmix) geo.setAttribute('gmix', new THREE.BufferAttribute(gmix, 1));
     geo.setIndex(new THREE.BufferAttribute(idx, 1));
     geo.computeVertexNormals();
     geo.computeBoundingSphere();
 
     const mat = new THREE.MeshStandardMaterial({
       vertexColors: true,
-      map: detailTex,
+      map: set ? set.map : detailTex,
       roughness: 0.96,
       metalness: 0,
     });
+    if (set) {
+      mat.normalMap = set.normal;
+      mat.normalScale = new THREE.Vector2(0.9, 0.9);
+      if (gmix) {
+        // Pflaster und Gras pro Ecke überblenden
+        mat.onBeforeCompile = (sh) => {
+          sh.uniforms.grassMap = { value: set.grass };
+          sh.uniforms.grassNormal = { value: set.grassNormal };
+          sh.vertexShader = sh.vertexShader
+            .replace('#include <common>', '#include <common>\nattribute float gmix;\nvarying float vGmix;')
+            .replace('#include <uv_vertex>', '#include <uv_vertex>\nvGmix = gmix;');
+          sh.fragmentShader = sh.fragmentShader
+            .replace('#include <common>', '#include <common>\nuniform sampler2D grassMap;\nuniform sampler2D grassNormal;\nvarying float vGmix;')
+            .replace('#include <map_fragment>', `#ifdef USE_MAP
+  vec4 sampledDiffuseColor = mix(texture2D(map, vMapUv), texture2D(grassMap, vMapUv * 0.8), vGmix);
+  diffuseColor *= sampledDiffuseColor;
+#endif`)
+            .replace('#include <normal_fragment_maps>', THREE.ShaderChunk.normal_fragment_maps.replace(
+              'vec3 mapN = texture2D( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0;',
+              'vec3 mapN = mix(texture2D( normalMap, vNormalMapUv ).xyz, texture2D( grassNormal, vNormalMapUv * 0.8 ).xyz, vGmix) * 2.0 - 1.0;'));
+        };
+        mat.customProgramCacheKey = () => 'terrain-grass';
+      }
+    }
     const mesh = new THREE.Mesh(geo, mat);
     mesh.receiveShadow = true;
     mesh.name = 'terrain';

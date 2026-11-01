@@ -5,7 +5,9 @@ import {
   EXTRACTS, POIS, PLAYER_SPAWNS, levelAt, stairRamp, generateLayout, Occupancy,
 } from './layout.js';
 import { buildCity } from './build.js';
-import { makeCobbleTexture, makeBrickTexture, makePlankTexture, makeTileTexture, makeSlateTexture, makeAshlarTexture } from '../../textures.js';
+import {
+  makeCobbleSet, makeBrickSet, makePlankSet, makeTileSet, makeSlateSet, makeAshlarSet, makeShingleSet, makePlasterSet, makeTimberSet, makeGrassSet, makeClothSet,
+} from '../../textures.js';
 import { Noise2D, mulberry32, clamp, smoothstep, lerp } from '../../util.js';
 
 let LAYOUT = null;
@@ -104,17 +106,38 @@ const terrain = {
   },
 
   mapColor() { return [40, 44, 46]; },
+
+  // Anteil Gras-Textur am Boden (0 = Pflaster)
+  grassMix(T, x, z) {
+    if (z < CITY.CLIFF_Z - 16) return 1;
+    if (z < CITY.CLIFF_Z) return 0;
+    if (Math.abs(x) > 200 || z > 200) return z > CITY.SEA_Z - 20 ? 0 : 0.6;
+    const g = groundGrid().at(x, z);
+    return g === 2 || g === 3 ? 1 : 0;
+  },
 };
 
 function materials() {
-  const mk = (map, roughness = 0.88, metalness = 0.03) => new THREE.MeshStandardMaterial({ vertexColors: true, map, roughness, metalness });
+  const mk = (set, roughness = 0.88, metalness = 0.03, ns = 0.9) => new THREE.MeshStandardMaterial({
+    vertexColors: true, map: set.map, normalMap: set.normal, normalScale: new THREE.Vector2(ns, ns), roughness, metalness,
+  });
   return {
-    brick: mk(makeBrickTexture(), 0.9),
-    stone: mk(makeAshlarTexture(), 0.92),
-    wood: mk(makePlankTexture(), 0.82),
-    tile: mk(makeTileTexture(), 0.8),
-    slate: mk(makeSlateTexture(), 0.62, 0.06),
+    world: mk(makePlasterSet(), 0.93, 0, 0.7),
+    brick: mk(makeBrickSet(), 0.9),
+    stone: mk(makeAshlarSet(), 0.92),
+    wood: mk(makePlankSet(), 0.82),
+    timber: mk(makeTimberSet(), 0.8, 0, 0.8),
+    shingle: mk(makeShingleSet(), 0.85),
+    tile: mk(makeTileSet(), 0.8, 0.02, 1.0),
+    slate: mk(makeSlateSet(), 0.62, 0.06),
+    cloth: mk(makeClothSet(), 0.97, 0, 0.6),
   };
+}
+
+// Boden: Pflaster, in Höfen, Gärten und im Wald Gras
+function groundTexture() {
+  const c = makeCobbleSet(), g = makeGrassSet();
+  return { map: c.map, normal: c.normal, grass: g.map, grassNormal: g.normal };
 }
 
 // Meer, Brunnenwasser
@@ -156,7 +179,7 @@ function vegetation(world) {
   const n = new Noise2D(31);
   const col = world.col;
   const trees = [], bushes = [], rocks = [], grass = [];
-  const linden = [], birches = [], flowers = [], weeds = [];
+  const linden = [], birches = [], flowers = [], weeds = [], meadow = [];
   const free = (x, z, r, h = 1) => !col.query(x - r, z - r, x + r, z + r).some((s) => s.maxY > T.height(x, z) + 0.3 && s.minY < T.height(x, z) + h);
   // Höfe, Gärten, Plätze
   const areas = [...L.yards.filter((y) => !y.passage), ...L.squares];
@@ -211,6 +234,7 @@ function vegetation(world) {
     if (!free(x, z, 0.3, 0.6)) continue;
     const tuft = { x, z, y: T.height(x, z), s: (green ? 0.7 : 0.45) + rnd() * 0.6, r: rnd() * 6 };
     if (!green && rnd() < 0.5) weeds.push(tuft);
+    else if (green && rnd() < 0.24) meadow.push(tuft);
     else grass.push(tuft);
   }
   // Stämme von Linden und Birken
@@ -224,8 +248,9 @@ function vegetation(world) {
   const extra = [
     { name: 'v_linde', list: linden, place: upright, opts: { tint: leaf } },
     { name: 'v_birke', list: birches, place: upright, opts: { tint: leaf } },
-    { name: 'v_flowers', list: flowers, place: upright, opts: { shadow: false, doubleSide: true } },
-    { name: 'v_weed', list: weeds, place: upright, opts: { shadow: false, doubleSide: true, tint: leaf } },
+    { name: 'v_flowers', list: flowers, place: upright, opts: { shadow: false, doubleSide: true, cull: true } },
+    { name: 'v_meadow', list: meadow, place: upright, opts: { shadow: false, doubleSide: true, cull: true } },
+    { name: 'v_weed', list: weeds, place: upright, opts: { shadow: false, doubleSide: true, tint: leaf, cull: true } },
   ];
   return { trees, bushes, rocks, grass, extra };
 }
@@ -285,7 +310,7 @@ export const WELTENBRUECK = {
   menuCamera: { x: 0, z: 10, r: 150, h: 70, lookY: 14 },
   spotChance: 0.24,
   terrain,
-  groundTexture: makeCobbleTexture,
+  groundTexture,
   materials,
   decorate,
   updateDecor,

@@ -2,6 +2,9 @@
 # Ursprung = Bodenmitte, +Y = vorne, Z = oben. "key"-Flächen werden im Spiel umgefärbt.
 import math
 import random
+
+import bmesh
+
 from kit import Asset, lathe
 
 R = math.radians
@@ -36,46 +39,149 @@ def p_container(col):
     return a
 
 
-def _wheel(p, loc, r=0.36, w=0.24):
-    p.cyl(r, w, loc=loc, rot=(0, R(90), 0), mat='rubber', seg=14, bevel=0.03)
-    p.cyl(r * 0.55, w + 0.02, loc=loc, rot=(0, R(90), 0), mat='rust', seg=10)
+def _wheel(p, loc, r=0.36, w=0.24, flat=False):
+    x, y, z = loc
+    if flat:
+        z -= r * 0.18
+        p.box((w + 0.03, r * 1.5, r * 0.4), loc=(x, y, r * 0.2), mat='rubber', bevel=0.04)
+    p.cyl(r, w, loc=(x, y, z), rot=(0, R(90), 0), mat='rubber', seg=16, bevel=0.03)
+    s = 1 if x > 0 else -1
+    p.cyl(r * 0.62, 0.02, loc=(x + s * (w / 2 + 0.005), y, z), rot=(0, R(90), 0), mat='rust' if flat else 'galv', seg=12)
+    p.cyl(r * 0.22, 0.03, loc=(x + s * (w / 2 + 0.015), y, z), rot=(0, R(90), 0), mat='chrome', seg=8)
+
+
+def _arch(p, y, z, r, width):
+    """Dunkler Radkasten: Zylinder quer durch die Karosserie, der an den Seiten heraussieht."""
+    p.cyl(r, width, loc=(0, y, z), rot=(0, R(90), 0), mat='black', seg=16, smooth=False)
+
+
+def _slab(p, a, b, width, mat, out=0.012, thick=0.02):
+    """Scheibe zwischen zwei Profilpunkten (y, z) auf der Seitenansicht, quer über die Breite."""
+    dy, dz = b[0] - a[0], b[1] - a[1]
+    L = math.hypot(dy, dz)
+    ny, nz = -dz / L, dy / L
+    if nz < 0:
+        ny, nz = -ny, -nz
+    cy, cz = (a[0] + b[0]) / 2 + ny * out, (a[1] + b[1]) / 2 + nz * out
+    p.box((width, L, thick), loc=(0, cy, cz), rot=(math.atan2(dz, dy), 0, 0), mat=mat)
+
+
+def _rust(p, rnd, n, x, y0, y1, z0, z1, side=True):
+    for _ in range(n):
+        y, z = rnd.uniform(y0, y1), rnd.uniform(z0, z1)
+        w, h = rnd.uniform(0.12, 0.4), rnd.uniform(0.06, 0.2)
+        for s in ((-1, 1) if not side else (rnd.choice((-1, 1)),)):
+            p.box((0.012, w, h), loc=(s * x, y, z), rot=(rnd.uniform(-0.3, 0.3), 0, 0), mat=rnd.choice(['rust', 'rust_dark']))
 
 
 def p_car_a(col):
+    """Verlassene Limousine der 70er: Stufenheck, runde Scheinwerfer, Chromstoßstangen, Rost, ein Plattfuß."""
     a = Asset('p_car_a', col)
     p = a.part('M')
-    L, W = 4.3, 1.8
-    p.box((W, L, 0.62), loc=(0, 0, 0.62), mat='key', bevel=0.12)
-    p.box((W - 0.1, 1.2, 0.2), loc=(0, 1.35, 0.98), mat='key', bevel=0.08, taper=(0.98, 0.9))
-    p.box((W - 0.2, 2.0, 0.55), loc=(0, -0.25, 1.2), mat='key', bevel=0.1, taper=(0.9, 0.7))
-    p.box((W - 0.12, 1.95, 0.38), loc=(0, -0.25, 1.2), mat='visor', bevel=0.04, taper=(0.92, 0.72))
-    p.box((W + 0.04, 0.2, 0.22), loc=(0, L / 2, 0.45), mat='chrome', bevel=0.05)
-    p.box((W + 0.04, 0.2, 0.22), loc=(0, -L / 2, 0.45), mat='rust', bevel=0.05)
-    for sx in (-0.62, 0.62):
-        p.box((0.3, 0.05, 0.14), loc=(sx, L / 2 + 0.06, 0.68), mat='white', bevel=0.02)
-        p.box((0.3, 0.05, 0.12), loc=(sx, -L / 2 - 0.06, 0.7), mat='arc_red', bevel=0.02)
-    p.box((0.9, 0.7, 0.03), loc=(0.35, 0.9, 0.94), rot=(0, 0, R(8)), mat='rust')
-    for (x, y) in [(-0.85, 1.35), (0.85, 1.35), (-0.85, -1.3), (0.85, -1.3)]:
-        _wheel(p, (x, y, 0.36))
+    W = 1.76
+    body = [(-2.15, 0.3), (2.12, 0.3), (2.17, 0.5), (2.15, 0.78), (2.0, 0.86), (0.95, 0.93), (-1.2, 0.95), (-2.02, 0.93), (-2.16, 0.82), (-2.18, 0.5)]
+    p.prism(body, W, mat='key', plane='YZ', bevel=0.05)
+    cab = [(-1.2, 0.93), (0.93, 0.91), (0.32, 1.4), (-0.78, 1.41)]
+    p.prism(cab, W - 0.24, mat='key', plane='YZ', bevel=0.035)
+    _slab(p, (0.93, 0.92), (0.32, 1.4), W - 0.4, 'visor')
+    _slab(p, (-0.78, 1.41), (-1.2, 0.94), W - 0.42, 'visor')
+    win = [(-1.08, 0.99), (0.82, 0.98), (0.34, 1.35), (-0.72, 1.36)]
+    p.prism(win, W - 0.22, mat='visor', plane='YZ')
+    p.box((W - 0.2, 0.07, 0.42), loc=(0, -0.22, 1.16), mat='key')
+    p.box((0.02, 0.5, 0.33), loc=(-(W - 0.22) / 2 - 0.004, -0.62, 1.17), mat='black')  # eingeschlagene Scheibe
+    for (y, z) in ((1.33, 0.33), (-1.28, 0.33)):
+        _arch(p, y, z, 0.43, W + 0.012)
+    # Front: Kühlergrill, runde Scheinwerfer, Blinker, Stoßstange, Kennzeichen
+    p.box((1.1, 0.03, 0.26), loc=(0, 2.16, 0.62), mat='chrome', bevel=0.01)
+    p.box((1.02, 0.04, 0.2), loc=(0, 2.165, 0.62), mat='black')
+    for k in range(5):
+        p.box((1.0, 0.045, 0.012), loc=(0, 2.168, 0.54 + k * 0.04), mat='metal_dark')
+    for sx in (-1, 1):
+        p.cyl(0.085, 0.04, loc=(sx * 0.68, 2.155, 0.64), rot=(R(90), 0, 0), mat='white', seg=14)
+        p.torus(0.088, 0.012, loc=(sx * 0.68, 2.175, 0.64), rot=(R(90), 0, 0), mat='chrome', seg=14, rseg=4)
+        p.box((0.12, 0.03, 0.05), loc=(sx * 0.72, 2.2, 0.48), mat='orange')
+        p.box((0.3, 0.03, 0.12), loc=(sx * 0.6, -2.175, 0.72), mat='arc_red')
+        p.box((0.08, 0.03, 0.12), loc=(sx * 0.4, -2.18, 0.72), mat='orange')
+        p.box((0.04, 0.1, 0.07), loc=(sx * 0.9, 0.84, 1.0), mat='chrome')
+        p.box((0.04, 0.03, 0.03), loc=(sx * 0.88, 0.84, 0.95), mat='chrome')
+    p.box((W + 0.08, 0.13, 0.13), loc=(0, 2.21, 0.42), mat='chrome', bevel=0.04)
+    p.box((W + 0.08, 0.13, 0.13), loc=(0, -2.22, 0.42), mat='rust_dark', bevel=0.04)
+    p.box((0.5, 0.012, 0.11), loc=(0, 2.282, 0.42), mat='white')
+    p.box((0.5, 0.012, 0.11), loc=(0, -2.19, 0.6), mat='white')
+    # Fugen, Türgriffe, Zierleiste
+    for y in (0.93, -0.22, -1.17):
+        p.box((W + 0.01, 0.012, 0.56), loc=(0, y, 0.63), mat='black')
+    p.box((W + 0.012, 1.75, 0.02), loc=(0, -0.05, 0.7), mat='chrome')
+    for y in (0.5, -0.62):
+        p.box((W + 0.02, 0.12, 0.025), loc=(0, y, 0.84), mat='chrome')
+    p.box((W - 0.1, 0.012, 0.012), loc=(0, 1.0, 0.935), mat='black')  # Haubenfuge
+    # Rost, Laub auf dem Dach, Antenne, Plattfuß
+    rnd = random.Random(7)
+    _rust(p, rnd, 7, W / 2 + 0.002, -2.0, 2.0, 0.36, 0.78)
+    for (y, w) in ((1.45, 0.5), (-1.6, 0.4)):
+        p.box((0.6, w, 0.01), loc=(rnd.uniform(-0.3, 0.3), y, 0.93), rot=(0, 0, rnd.uniform(-0.4, 0.4)), mat='rust')
+    p.box((0.9, 0.7, 0.012), loc=(0.15, -0.25, 1.415), rot=(0, 0, R(12)), mat='moss')
+    for i in range(6):
+        p.ico(0.07, loc=(rnd.uniform(-0.6, 0.6), 0.97 + rnd.uniform(-0.04, 0.06), 0.95), mat=rnd.choice(['leaves2', 'rust', 'leaves']), sub=0, scale=(1.4, 1, 0.3), seed=i)
+    p.beam((0.75, 1.75, 0.86), (0.82, 1.6, 1.75), 0.006, mat='metal_dark', seg=4)
+    for (x, y, flat) in ((-0.8, 1.33, True), (0.8, 1.33, False), (-0.8, -1.28, False), (0.8, -1.28, False)):
+        _wheel(p, (x, y, 0.33), r=0.33, w=0.2, flat=flat)
     a.add(p)
     return a
 
 
 def p_car_b(col):
+    """Verlassener Kastenwagen: Dachträger mit Leiter, Schiebetür, Hecktüren, viel Rost."""
     a = Asset('p_car_b', col)
     p = a.part('M')
-    L, W = 4.9, 2.0
-    p.box((W, L - 1.0, 1.9), loc=(0, -0.5, 1.2), mat='key', bevel=0.12)
-    p.box((W, 1.2, 1.0), loc=(0, L / 2 - 0.6, 0.75), mat='key', bevel=0.12)
-    p.box((W - 0.1, 0.4, 0.7), loc=(0, L / 2 - 1.25, 1.55), rot=(R(-25), 0, 0), mat='visor', bevel=0.03)
-    for s in (-1, 1):
-        p.box((0.04, 0.6, 0.45), loc=(s * (W / 2 + 0.01), L / 2 - 1.3, 1.5), mat='visor')
-        p.box((0.05, 2.5, 0.1), loc=(s * (W / 2 + 0.01), -0.7, 0.9), mat='key_dark')
-    p.box((W + 0.04, 0.2, 0.25), loc=(0, L / 2, 0.45), mat='rust', bevel=0.05)
-    p.box((W - 0.4, 0.04, 1.4), loc=(0, -L / 2 - 0.02 + 0.5 - 0.5, 1.2), mat='key_dark')
-    p.box((1.4, 2.8, 0.1), loc=(0, -0.6, 2.2), mat='galv')
-    for (x, y) in [(-0.9, 1.6), (0.9, 1.6), (-0.9, -1.5), (0.9, -1.5)]:
-        _wheel(p, (x, y, 0.4), r=0.4, w=0.26)
+    W = 1.96
+    body = [(-2.45, 0.32), (2.4, 0.32), (2.47, 0.55), (2.45, 0.95), (2.3, 1.1), (1.85, 1.22), (1.45, 2.02), (1.25, 2.1), (-2.35, 2.12), (-2.45, 2.0)]
+    p.prism(body, W, mat='key', plane='YZ', bevel=0.06)
+    _slab(p, (1.86, 1.24), (1.45, 2.0), W - 0.2, 'visor')
+    p.prism([(0.62, 1.3), (1.74, 1.3), (1.42, 1.96), (0.62, 1.96)], W + 0.012, mat='visor', plane='YZ')
+    p.box((W + 0.02, 0.06, 0.66), loc=(0, 1.0, 1.63), mat='key')
+    p.box((W - 0.15, 0.03, 0.18), loc=(0, 2.44, 0.75), mat='key_dark')  # Zweifarbig: Front unten
+    for (y, z) in ((1.55, 0.38), (-1.5, 0.38)):
+        _arch(p, y, z, 0.48, W + 0.012)
+    # Front
+    for k in range(4):
+        p.box((1.1, 0.04, 0.025), loc=(0, 2.47, 0.62 + k * 0.06), mat='chrome' if k % 3 == 0 else 'black')
+    for sx in (-1, 1):
+        p.cyl(0.09, 0.04, loc=(sx * 0.72, 2.45, 0.78), rot=(R(90), 0, 0), mat='white', seg=14)
+        p.torus(0.092, 0.012, loc=(sx * 0.72, 2.47, 0.78), rot=(R(90), 0, 0), mat='chrome', seg=14, rseg=4)
+        p.box((0.12, 0.03, 0.06), loc=(sx * 0.75, 2.48, 0.6), mat='orange')
+        p.box((0.045, 0.14, 0.2), loc=(sx * 1.02, 1.62, 1.35), mat='black')
+        p.beam((sx * 0.98, 1.62, 1.3), (sx * 1.02, 1.62, 1.35), 0.012, mat='black', seg=4)
+        p.box((0.2, 0.03, 0.14), loc=(sx * 0.82, -2.455, 0.85), mat='arc_red')
+        p.box((0.36, 0.02, 0.38), loc=(sx * 0.45, -2.452, 1.62), mat='visor')
+    p.box((W + 0.08, 0.15, 0.16), loc=(0, 2.5, 0.44), mat='rust', bevel=0.04)
+    p.box((W + 0.08, 0.15, 0.16), loc=(0, -2.5, 0.44), mat='rust_dark', bevel=0.04)
+    p.box((0.5, 0.012, 0.11), loc=(0, 2.585, 0.44), mat='white')
+    # Fugen: Fahrertür, Schiebetür mit Schiene, Hecktüren
+    for y in (1.75, 0.6, 0.45, -0.85):
+        p.box((W + 0.012, 0.012, 1.5 if y < 1 else 0.95), loc=(0, y, 1.1 if y < 1 else 0.8), mat='black')
+    p.box((0.012, 0.02, 1.6), loc=(0, -2.455, 1.15), mat='black')
+    p.box((W + 0.02, 1.4, 0.03), loc=(0, -0.2, 1.92), mat='metal_dark')
+    for y in (0.55, 1.35):
+        p.box((W + 0.02, 0.14, 0.03), loc=(0, y, 1.15), mat='chrome')
+    p.box((0.2, 0.04, 0.03), loc=(0.15, -2.47, 1.15), mat='chrome')
+    # Dachträger mit Leiter und Plane
+    for sx in (-1, 1):
+        p.beam((sx * 0.85, -2.2, 2.32), (sx * 0.85, 1.1, 2.32), 0.025, mat='galv', seg=6)
+        for y in (-2.1, -0.6, 1.0):
+            p.beam((sx * 0.85, y, 2.12), (sx * 0.85, y, 2.32), 0.02, mat='galv', seg=4)
+    for y in (-2.1, -1.3, -0.5, 0.3, 1.0):
+        p.beam((-0.85, y, 2.32), (0.85, y, 2.32), 0.018, mat='galv', seg=4)
+    for sx in (0.55, 0.85):
+        p.beam((sx, -2.5, 0.6), (sx, -2.5, 2.32), 0.018, mat='galv', seg=4)
+    for k in range(6):
+        p.beam((0.55, -2.5, 0.75 + k * 0.28), (0.85, -2.5, 0.75 + k * 0.28), 0.012, mat='galv', seg=4)
+    p.box((1.1, 1.2, 0.3), loc=(-0.1, -0.9, 2.5), rot=(0, 0, R(5)), mat='canvas', bevel=0.08)
+    rnd = random.Random(11)
+    _rust(p, rnd, 12, W / 2 + 0.002, -2.3, 2.3, 0.38, 1.5)
+    p.box((1.2, 2.0, 0.012), loc=(0.2, 0.0, 2.125), rot=(0, 0, R(-6)), mat='moss')
+    for (x, y, flat) in ((-0.86, 1.55, False), (0.86, 1.55, False), (-0.86, -1.5, False), (0.86, -1.5, True)):
+        _wheel(p, (x, y, 0.38), r=0.38, w=0.24, flat=flat)
     a.add(p)
     return a
 
@@ -478,30 +584,52 @@ def l_elevator(col):
 
 
 # ================================================================ Vegetation
+def _ragged_cone(p, r, h, loc, mat, seg, seed, droop=0.18):
+    """Kegel mit zerzaustem, hängendem unteren Rand (Fichtenäste)."""
+    tb = bmesh.new()
+    bmesh.ops.create_cone(tb, cap_ends=True, cap_tris=False, segments=seg, radius1=r, radius2=0.04, depth=h)
+    # obere Kappe weglassen (unsichtbar, spart Dreiecke)
+    bmesh.ops.delete(tb, geom=[f for f in tb.faces if len(f.verts) == seg and all(v.co.z > 0 for v in f.verts)], context='FACES_ONLY')
+    rnd = random.Random(seed)
+    for v in tb.verts:
+        if v.co.z < 0:
+            k = rnd.uniform(0.8, 1.2)
+            v.co.x *= k
+            v.co.y *= k
+            v.co.z -= rnd.uniform(0, droop) * h
+    p._merge(tb, loc, (0, 0, rnd.uniform(0, 1)), (1, 1, 1), mat, 0, False)
+
+
 def v_pine(col):
+    """Fichte: schlanker Stamm, sechs zerzauste Astetagen, Spitze."""
     a = Asset('v_pine', col)
     p = a.part('M')
-    p.cyl(0.22, 3.0, loc=(0, 0, 1.5), r2=0.1, mat='bark', seg=7)
-    rnd = random.Random(5)
-    for k in range(4):
-        z = 1.6 + k * 1.3
-        r = 2.1 - k * 0.45
-        p.cyl(r, 1.9, loc=(rnd.uniform(-0.08, 0.08), rnd.uniform(-0.08, 0.08), z + 0.9), r2=0.05, mat='needles' if k % 2 else 'needles2', seg=8, smooth=False)
+    lathe(p, [(0.3, 0.0), (0.22, 0.25), (0.19, 1.0), (0.12, 4.0), (0.05, 7.6)], mat='bark', seg=7, smooth=True)
+    for k in range(6):
+        z = 1.7 + k * 0.95
+        r = 2.2 - k * 0.3
+        _ragged_cone(p, r, 1.7, (0, 0, z + 0.8), 'needles' if k % 2 else 'needles2', seg=9, seed=40 + k)
+    p.cyl(0.35, 1.2, loc=(0, 0, 8.0), r2=0.02, mat='needles2', seg=7, smooth=False)
     a.add(p)
     return a
 
 
 def v_tree(col):
+    """Laubbaum (Ahorn/Buche): Wurzelanlauf, Hauptäste, lockere Krone aus vielen Blattballen."""
     a = Asset('v_tree', col)
     p = a.part('M')
     rnd = random.Random(17)
-    p.cyl(0.25, 3.2, loc=(0, 0, 1.6), r2=0.14, mat='bark', seg=7)
-    for (x, y, z) in [(0.9, 0.3, 3.4), (-0.8, 0.5, 3.1), (0.1, -0.9, 3.6), (-0.4, -0.5, 4.0)]:
-        p.beam((0, 0, 2.4), (x, y, z), 0.09, mat='bark', seg=5)
-    blobs = [((0, 0, 4.4), 1.6), ((1.1, 0.4, 3.9), 1.15), ((-1.0, 0.6, 3.7), 1.2), ((0.2, -1.0, 4.0), 1.15),
-             ((-0.6, -0.6, 4.6), 1.0), ((0.7, -0.3, 4.9), 1.0), ((0.1, 0.2, 5.4), 1.05), ((-0.3, 0.9, 4.8), 0.95)]
+    lathe(p, [(0.42, 0.0), (0.3, 0.22), (0.25, 0.7), (0.22, 1.9), (0.17, 2.8), (0.1, 3.6)], mat='bark', seg=8, smooth=True)
+    limbs = [(1.3, 0.5, 3.6), (-1.2, 0.7, 3.4), (0.2, -1.3, 3.8), (-0.6, -0.8, 4.3), (0.6, 0.9, 4.5)]
+    for (x, y, z) in limbs:
+        p.beam((0, 0, 2.3), (x, y, z), 0.1, mat='bark', seg=5)
+        p.beam((x, y, z), (x * 1.35, y * 1.35, z + 0.5), 0.05, mat='bark', seg=4)
+    blobs = [((0, 0, 4.6), 1.5), ((1.3, 0.5, 4.0), 1.1), ((-1.2, 0.7, 3.8), 1.15), ((0.2, -1.3, 4.1), 1.1),
+             ((-0.7, -0.8, 4.8), 1.0), ((0.8, -0.4, 5.1), 1.0), ((0.1, 0.3, 5.6), 1.0), ((-0.4, 1.0, 4.9), 0.95),
+             ((1.7, -0.3, 3.6), 0.75), ((-1.6, -0.2, 3.9), 0.8), ((0.5, 1.5, 3.9), 0.8), ((-0.3, -1.6, 3.7), 0.75),
+             ((0.9, 0.9, 5.3), 0.75), ((-0.9, 0.2, 5.5), 0.7)]
     for i, (c, r) in enumerate(blobs):
-        p.ico(r, loc=c, mat=rnd.choice(['leaves', 'leaves2', 'leaves']), sub=1, jitter=0.35, seed=i + 3)
+        p.ico(r, loc=c, mat=rnd.choice(['leaves', 'leaves2', 'leaves', 'needles2']), sub=1, jitter=0.4, seed=i + 3, scale=(1, 1, 0.85))
     a.add(p)
     return a
 
@@ -509,8 +637,12 @@ def v_tree(col):
 def v_bush(col):
     a = Asset('v_bush', col)
     p = a.part('M')
-    for i, (c, r) in enumerate([((0, 0, 0.35), 0.75), ((0.55, 0.2, 0.25), 0.55), ((-0.5, -0.2, 0.25), 0.5)]):
-        p.ico(r, loc=c, mat='leaves' if i != 1 else 'leaves2', sub=1, jitter=0.3, seed=i + 20, scale=(1, 1, 0.75))
+    rnd = random.Random(23)
+    for i, (c, r) in enumerate([((0, 0, 0.38), 0.72), ((0.55, 0.2, 0.28), 0.52), ((-0.5, -0.2, 0.26), 0.5), ((0.1, -0.5, 0.3), 0.45), ((-0.2, 0.5, 0.5), 0.42)]):
+        p.ico(r, loc=c, mat=rnd.choice(['leaves', 'leaves2', 'needles2']), sub=1, jitter=0.35, seed=i + 20, scale=(1, 1, 0.75))
+    for i in range(5):
+        ang = rnd.uniform(0, 2 * math.pi)
+        p.ico(0.04, loc=(math.cos(ang) * 0.62, math.sin(ang) * 0.62, rnd.uniform(0.3, 0.7)), mat='red', sub=0)
     a.add(p)
     return a
 
@@ -534,13 +666,20 @@ def v_grass(col):
     a = Asset('v_grass', col)
     p = a.part('M')
     rnd = random.Random(9)
-    for k in range(8):
+    for k in range(13):
         ang = rnd.uniform(0, 2 * math.pi)
-        h = rnd.uniform(0.35, 0.75)
-        x, y = math.cos(ang) * 0.1, math.sin(ang) * 0.1
-        tx, ty = -math.sin(ang) * 0.045, math.cos(ang) * 0.045
-        lean = rnd.uniform(0.05, 0.2)
-        p.face([(x - tx, y - ty, 0), (x + tx, y + ty, 0), (x + math.cos(ang) * lean, y + math.sin(ang) * lean, h)], mat='grass' if k % 3 else 'leaves2')
+        h = rnd.uniform(0.3, 0.8)
+        d = rnd.uniform(0.0, 0.14)
+        x, y = math.cos(ang) * d, math.sin(ang) * d
+        tx, ty = -math.sin(ang) * 0.04, math.cos(ang) * 0.04
+        lean = rnd.uniform(0.05, 0.25)
+        p.face([(x - tx, y - ty, 0), (x + tx, y + ty, 0), (x + math.cos(ang) * lean, y + math.sin(ang) * lean, h)], mat=rnd.choice(['grass', 'leaves2', 'grass', 'straw']))
+    # zwei Halme mit Ähren
+    for k in range(2):
+        ang = rnd.uniform(0, 2 * math.pi)
+        tip = (math.cos(ang) * 0.15, math.sin(ang) * 0.15, rnd.uniform(0.75, 0.95))
+        p.face([(-0.006, 0, 0), (0.006, 0, 0), (tip[0] + 0.004, tip[1], tip[2]), (tip[0] - 0.004, tip[1], tip[2])], mat='straw')
+        p.face([(tip[0] - 0.02, tip[1], tip[2]), (tip[0] + 0.02, tip[1], tip[2]), (tip[0] + 0.005, tip[1], tip[2] + 0.12), (tip[0] - 0.005, tip[1], tip[2] + 0.12)], mat='straw')
     a.add(p)
     return a
 

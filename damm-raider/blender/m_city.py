@@ -42,6 +42,15 @@ kit.PALETTE.update({
     'veg_orange': ('#d9782c', 'matte', 0.7, 0, 0),
     'veg_green': ('#5a8a3a', 'matte', 0.7, 0, 0),
     'core': ('#9ff8ff', 'emit', 0.2, 0, 3.0),
+    'ceramic_green2': ('#4d7d58', 'matte', 0.25, 0, 0),
+    'soil': ('#3a2c20', 'matte', 0.95, 0, 0),
+    'poppy': ('#c8261e', 'matte', 0.75, 0, 0),
+    'cornflower': ('#3f5fd0', 'matte', 0.75, 0, 0),
+    'dandelion': ('#e8c020', 'matte', 0.75, 0, 0),
+    'seed_white': ('#e9e6dc', 'matte', 0.9, 0, 0),
+    'leaf_meadow': ('#5f7f34', 'matte', 0.8, 0, 0),
+    'clover_leaf': ('#4f7a30', 'matte', 0.8, 0, 0),
+    'clover_pink': ('#dcb4c4', 'matte', 0.8, 0, 0),
 })
 
 
@@ -309,48 +318,126 @@ def kc_awning(col):
     return a
 
 
-# ================================================================ Möbel und Behälter
+# Blumenkasten mit Geranien: 1 m lang (wird auf die Fensterbreite skaliert), Wand bei y = 0, ragt nach -Y
+def kc_flowerbox(col):
+    a = Asset('kc_flowerbox', col)
+    p = a.part('M')
+    p.box((1.0, 0.2, 0.17), loc=(0, -0.16, -0.1), mat='wood_dark')
+    p.box((0.98, 0.18, 0.02), loc=(0, -0.16, -0.02), mat='soil')
+    for x in (-0.38, 0.38):
+        p.beam((x, -0.01, -0.3), (x, -0.25, -0.19), 0.012, mat='iron', seg=4)
+    rnd = random.Random(71)
+    for i in range(5):
+        x = -0.4 + i * 0.2 + rnd.uniform(-0.03, 0.03)
+        p.ico(0.1, loc=(x, -0.17 + rnd.uniform(-0.03, 0.03), 0.04), mat=rnd.choice(['leaves3', 'leaves']), sub=0, jitter=0.4, seed=700 + i, scale=(1.2, 1.0, 0.7))
+    for x in (-0.3, 0.25):
+        p.ico(0.06, loc=(x, -0.26, -0.12), mat='leaves3', sub=0, jitter=0.4, seed=710, scale=(1.0, 0.6, 1.6))
+    a.add(p)
+    q = a.part('Paint')
+    for i in range(6):
+        x = -0.42 + i * 0.17 + rnd.uniform(-0.03, 0.03)
+        q.ico(0.055, loc=(x, -0.17 + rnd.uniform(-0.05, 0.04), 0.12 + rnd.uniform(0, 0.06)), mat='paint', sub=0, jitter=0.3, seed=720 + i)
+    a.add(q)
+    return a
+
+
+# Balkenkopf unter der Schwelle (Fachwerk): Wand bei y = 0, Unterkante z = 0, Karniesprofil
+def kc_beamhead(col):
+    a = Asset('kc_beamhead', col)
+    p = a.part('Paint')
+    prof = [(0.0, 0.0), (0.0, 0.2), (-0.15, 0.2), (-0.15, 0.13), (-0.125, 0.075), (-0.08, 0.035), (-0.035, 0.0)]
+    p.prism(prof, 0.14, mat='paint', plane='YZ')
+    a.add(p)
+    return a
+
+
+# Bauerntisch: gedrechselte Beine, Hirnleisten, Zarge mit Schublade, H-Steg
 def kc_table(col):
     a = Asset('kc_table', col)
     p = a.part('M')
-    p.box((1.4, 0.8, 0.06), loc=(0, 0, 0.73), mat='wood_light', bevel=0.01)
+    p.box((1.32, 0.8, 0.05), loc=(0, 0, 0.745), mat='wood_light', bevel=0.012)
+    for sx in (-1, 1):
+        p.box((0.06, 0.82, 0.055), loc=(sx * 0.69, 0, 0.745), mat='wood', bevel=0.01)
+    p.box((1.18, 0.62, 0.13), loc=(0, 0, 0.655), mat='wood')
+    p.box((0.42, 0.016, 0.085), loc=(0.22, -0.315, 0.655), mat='wood_light')
+    p.sphere(0.018, loc=(0.22, -0.33, 0.655), mat='bronze', seg=6, rings=4)
+    leg = [(0.032, 0.0), (0.036, 0.05), (0.046, 0.075), (0.03, 0.11), (0.026, 0.3), (0.044, 0.35), (0.028, 0.4), (0.03, 0.55), (0.04, 0.59)]
     for sx in (-1, 1):
         for sy in (-1, 1):
-            p.box((0.07, 0.07, 0.7), loc=(sx * 0.6, sy * 0.32, 0.35), mat='wood')
-        p.box((0.06, 0.6, 0.06), loc=(sx * 0.6, 0, 0.18), mat='wood')
-    p.box((1.2, 0.05, 0.05), loc=(0, 0, 0.18), mat='wood')
-    # etwas Geschirr
-    p.cyl(0.08, 0.12, loc=(0.3, 0.1, 0.82), mat='ceramic_white', seg=10)
-    p.cyl(0.13, 0.03, loc=(-0.25, -0.1, 0.775), mat='ceramic_white', seg=12)
+            kit.lathe(p, leg, loc=(sx * 0.56, sy * 0.27, 0), mat='wood', seg=6)
+            p.box((0.075, 0.075, 0.12), loc=(sx * 0.56, sy * 0.27, 0.65), mat='wood')
+        p.box((0.05, 0.5, 0.05), loc=(sx * 0.56, 0, 0.13), mat='wood')
+    p.box((1.08, 0.055, 0.05), loc=(0, 0, 0.13), mat='wood')
+    # Tischläufer, Krug, Becher, Teller, Brotlaib
+    p.box((0.32, 0.84, 0.004), loc=(-0.12, 0, 0.772), mat='linen')
+    kit.lathe(p, [(0.0, 0.0), (0.055, 0.0), (0.066, 0.05), (0.06, 0.12), (0.038, 0.165), (0.044, 0.19), (0.0, 0.19)], loc=(0.36, 0.12, 0.77), mat='ceramic_blue', seg=10)
+    p.torus(0.035, 0.008, loc=(0.42, 0.12, 0.88), rot=(R(90), 0, 0), mat='ceramic_blue', seg=8, rseg=3)
+    p.cyl(0.035, 0.09, loc=(0.18, -0.2, 0.815), mat='ceramic_white', seg=8)
+    p.cyl(0.13, 0.02, loc=(-0.15, 0.05, 0.784), mat='ceramic_white', seg=12)
+    p.sphere(0.1, loc=(-0.45, -0.12, 0.8), mat='gun_wood', seg=8, rings=5, scale=(1.4, 0.95, 0.55))
     a.add(p)
     return a
+
+
+# Brettstuhl: Sitzbrett mit Gratleisten, gespreizte Beine, geschwungene Lehne mit Herz
+def _heart(cx, cz, s, n=14):
+    pts = []
+    for k in range(n):
+        t = 2 * math.pi * k / n
+        x = 16 * math.sin(t) ** 3
+        z = 13 * math.cos(t) - 5 * math.cos(2 * t) - 2 * math.cos(3 * t) - math.cos(4 * t)
+        pts.append((cx + x * s, cz + z * s))
+    return pts
 
 
 def kc_chair(col):
     a = Asset('kc_chair', col)
     p = a.part('M')
-    p.box((0.44, 0.42, 0.05), loc=(0, 0, 0.46), mat='wood_light')
+    p.box((0.42, 0.4, 0.045), loc=(0, 0, 0.46), mat='wood_light', bevel=0.008)
+    for sy in (-1, 1):
+        p.box((0.4, 0.05, 0.035), loc=(0, sy * 0.12, 0.42), mat='wood')
     for sx in (-1, 1):
         for sy in (-1, 1):
-            p.box((0.04, 0.04, 0.45), loc=(sx * 0.18, sy * 0.17, 0.225), mat='wood')
-    p.box((0.44, 0.04, 0.5), loc=(0, 0.19, 0.74), mat='wood')
-    for x in (-0.12, 0, 0.12):
-        p.box((0.06, 0.045, 0.34), loc=(x, 0.19, 0.74), mat='wood_dark')
+            p.beam((sx * 0.13, sy * 0.12, 0.43), (sx * 0.19, sy * 0.18, 0.0), 0.021, mat='wood', seg=6)
+    back = [(-0.15, 0.0), (0.15, 0.0), (0.13, 0.12), (0.17, 0.26), (0.21, 0.38), (0.17, 0.45), (0.08, 0.43), (0.0, 0.48), (-0.08, 0.43), (-0.17, 0.45), (-0.21, 0.38), (-0.17, 0.26), (-0.13, 0.12)]
+    rot = (R(-10), 0, 0)
+    p.prism(back, 0.032, loc=(0, 0.18, 0.47), rot=rot, mat='wood', plane='XZ')
+    p.prism(_heart(0, 0.29, 0.0042), 0.036, loc=(0, 0.18, 0.47), rot=rot, mat='black', plane='XZ')
     a.add(p)
     return a
 
 
+# Bauernbett: Kopfteil mit Bogen und bemalter Füllung, gedrechselte Pfosten
 def kc_bed(col):
     a = Asset('kc_bed', col)
     p = a.part('M')
-    p.box((1.0, 2.0, 0.3), loc=(0, 0, 0.25), mat='wood')
-    p.box((1.0, 0.07, 1.0), loc=(0, 0.98, 0.5), mat='wood_dark', bevel=0.01)
-    p.box((1.0, 0.07, 0.6), loc=(0, -0.98, 0.3), mat='wood_dark', bevel=0.01)
-    p.box((0.92, 1.9, 0.16), loc=(0, 0, 0.47), mat='linen', bevel=0.04)
-    p.box((0.7, 0.35, 0.12), loc=(0, 0.72, 0.6), mat='cloth', bevel=0.05)
+    p.box((1.0, 1.96, 0.26), loc=(0, 0, 0.3), mat='wood', bevel=0.01)
+    head = [(-0.5, 0.0), (0.5, 0.0), (0.5, 0.95), (0.36, 1.06), (0.0, 1.12), (-0.36, 1.06), (-0.5, 0.95)]
+    foot = [(-0.5, 0.0), (0.5, 0.0), (0.5, 0.6), (0.3, 0.66), (0.0, 0.7), (-0.3, 0.66), (-0.5, 0.6)]
+    p.prism(head, 0.06, loc=(0, 0.99, 0), mat='wood_dark', plane='XZ')
+    p.prism(foot, 0.06, loc=(0, -0.99, 0), mat='wood_dark', plane='XZ')
+    p.box((0.66, 0.066, 0.4), loc=(0, 0.99, 0.72), mat='teal')
+    p.box((0.5, 0.066, 0.22), loc=(0, -0.99, 0.45), mat='teal')
+    # gemalte Blumen auf den Füllungen
+    rnd = random.Random(91)
+    for (y, zc, n, w) in ((0.955, 0.72, 5, 0.26), (-1.025, 0.45, 3, 0.18)):
+        for i in range(n):
+            x = -w + 2 * w * i / max(1, n - 1)
+            z = zc + rnd.uniform(-0.06, 0.06)
+            p.box((0.05, 0.004, 0.05), loc=(x, y, z), rot=(0, R(45), 0), mat=rnd.choice(['bloom_red', 'bloom_white', 'bloom_yellow']))
+            p.box((0.07, 0.004, 0.02), loc=(x + 0.03, y, z - 0.05), rot=(0, R(-30), 0), mat='leaves3')
+    post = [(0.04, 0.0), (0.04, 0.3), (0.05, 0.34), (0.033, 0.4), (0.033, 0.7), (0.048, 0.74), (0.03, 0.78)]
+    for sx in (-1, 1):
+        for (y, h) in ((0.99, 1.15), (-0.99, 0.78)):
+            prof = [(r, z * h / 0.78) for (r, z) in post]
+            kit.lathe(p, prof, loc=(sx * 0.5, y, 0), mat='wood', seg=6)
+            p.sphere(0.05, loc=(sx * 0.5, y, h + 0.03), mat='wood_dark', seg=8, rings=5)
+    p.box((0.92, 1.88, 0.16), loc=(0, 0, 0.5), mat='linen', bevel=0.04)
+    p.sphere(0.3, loc=(0, 0.72, 0.64), mat='cloth', seg=10, rings=6, scale=(1.25, 0.6, 0.32))
     a.add(p)
     q = a.part('Paint')
-    q.box((0.96, 1.2, 0.06), loc=(0, -0.3, 0.58), rot=(R(2), 0, 0), mat='paint', bevel=0.02)
+    q.box((0.98, 1.25, 0.07), loc=(0, -0.28, 0.6), rot=(R(1.5), 0, 0), mat='paint', bevel=0.025)
+    q.box((0.98, 0.18, 0.09), loc=(0, 0.36, 0.62), mat='paint', bevel=0.04)
     a.add(q)
     return a
 
@@ -376,17 +463,107 @@ def kc_shelf(col):
     return a
 
 
+# Kachelofen: Sockel, Korpus aus einzelnen Kacheln, Aufsatz, Ofenbank, Trockenstange
 def kc_stove(col):
     a = Asset('kc_stove', col)
     p = a.part('M')
-    p.box((1.0, 0.8, 1.5), loc=(0, 0, 0.75), mat='ceramic_green', bevel=0.03)
-    for z in (0.4, 0.8, 1.2):
-        p.box((1.03, 0.83, 0.04), loc=(0, 0, z), mat='ceramic_white')
-    p.box((1.1, 0.9, 0.12), loc=(0, 0, 1.56), mat='ceramic_white', bevel=0.02)
-    p.box((0.6, 0.5, 0.35), loc=(0, 0, 1.79), mat='ceramic_green', bevel=0.03)
-    p.box((0.3, 0.05, 0.25), loc=(0, -0.41, 0.35), mat='iron')
-    p.box((1.6, 0.4, 0.06), loc=(0.2, -0.6, 0.45), mat='wood')
+    W, D = 1.0, 0.8
+    p.box((W + 0.06, D + 0.06, 0.14), loc=(0, 0, 0.07), mat='stone_light', bevel=0.01)
+    p.box((W, D, 1.26), loc=(0, 0, 0.14 + 0.63), mat='ceramic_white')
+    tiles = ['ceramic_green', 'ceramic_green2']
+    th, tz0 = 0.2, 0.17
+    for j in range(6):
+        z = tz0 + th / 2 + j * (th + 0.01)
+        for i in range(4):
+            x = -W / 2 + 0.125 + i * 0.25
+            p.box((0.23, 0.02, th), loc=(x, -D / 2 - 0.008, z), mat=tiles[(i + j) % 2])
+        for sx in (-1, 1):
+            for i in range(3):
+                y = -D / 2 + 0.135 + i * 0.265
+                p.box((0.02, 0.245, th), loc=(sx * (W / 2 + 0.008), y, z), mat=tiles[(i + j + 1) % 2])
+    p.box((W + 0.1, D + 0.1, 0.1), loc=(0, 0, 1.45), mat='ceramic_white', bevel=0.02)
+    p.box((0.66, 0.54, 0.34), loc=(0, 0.05, 1.67), mat='ceramic_green', bevel=0.02)
+    for i in range(3):
+        p.box((0.2, 0.015, 0.26), loc=(-0.21 + i * 0.21, -0.23, 1.67), mat=tiles[i % 2])
+    p.box((0.74, 0.62, 0.06), loc=(0, 0.05, 1.86), mat='ceramic_white', bevel=0.015)
+    # Feuertür
+    p.box((0.3, 0.03, 0.24), loc=(0, -D / 2 - 0.02, 0.36), mat='iron')
+    p.box((0.12, 0.05, 0.02), loc=(0.08, -D / 2 - 0.045, 0.4), mat='iron')
+    # Ofenbank
+    p.box((1.6, 0.4, 0.05), loc=(0.2, -0.62, 0.45), mat='wood', bevel=0.008)
+    for x in (-0.5, 0.9):
+        p.box((0.05, 0.36, 0.43), loc=(x, -0.62, 0.215), mat='wood')
+    # Trockenstange mit Tuch
+    for sx in (-1, 1):
+        p.beam((sx * 0.48, 0.0, 1.5), (sx * 0.48, -0.62, 1.98), 0.012, mat='iron', seg=4)
+    p.beam((-0.55, -0.62, 1.98), (0.55, -0.62, 1.98), 0.016, mat='wood', seg=6)
+    p.box((0.32, 0.012, 0.42), loc=(-0.18, -0.62, 1.77), mat='linen')
     a.add(p)
+    return a
+
+
+# Kuckucksuhr: Rückwand an der Wand (y = 0), Gehäuseunterkante z = 0, Gewichte hängen nach unten
+def kc_cuckoo(col):
+    a = Asset('kc_cuckoo', col)
+    p = a.part('M')
+    W, D, H = 0.3, 0.13, 0.34
+    p.box((W + 0.04, 0.012, H + 0.05), loc=(0, -0.006, H / 2), mat='wood_dark')
+    p.prism([(-W / 2, 0.0), (W / 2, 0.0), (W / 2, H), (0.0, H + 0.12), (-W / 2, H)], D, loc=(0, -0.012 - D / 2, 0), mat='wood', plane='XZ')
+    ang = math.atan2(0.12, W / 2)
+    for s in (-1, 1):
+        p.box((0.25, D + 0.06, 0.014), loc=(s * 0.08, -0.012 - D / 2 - 0.01, H + 0.065), rot=(0, s * ang, 0), mat='wood_dark')
+    # Schnitzwerk: Blätter, Vogel auf dem First, Hirschkopf-Andeutung unten
+    rnd = random.Random(81)
+    for i in range(5):
+        x = -0.13 + i * 0.065
+        p.ico(0.035, loc=(x, -D - 0.025, H + 0.03 + (0.06 - abs(x) * 0.4)), mat='wood_dark', sub=0, jitter=0.5, seed=800 + i, scale=(1.3, 0.5, 0.9))
+    p.sphere(0.028, loc=(0, -0.08, H + 0.15), mat='wood_dark', seg=6, rings=4, scale=(1.4, 1, 1))
+    p.cyl(0.012, 0.05, loc=(0.045, -0.08, H + 0.15), rot=(0, R(90), 0), mat='wood_dark', seg=4, r2=0.0)
+    for i in range(4):
+        x = -0.12 + i * 0.08
+        p.ico(0.03, loc=(x, -D - 0.02, 0.01), mat='wood_dark', sub=0, jitter=0.5, seed=820 + i, scale=(1.2, 0.5, 0.8))
+    # Zifferblatt, Zeiger, Kuckuckstürchen
+    p.cyl(0.075, 0.01, loc=(0, -0.012 - D - 0.005, H * 0.45), rot=(R(90), 0, 0), mat='ceramic_white', seg=16)
+    p.torus(0.07, 0.006, loc=(0, -0.012 - D - 0.011, H * 0.45), rot=(R(90), 0, 0), mat='wood_dark', seg=16, rseg=3)
+    p.box((0.008, 0.004, 0.06), loc=(0, -0.012 - D - 0.013, H * 0.45 + 0.025), mat='black')
+    p.box((0.045, 0.004, 0.008), loc=(0.02, -0.012 - D - 0.014, H * 0.45), rot=(0, R(-20), 0), mat='black')
+    p.box((0.07, 0.008, 0.07), loc=(0, -0.012 - D - 0.004, H * 0.86), mat='wood_dark')
+    # Pendel und Tannenzapfen-Gewichte an Ketten
+    p.beam((0, -0.03, 0.0), (0, -0.03, -0.42), 0.004, mat='bronze', seg=4)
+    p.cyl(0.045, 0.01, loc=(0, -0.03, -0.44), rot=(R(90), 0, 0), mat='wood', seg=10)
+    for x in (-0.07, 0.07):
+        z = -0.55 if x < 0 else -0.68
+        p.beam((x, -0.06, 0.0), (x, -0.06, z), 0.003, mat='iron', seg=3)
+        p.ico(0.03, loc=(x, -0.06, z - 0.07), mat='bronze', sub=1, jitter=0.25, seed=840, scale=(1, 1, 2.6))
+    a.add(p)
+    return a
+
+
+# Eckbank: Ecke im Ursprung, Arme entlang +X und -Y (im Spiel +X und +Z), Wände bei y = 0 und x = 0.
+# Sitzkissen sind "__Paint" und werden pro Haus eingefärbt.
+def kc_eckbank(col):
+    a = Asset('kc_eckbank', col)
+    p = a.part('M')
+    Lb, D, H = 1.85, 0.48, 0.45
+    p.box((Lb, D, 0.05), loc=(Lb / 2, -D / 2, H - 0.025), mat='wood_light', bevel=0.008)
+    p.box((D, Lb - D, 0.05), loc=(D / 2, -(D + Lb) / 2, H - 0.025), mat='wood_light', bevel=0.008)
+    p.box((Lb - D + 0.04, 0.03, H - 0.05), loc=((Lb + D) / 2 - 0.02, -D + 0.04, (H - 0.05) / 2), mat='wood')
+    p.box((0.03, Lb - D, H - 0.05), loc=(D - 0.04, -(D + Lb) / 2, (H - 0.05) / 2), mat='wood')
+    p.box((0.04, D - 0.04, H - 0.05), loc=(Lb - 0.03, -D / 2, (H - 0.05) / 2), mat='wood')
+    p.box((D - 0.04, 0.04, H - 0.05), loc=(D / 2, -Lb + 0.03, (H - 0.05) / 2), mat='wood')
+    # Lehnen, leicht zur Wand geneigt, mit Herzen
+    p.box((Lb, 0.03, 0.5), loc=(Lb / 2, -0.05, H + 0.27), rot=(R(-8), 0, 0), mat='wood')
+    p.box((0.03, Lb, 0.5), loc=(0.05, -Lb / 2, H + 0.27), rot=(0, R(-8), 0), mat='wood')
+    p.box((Lb, 0.05, 0.04), loc=(Lb / 2, -0.03, H + 0.53), mat='wood_dark')
+    p.box((0.05, Lb, 0.04), loc=(0.03, -Lb / 2, H + 0.53), mat='wood_dark')
+    for t in (0.75, 1.4):
+        p.prism(_heart(t, 0.05, 0.0035), 0.036, loc=(0, -0.05, H + 0.27), rot=(R(-8), 0, 0), mat='black', plane='XZ')
+        p.prism(_heart(-t, 0.05, 0.0035), 0.036, loc=(0.05, 0, H + 0.27), rot=(R(-8), 0, R(90)), mat='black', plane='XZ')
+    a.add(p)
+    q = a.part('Paint')
+    for (x, y, sx, sy) in ((1.15, -0.25, 1.1, 0.4), (0.25, -1.15, 0.4, 1.1), (0.27, -0.27, 0.42, 0.42)):
+        q.box((sx, sy, 0.06), loc=(x, y, H + 0.03), mat='paint', bevel=0.02)
+    a.add(q)
     return a
 
 
@@ -755,21 +932,116 @@ def v_birke(col):
     return a
 
 
+# Gartenblumen: Mohn, Kornblume, Margerite, Löwenzahn, Ringelblume
+def _stem(p, x, y, h, lean, ang, w=0.012, mat='grass'):
+    tx, ty = -math.sin(ang) * w, math.cos(ang) * w
+    top = (x + math.cos(ang) * lean, y + math.sin(ang) * lean, h)
+    p.face([(x - tx, y - ty, 0), (x + tx, y + ty, 0), (top[0] + tx * 0.5, top[1] + ty * 0.5, h), (top[0] - tx * 0.5, top[1] - ty * 0.5, h)], mat=mat)
+    return top
+
+
+def _star(p, c, r, n, mat, cup=0.0, inner=0.45, rot=0.0):
+    pts = []
+    for k in range(2 * n):
+        a = rot + math.pi * k / n
+        rr = r if k % 2 == 0 else r * inner
+        pts.append((c[0] + math.cos(a) * rr, c[1] + math.sin(a) * rr, c[2] + (cup if k % 2 == 0 else 0)))
+    p.face(pts, mat=mat)
+
+
+def _ngon(p, c, r, n, mat, z=0.0):
+    p.face([(c[0] + math.cos(2 * math.pi * k / n) * r, c[1] + math.sin(2 * math.pi * k / n) * r, c[2] + z) for k in range(n)], mat=mat)
+
+
+def _leaf(p, x, y, ang, l, w, mat='leaf_meadow', up=0.04, z=0.0):
+    ca, sa = math.cos(ang), math.sin(ang)
+    p.face([(x, y, z), (x + ca * l * 0.4 - sa * w, y + sa * l * 0.4 + ca * w, z + up * 0.6), (x + ca * l, y + sa * l, z + up), (x + ca * l * 0.4 + sa * w, y + sa * l * 0.4 - ca * w, z + up * 0.6)], mat=mat)
+
+
+def _flower(p, kind, x, y, h, rnd):
+    ang = rnd.uniform(0, 2 * math.pi)
+    top = _stem(p, x, y, h, rnd.uniform(0.02, 0.08), ang)
+    if kind == 'mohn':
+        _star(p, top, 0.05, 4, 'poppy', cup=0.025, inner=0.85, rot=rnd.uniform(0, 1))
+        _ngon(p, top, 0.012, 5, 'black', z=0.006)
+    elif kind == 'kornblume':
+        _star(p, top, 0.035, 7, 'cornflower', cup=0.012, inner=0.4, rot=rnd.uniform(0, 1))
+    elif kind == 'margerite':
+        _star(p, top, 0.045, 11, 'bloom_white', cup=0.004, inner=0.5, rot=rnd.uniform(0, 1))
+        _ngon(p, top, 0.014, 6, 'bloom_yellow', z=0.006)
+    elif kind == 'loewenzahn':
+        _star(p, top, 0.03, 9, 'dandelion', cup=0.01, inner=0.7, rot=rnd.uniform(0, 1))
+    elif kind == 'pusteblume':
+        p.ico(0.032, loc=top, mat='seed_white', sub=0)
+    else:  # Ringelblume
+        _star(p, top, 0.04, 9, 'veg_orange', cup=0.008, inner=0.6, rot=rnd.uniform(0, 1))
+        _ngon(p, top, 0.012, 5, 'rust_dark', z=0.005)
+
+
 def v_flowers(col):
     a = Asset('v_flowers', col)
     p = a.part('M')
     rnd = random.Random(51)
-    mats = ['bloom_red', 'bloom_blue', 'bloom_white', 'bloom_yellow']
-    for i in range(14):
-        x, y = rnd.uniform(-0.6, 0.6), rnd.uniform(-0.6, 0.6)
-        h = rnd.uniform(0.25, 0.55)
-        ang = rnd.uniform(0, math.pi)
-        dx, dy = math.cos(ang) * 0.02, math.sin(ang) * 0.02
-        p.face([(x - dx, y - dy, 0), (x + dx, y + dy, 0), (x + dx, y + dy, h), (x - dx, y - dy, h)], mat='grass')
-        s = rnd.uniform(0.05, 0.09)
-        m = mats[i % 4]
-        p.face([(x - s, y - s, h), (x + s, y - s, h), (x + s, y + s, h + 0.01), (x - s, y + s, h + 0.01)], mat=m)
-        p.face([(x - s * 0.8, y, h - s * 0.6), (x + s * 0.8, y, h - s * 0.6), (x + s * 0.8, y, h + s * 0.6), (x - s * 0.8, y, h + s * 0.6)], mat=m)
+    kinds = ['mohn', 'kornblume', 'margerite', 'mohn', 'ringel', 'margerite', 'kornblume', 'loewenzahn', 'mohn', 'margerite', 'pusteblume', 'kornblume']
+    for i, k in enumerate(kinds):
+        r, t = rnd.uniform(0.05, 0.6), rnd.uniform(0, 2 * math.pi)
+        _flower(p, k, math.cos(t) * r, math.sin(t) * r, rnd.uniform(0.28, 0.6), rnd)
+    for i in range(8):
+        t = rnd.uniform(0, 2 * math.pi)
+        _leaf(p, math.cos(t) * rnd.uniform(0, 0.4), math.sin(t) * rnd.uniform(0, 0.4), rnd.uniform(0, 2 * math.pi), rnd.uniform(0.15, 0.26), 0.035, mat=rnd.choice(['leaf_meadow', 'grass']), up=rnd.uniform(0.08, 0.2))
+    a.add(p)
+    return a
+
+
+# Wiesenbüschel für Rasen und Höfe: Gräser, Klee, Löwenzahnrosette, Gänseblümchen
+def v_meadow(col):
+    a = Asset('v_meadow', col)
+    p = a.part('M')
+    rnd = random.Random(57)
+    for k in range(18):
+        ang = rnd.uniform(0, 2 * math.pi)
+        h = rnd.uniform(0.18, 0.5)
+        x, y = math.cos(ang) * rnd.uniform(0, 0.3), math.sin(ang) * rnd.uniform(0, 0.3)
+        tx, ty = -math.sin(ang) * 0.035, math.cos(ang) * 0.035
+        lean = rnd.uniform(0.05, 0.2)
+        p.face([(x - tx, y - ty, 0), (x + tx, y + ty, 0), (x + math.cos(ang) * lean, y + math.sin(ang) * lean, h)], mat=rnd.choice(['grass', 'leaves2', 'grass', 'straw', 'leaf_meadow']))
+    # Spitzwegerich: lange, schmale Blätter am Boden
+    for j in range(4):
+        _leaf(p, 0.18, -0.12, 1.3 + j * 1.4, 0.2, 0.03, mat='leaf_meadow', up=0.05, z=0.01)
+    # Klee: Dreiblätter und Blütenköpfe
+    for i in range(9):
+        cx, cy = rnd.uniform(-0.35, 0.35), rnd.uniform(-0.35, 0.35)
+        z = rnd.uniform(0.04, 0.1)
+        for j in range(3):
+            ang = 2 * math.pi * j / 3 + i
+            _leaf(p, cx, cy, ang, 0.06, 0.032, mat='clover_leaf', up=0.0, z=z)
+    for i in range(3):
+        top = _stem(p, rnd.uniform(-0.25, 0.25), rnd.uniform(-0.25, 0.25), rnd.uniform(0.1, 0.17), 0.02, rnd.uniform(0, 6))
+        for (dx, dy) in ((0.02, 0), (0, 0.02)):
+            p.face([(top[0] - dx, top[1] - dy, top[2] - 0.012), (top[0] + dx, top[1] + dy, top[2] - 0.012), (top[0] + dx, top[1] + dy, top[2] + 0.025), (top[0] - dx, top[1] - dy, top[2] + 0.025)], mat='clover_pink')
+    # Löwenzahnrosette mit gezackten Blättern und einer Blüte
+    for j in range(5):
+        ang = 2 * math.pi * j / 5 + 0.3
+        ca, sa = math.cos(ang), math.sin(ang)
+        pts = []
+        for s in range(5):
+            d = 0.04 + s * 0.04
+            w = 0.022 if s % 2 == 0 else 0.012
+            pts.append((ca * d - sa * w, sa * d + ca * w, 0.02 + s * 0.006))
+        pts.append((ca * 0.24, sa * 0.24, 0.05))
+        for s in reversed(range(5)):
+            d = 0.04 + s * 0.04
+            w = 0.022 if s % 2 == 0 else 0.012
+            pts.append((ca * d + sa * w, sa * d - ca * w, 0.02 + s * 0.006))
+        p.face(pts, mat='leaf_meadow')
+    top = _stem(p, 0.02, 0.0, 0.2, 0.03, 1.0)
+    _star(p, top, 0.028, 9, 'dandelion', cup=0.01, inner=0.7)
+    # Gänseblümchen
+    for i in range(5):
+        cx, cy = rnd.uniform(-0.35, 0.35), rnd.uniform(-0.35, 0.35)
+        top = _stem(p, cx, cy, rnd.uniform(0.05, 0.1), 0.01, rnd.uniform(0, 6), w=0.006)
+        _star(p, top, 0.022, 8, 'bloom_white', cup=0.003, inner=0.55)
+        _ngon(p, top, 0.007, 5, 'bloom_yellow', z=0.004)
     a.add(p)
     return a
 
@@ -795,9 +1067,9 @@ def v_weed(col):
 
 
 FACES = [f_seefahrer, f_schatten, f_erfinder, f_waechter]
-FASSADE = [kc_window, kc_shutter, kc_door, kc_chimney, kc_dormer, kc_sign, kc_awning]
-MOEBEL = [kc_table, kc_chair, kc_bed, kc_shelf, kc_stove, c_truhe, c_schrank, c_kommode]
+FASSADE = [kc_window, kc_shutter, kc_door, kc_chimney, kc_dormer, kc_sign, kc_awning, kc_flowerbox, kc_beamhead]
+MOEBEL = [kc_table, kc_chair, kc_bed, kc_shelf, kc_stove, kc_cuckoo, kc_eckbank, c_truhe, c_schrank, c_kommode]
 STRASSE = [kc_lantern, kc_bench, kc_stall, kc_cart, kc_tank, kc_fountain, kc_well, kc_maypole, kc_pinnacle]
 LANDMARKEN = [l_spire, l_clock, v_giant]
-VEG = [v_linde, v_birke, v_flowers, v_weed]
+VEG = [v_linde, v_birke, v_flowers, v_meadow, v_weed]
 ALL = FACES + FASSADE + MOEBEL + STRASSE + LANDMARKEN + VEG

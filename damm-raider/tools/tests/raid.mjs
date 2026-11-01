@@ -11,7 +11,7 @@ const damm = await page.evaluate(() => {
   return { map: g.mapId, enemies: n0, alive: g.enemies.filter((e) => e.alive).length, y: +g.player.pos.y.toFixed(2), state: g.state, shapes: g.col.shapes.length };
 });
 console.log('damm', JSON.stringify(damm));
-await page.evaluate(() => { const g = window.__game; g.building = true; g.player.updateCamera?.(0.016); g.world.update(0.016, g.player.pos, null); g.renderer.render(g.scene, g.camera); });
+await page.evaluate(() => { const g = window.__game; g.building = true; g.player.updateCamera?.(0.016); g.world.update(0.016, g.player.pos, null); (g.renderFrame ? g.renderFrame(0.016) : g.renderer.render(g.scene, g.camera)); });
 await page.screenshot({ path: SHOTS + 'damm-raid.png', timeout: 180000, timeout: 180000 });
 await page.evaluate(() => { const g = window.__game; g.building = false; g.toHub(); });
 // 2) Stadt: Raid mit Gegnern 30 s
@@ -41,7 +41,7 @@ await page.evaluate(() => {
   g.debugStep(0.5);
   g.building = true;
   g.world.update(0.016, p.pos, null);
-  g.renderer.render(g.scene, g.camera);
+  (g.renderFrame ? g.renderFrame(0.016) : g.renderer.render(g.scene, g.camera));
   window.__lot = { id: l.id, floor: +(p.pos.y - l.level).toFixed(2) };
 });
 await page.screenshot({ path: SHOTS + 'innen.png', timeout: 180000, timeout: 180000 });

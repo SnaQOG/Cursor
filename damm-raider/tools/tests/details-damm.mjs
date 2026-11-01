@@ -4,7 +4,7 @@ const { browser, page, errors } = await open();
 await page.evaluate(() => { const g = window.__game; g.startRaid(); for (const e of g.enemies) { e.alive = false; e.root.visible = false; } g.world.applyCondition('tag'); g.building = true; g.player.model.root.visible = false; });
 const cam = async (name, fn, arg) => {
   const info = await page.evaluate(fn, arg);
-  await page.evaluate(() => { const g = window.__game; g.world.update(0.016, g.camera.position, null); g.renderer.render(g.scene, g.camera); });
+  await page.evaluate(() => { const g = window.__game; g.world.update(0.016, g.camera.position, null); (g.renderFrame ? g.renderFrame(0.016) : g.renderer.render(g.scene, g.camera)); });
   await page.screenshot({ path: SHOTS + name + '.png', timeout: 240000 });
   console.log(name, JSON.stringify(info));
 };

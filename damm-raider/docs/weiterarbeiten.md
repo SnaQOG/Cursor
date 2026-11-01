@@ -13,7 +13,10 @@ Sitzung (z. B. Claude Code auf dem eigenen Rechner) direkt weitermachen kann.
 - Alle festen Formen (Möbel, Fassadenteile, Requisiten, Bäume, Autos, Waffen, Figuren, Gesichter)
   kommen aus Blender-Skripten. Wände, Böden, Treppen und Dächer der Stadthäuser erzeugt das Spiel aus
   dem Stadtplan, weil jedes Haus genau auf sein Grundstück passen muss.
-- Letzte Runde: Oberflächen mit Normal-Maps, Fassadendetails, Stuben, Wiesen, Autos, Bäume.
+- Detail-Runde: Oberflächen mit Normal-Maps, Fassadendetails, Stuben, Wiesen, Autos, Bäume.
+- Grafik-Runde: Nachbearbeitung in `src/post.js` (GTAO auf „hoch“, Bloom, Farblook je Wetter,
+  Vignette, Korn), weichere und schärfere Schatten, Himmel mit beleuchteten Wolken, Wind in der
+  Vegetation (`World.addWind`), tiefere Tagessonne mit längeren Schatten.
 - Referenzen bisher nur aus Texten (Bildseiten waren in der Cloud-Umgebung gesperrt): Fachwerk
   (Mannfigur, Andreaskreuz, Balkenköpfe), Schwarzwaldhaus (Walmdach, Holzschindeln), Bauernmöbel
   (Brettstuhl mit Herz, Eckbank, Kachelofen, Kuckucksuhr), Wiesenpflanzen (Mohn, Kornblume, Margerite,
@@ -65,7 +68,8 @@ durch die Hintertür, kein Fehler), Brücken 6/6, Spawns 11/11.
 
 1. **Echte Fotos als Vorlage** (Wikimedia Commons, Unsplash): Fachwerk- und Schwarzwaldhäuser,
    Bauernstuben, Blumenwiesen, verlassene Autos. Danach Modelle, Farben und Texturen angleichen.
-2. **Mit Grafikkarte testen:** echte Bildrate messen (Ziel 60 fps auf „mittel“), Optik prüfen.
+2. **Mit Grafikkarte testen:** echte Bildrate auf allen drei Grafikstufen messen (Ziel 60 fps auf
+   „mittel“), GTAO-Stärke und Bloom nach Augenmaß nachstellen (`src/post.js`, `LOOKS`).
 3. Offene Ideen: Krüppelwalmdächer, mehr Innenraum-Vielfalt (Herrgottswinkel, Bilder, Geschirrschrank),
    Stadttore öffnen, Autos auch in Weltenbrück, Licht und Schatten feiner abstimmen.
 

@@ -9,11 +9,11 @@ import { Noise2D, clamp } from './util.js';
 
 const CONDITION_LOOK = {
   tag: {
-    sunElev: 0.95, sunAz: 2.3, sun: 0xfff1d6, sunI: 2.8, hemiSky: 0xcfe2ff, hemiGround: 0x6a5c44, hemiI: 0.75, envI: 0.55,
-    top: 0x5f93c7, horizon: 0xd9ddcf, fog: 0xc9d2cc, fogNear: 60, fogFar: 460, exposure: 1.0,
+    sunElev: 0.72, sunAz: 2.3, sun: 0xffe8c8, sunI: 3.1, hemiSky: 0xcfe2ff, hemiGround: 0x6a5c44, hemiI: 0.6, envI: 0.5,
+    top: 0x4f86c2, horizon: 0xd6dccf, fog: 0xc6d0cc, fogNear: 90, fogFar: 620, exposure: 1.0,
   },
   daemmerung: {
-    sunElev: 0.2, sunAz: -1.9, sun: 0xffa45c, sunI: 2.4, hemiSky: 0x9fa4c8, hemiGround: 0x5a4636, hemiI: 0.5, envI: 0.5,
+    sunElev: 0.2, sunAz: -1.9, sun: 0xffa45c, sunI: 2.4, hemiSky: 0x9fa4c8, hemiGround: 0x5a4636, hemiI: 0.62, envI: 0.6,
     top: 0x34466f, horizon: 0xf2a06a, fog: 0xc79377, fogNear: 50, fogFar: 380, exposure: 1.05,
   },
   sturm: {
@@ -37,6 +37,8 @@ export class World {
     this.terrain = new Terrain(def.terrain);
     this.col = new CollisionWorld(this.terrain);
 
+    // Wind für Vegetation: Zeit und Stärke, gemeinsam für alle Pflanzen-Shader
+    this.wind = { time: { value: 0 }, strength: { value: 1 } };
     this.setupLights();
     this.setupSky();
 
@@ -93,9 +95,11 @@ export class World {
     this.sun = new THREE.DirectionalLight(0xfff1d6, 2.8);
     this.sun.castShadow = this.quality !== 'niedrig';
     const s = this.sun.shadow;
-    const size = this.quality === 'hoch' ? 2048 : 1024;
+    // feinere, weichere Schatten über einen größeren Bereich (PCF mit Vogel-Scheibe)
+    const size = this.quality === 'hoch' ? 4096 : 2048;
     s.mapSize.set(size, size);
-    const ext = this.quality === 'hoch' ? 75 : 60;
+    s.radius = this.quality === 'hoch' ? 3 : 2;
+    const ext = this.quality === 'hoch' ? 90 : 70;
     s.camera.left = -ext; s.camera.right = ext; s.camera.top = ext; s.camera.bottom = -ext;
     s.camera.near = 1; s.camera.far = 400;
     s.bias = -0.0004;
@@ -132,15 +136,33 @@ export class World {
         void main(){
           vec3 d = normalize(vDir);
           float h = clamp(d.y, -0.2, 1.0);
-          vec3 col = mix(horizon, top, pow(max(h,0.0), 0.55));
-          if (h < 0.0) col = mix(horizon, horizon*0.7, -h*5.0);
-          float sd = max(dot(d, normalize(sunDir)), 0.0);
-          col += sunColor * (pow(sd, 900.0) * 3.0 + pow(sd, 12.0) * 0.25);
-          vec2 uv = d.xz / max(d.y, 0.08) * 0.9 + vec2(time*0.004, time*0.002);
-          float c = smoothstep(0.45, 0.85, fbm(uv*1.4)) * smoothstep(0.02, 0.25, d.y);
-          vec3 cc = mix(vec3(1.0), horizon, 0.35) * (0.8 + 0.3*sd);
-          col = mix(col, cc, c * cloud);
+          vec3 s3 = normalize(sunDir);
+          float sd = max(dot(d, s3), 0.0);
+          // Verlauf Zenit -> Horizont mit Dunstband
+          vec3 col = mix(horizon, top, pow(max(h, 0.0), 0.5));
+          col = mix(col, horizon * 1.06, exp(-max(h, 0.0) * 9.0) * 0.55);
+          if (h < 0.0) col = mix(horizon, horizon * 0.72, -h * 5.0);
+          // Sonne: Scheibe, Korona und weiter Schein (in Horizontnähe stärker)
+          col += sunColor * (pow(sd, 1400.0) * 4.0 + pow(sd, 70.0) * 0.32 + pow(sd, 6.0) * 0.12 * (1.0 - 0.6 * max(h, 0.0)));
+          // Wolken: verwirbeltes Rauschen, zur Sonne hin aufgehellt, Silberrand
+          if (d.y > 0.0) {
+            vec2 q = d.xz / (d.y + 0.12) * 0.8 + vec2(time * 0.006, time * 0.003);
+            vec2 warp = vec2(fbm(q * 0.7 + 3.1), fbm(q * 0.7 - 1.7));
+            float n = fbm(q * 1.3 + warp * 0.8);
+            float cov = mix(0.6, 0.36, cloud);
+            float dens = smoothstep(cov, cov + 0.26, n);
+            vec2 toSun = normalize(s3.xz + 1e-4) * 0.09;
+            float n2 = fbm((q + toSun) * 1.3 + warp * 0.8);
+            float lit = clamp(0.55 + (n - n2) * 3.0, 0.0, 1.0);
+            vec3 cLit = mix(vec3(1.0), sunColor, 0.35) * (1.0 + 0.5 * pow(sd, 8.0));
+            vec3 cShade = mix(horizon, top, 0.35) * 0.74;
+            vec3 cc = mix(cShade, cLit, lit);
+            cc += sunColor * pow(sd, 10.0) * (1.0 - dens) * 0.7;
+            col = mix(col, cc, dens * smoothstep(0.0, 0.18, d.y) * (0.6 + 0.4 * cloud));
+          }
           gl_FragColor = vec4(col, 1.0);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
         }`,
     });
     this.sky = new THREE.Mesh(geo, mat);
@@ -170,6 +192,7 @@ export class World {
     this.skyUniforms.cloud.value = id === 'sturm' ? 1.0 : id === 'daemmerung' ? 0.45 : 0.35;
     this.renderer.toneMappingExposure = L.exposure;
     this.rain.visible = id === 'sturm';
+    this.wind.strength.value = id === 'sturm' ? 2.6 : id === 'daemmerung' ? 0.7 : 1;
     this.updateEnvironment(L.envI);
   }
 
@@ -280,7 +303,7 @@ export class World {
     // In Kacheln aufteilen, damit Frustum- und Schatten-Culling greifen
     // Bodendecker (Gras, Blumen) in kleineren Kacheln, die ab mittlerer Entfernung ausgeblendet werden
     this.vegDetail = [];
-    const inst = (name, all, place, { shadow = true, tint = null, doubleSide = false, cull = false } = {}) => {
+    const inst = (name, all, place, { shadow = true, tint = null, doubleSide = false, cull = false, wind = 0 } = {}) => {
       if (!all.length) return;
       const CH = cull ? 40 : 110;
       const chunks = new Map();
@@ -292,6 +315,7 @@ export class World {
       const mats = this.assets.bakedMeshes(name).map((bm) => {
         const mat = bm.material.clone();
         if (doubleSide) mat.side = THREE.DoubleSide;
+        if (wind) this.addWind(mat, wind);
         return { geo: bm.geometry, mat };
       });
       for (const list of chunks.values()) {
@@ -325,9 +349,9 @@ export class World {
     };
     const pines = trees.filter((t) => t.pine), leafy = trees.filter((t) => !t.pine);
     for (const t of trees) this.col.addCyl(t.x, t.z, 0.3 * t.s, t.y - 1, t.y + 7 * t.s, { tree: true });
-    inst('v_pine', pines, (t) => { p.set(t.x, t.y - 0.1, t.z); q.setFromEuler(e.set(0, t.r, 0)); sc.set(t.s, t.s * (0.9 + (t.r % 0.4)), t.s); }, { tint: leafTint });
-    inst('v_tree', leafy, (t) => { p.set(t.x, t.y - 0.1, t.z); q.setFromEuler(e.set(0, t.r, 0)); sc.setScalar(t.s); }, { tint: leafTint });
-    inst('v_bush', bushes, (b) => { p.set(b.x, b.y - 0.05, b.z); q.setFromEuler(e.set(0, b.r * 3, 0)); sc.set(b.s, b.s * 0.9, b.s); }, { shadow: false, tint: leafTint });
+    inst('v_pine', pines, (t) => { p.set(t.x, t.y - 0.1, t.z); q.setFromEuler(e.set(0, t.r, 0)); sc.set(t.s, t.s * (0.9 + (t.r % 0.4)), t.s); }, { tint: leafTint, wind: 0.0018 });
+    inst('v_tree', leafy, (t) => { p.set(t.x, t.y - 0.1, t.z); q.setFromEuler(e.set(0, t.r, 0)); sc.setScalar(t.s); }, { tint: leafTint, wind: 0.003 });
+    inst('v_bush', bushes, (b) => { p.set(b.x, b.y - 0.05, b.z); q.setFromEuler(e.set(0, b.r * 3, 0)); sc.set(b.s, b.s * 0.9, b.s); }, { shadow: false, tint: leafTint, wind: 0.03 });
     for (let k = 0; k < 3; k++) {
       const list = rocks.filter((_, i) => i % 3 === k);
       inst(`v_rock${k}`, list, (r) => { p.set(r.x, r.y - r.s * (0.15 + Math.min(0.6, T.slope(r.x, r.z) * 0.45)), r.z); q.setFromEuler(e.set(0, r.r, 0)); sc.setScalar(r.s * 0.8); }, {
@@ -335,9 +359,36 @@ export class World {
       });
     }
     for (const r of rocks) if (r.s > 1.1) this.col.addCyl(r.x, r.z, r.s * 0.95, r.y - 2, r.y + r.s * 0.8, { rock: true });
-    inst('v_grass', grass, (g) => { p.set(g.x, g.y - 0.05, g.z); q.setFromEuler(e.set(0, g.r, 0)); sc.setScalar(g.s); }, { shadow: false, doubleSide: true, tint: leafTint, cull: true });
+    inst('v_grass', grass, (g) => { p.set(g.x, g.y - 0.05, g.z); q.setFromEuler(e.set(0, g.r, 0)); sc.setScalar(g.s); }, { shadow: false, doubleSide: true, tint: leafTint, cull: true, wind: 0.12 });
     // weitere Modelle der Karte (z. B. Riesenbäume): { name, list, place(it, p, q, sc, e), opts }
     for (const ex of extra) inst(ex.name, ex.list, (it) => ex.place(it, p, q, sc, e), ex.opts || {});
+  }
+
+  // Pflanzen im Wind wiegen: Auslenkung wächst mit der Höhe über dem Modellursprung,
+  // Phase je Instanz aus ihrer Position
+  addWind(mat, amp) {
+    const w = this.wind;
+    mat.onBeforeCompile = (sh) => {
+      sh.uniforms.uWindTime = w.time;
+      sh.uniforms.uWindK = w.strength;
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nuniform float uWindTime;\nuniform float uWindK;')
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+          {
+            float hgt = max(position.y, 0.0);
+            #ifdef USE_INSTANCING
+              vec3 ip = instanceMatrix[3].xyz;
+            #else
+              vec3 ip = vec3(0.0);
+            #endif
+            float ph = ip.x * 0.31 + ip.z * 0.23;
+            float bend = hgt * hgt * ${amp.toFixed(5)} * uWindK;
+            float t = uWindTime * (0.8 + 0.4 * uWindK);
+            transformed.x += (sin(t * 1.6 + ph) + 0.35 * sin(t * 3.9 + ph * 2.3)) * bend;
+            transformed.z += (cos(t * 1.25 + ph * 1.3) + 0.3 * sin(t * 4.3 + ph)) * bend * 0.7;
+          }`);
+    };
+    mat.customProgramCacheKey = () => 'wind' + amp;
   }
 
   buildRain() {
@@ -358,6 +409,7 @@ export class World {
 
   update(dt, focus, sfx, near = true) {
     this.time += dt;
+    this.wind.time.value = this.time;
     this.skyUniforms.time.value = this.time;
     this.sky.position.copy(focus);
     // Schatten folgen dem Spieler (auf Texel gerastert, damit nichts flimmert)

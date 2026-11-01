@@ -114,6 +114,21 @@ Die Stadt entsteht bei jedem Laden gleich aus einem Generator (`src/maps/weltenb
 `layout.js` legt Straßen, Gassen, Plätze, Terrassen und Grundstücke fest, `house.js` baut daraus die
 Häuser, `build.js` die Sonderbauten, `index.js` Terrain, Materialien und Vegetation.
 
+## Grafik
+
+Unter **Optionen → Grafik** gibt es drei Stufen:
+
+| Stufe | Was gezeichnet wird |
+| --- | --- |
+| Niedrig | ohne Schatten und Nachbearbeitung, für schwache Rechner |
+| Mittel | weiche Schatten (2048er Schattenkarte, 70 m Umkreis), Kantenglättung, Bloom, Farbkorrektur |
+| Hoch | zusätzlich Umgebungsverdeckung (GTAO) in Ecken, Gassen und unter Dachüberständen, 4096er Schattenkarte über 90 m |
+
+Dazu auf allen Stufen: Himmel mit verwirbelten, von der Sonne beleuchteten Wolken und Silberrändern,
+Dunst am Horizont, ACES-Tonemapping, ein eigener Farblook je Wetterlage (warm am Tag, glühend in
+der Dämmerung, entsättigt im Sturm) und Wind, der Gras, Blumen und Baumkronen wiegt – im Sturm
+deutlich stärker.
+
 ## ARC-Gegner
 
 | ARC | Verhalten | Schwachstelle |
@@ -197,6 +212,7 @@ damm-raider/
 │   ├── structures.js   Gebäude-Baukasten
 │   ├── batcher.js      Zusammenfassen statischer Geometrie
 │   ├── instancer.js    wiederholte Blender-Modelle als Instanzen (einfärbbar, mit Culling)
+│   ├── post.js         Nachbearbeitung: GTAO, Bloom, Tonemapping, Farblook, Vignette
 │   ├── collision.js    Kollision und Raycasts
 │   ├── player.js       Spielfigur, Kamera, Waffen, Heilung
 │   ├── enemies.js      ARC-KI

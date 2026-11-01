@@ -6,7 +6,7 @@ await page.waitForFunction(() => window.__game.mapId === 'weltenbrueck' && !wind
 await page.evaluate(() => { const g = window.__game; g.startRaid(); for (const e of g.enemies) { e.alive = false; e.root.visible = false; } g.player.hp = 100; g.condition = 'tag'; g.world.applyCondition('tag'); });
 const shoot = async (name, fn) => {
   await page.evaluate(fn);
-  await page.evaluate(() => { const g = window.__game; g.building = true; g.player.updateCamera(0.016); g.world.update(0.016, g.player.pos, null); g.renderer.render(g.scene, g.camera); });
+  await page.evaluate(() => { const g = window.__game; g.building = true; g.player.updateCamera(0.016); g.world.update(0.016, g.player.pos, null); (g.renderFrame ? g.renderFrame(0.016) : g.renderer.render(g.scene, g.camera)); });
   await page.screenshot({ path: SHOTS + name + '.png', timeout: 240000, timeout: 180000 });
   await page.evaluate(() => { window.__game.building = false; });
 };

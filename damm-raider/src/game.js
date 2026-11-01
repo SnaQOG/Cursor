@@ -1,6 +1,7 @@
 // Spielablauf: Hub ↔ Raid, Treffer, Explosionen, Extraktion, Speichern.
 import * as THREE from 'three';
 import { World } from './world.js';
+import { Post } from './post.js';
 import { Player } from './player.js';
 import { Input } from './input.js';
 import { Sfx } from './audio.js';
@@ -46,6 +47,7 @@ export class Game {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.camera = new THREE.PerspectiveCamera(70, 1, 0.1, 800);
+    this.post = new Post(this.renderer);
     this.input = new Input(canvas);
     this.sfx = new Sfx();
     this.enemies = [];
@@ -151,14 +153,20 @@ export class Game {
       const shadows = q !== 'niedrig';
       this.renderer.shadowMap.enabled = shadows;
       this.world.sun.castShadow = shadows;
-      const size = q === 'hoch' ? 2048 : 1024;
+      const size = q === 'hoch' ? 4096 : 2048;
       const sh = this.world.sun.shadow;
+      sh.radius = q === 'hoch' ? 3 : 2;
+      const ext = q === 'hoch' ? 90 : 70;
+      Object.assign(sh.camera, { left: -ext, right: ext, top: ext, bottom: -ext });
+      sh.camera.updateProjectionMatrix();
+      this.world.shadowExt = ext;
       if (sh.mapSize.x !== size) {
         sh.mapSize.set(size, size);
         if (sh.map) { sh.map.dispose(); sh.map = null; }
       }
       this.camera.far = q === 'niedrig' ? 450 : 800;
       this.camera.updateProjectionMatrix();
+      this.post.setup(this.scene, this.camera, q);
     }
     this.resize();
   }
@@ -171,6 +179,7 @@ export class Game {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.viewH = h * this.renderer.getPixelRatio();
+    this.post.setSize(w, h, this.renderer.getPixelRatio());
     if (this.effects) this.effects.setViewport(this.viewH);
   }
 
@@ -513,13 +522,21 @@ export class Game {
       if (!this.building) {
         if (this.state === 'raid') this.updateRaid(dt);
         else this.updateMenu(dt);
-        this.renderer.render(this.scene, this.camera);
+        this.renderFrame(dt);
       }
     } catch (err) {
       console.error(err);
     }
     this.input.endFrame();
     requestAnimationFrame((t) => this.loop(t));
+  }
+
+  // Ein Bild zeichnen, mit Nachbearbeitung, wenn die Qualität sie vorsieht
+  renderFrame(dt = 0) {
+    if (this.post.active) {
+      this.post.setLook(this.world.condition);
+      this.post.render(dt);
+    } else this.renderer.render(this.scene, this.camera);
   }
 
   // Für automatisierte Tests: Simulation ohne Rendern vorspulen

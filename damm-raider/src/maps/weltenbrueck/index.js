@@ -246,11 +246,11 @@ function vegetation(world) {
   };
   const upright = (it, p, q, sc, e) => { p.set(it.x, it.y - 0.08, it.z); q.setFromEuler(e.set(0, it.r, 0)); sc.setScalar(it.s); };
   const extra = [
-    { name: 'v_linde', list: linden, place: upright, opts: { tint: leaf } },
-    { name: 'v_birke', list: birches, place: upright, opts: { tint: leaf } },
-    { name: 'v_flowers', list: flowers, place: upright, opts: { shadow: false, doubleSide: true, cull: true } },
-    { name: 'v_meadow', list: meadow, place: upright, opts: { shadow: false, doubleSide: true, cull: true } },
-    { name: 'v_weed', list: weeds, place: upright, opts: { shadow: false, doubleSide: true, tint: leaf, cull: true } },
+    { name: 'v_linde', list: linden, place: upright, opts: { tint: leaf, wind: 0.0025 } },
+    { name: 'v_birke', list: birches, place: upright, opts: { tint: leaf, wind: 0.004 } },
+    { name: 'v_flowers', list: flowers, place: upright, opts: { shadow: false, doubleSide: true, cull: true, wind: 0.25 } },
+    { name: 'v_meadow', list: meadow, place: upright, opts: { shadow: false, doubleSide: true, cull: true, wind: 0.2 } },
+    { name: 'v_weed', list: weeds, place: upright, opts: { shadow: false, doubleSide: true, tint: leaf, cull: true, wind: 0.12 } },
   ];
   return { trees, bushes, rocks, grass, extra };
 }

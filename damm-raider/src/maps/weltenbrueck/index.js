@@ -156,6 +156,7 @@ function vegetation(world) {
   const n = new Noise2D(31);
   const col = world.col;
   const trees = [], bushes = [], rocks = [], grass = [];
+  const linden = [], birches = [], flowers = [], weeds = [];
   const free = (x, z, r, h = 1) => !col.query(x - r, z - r, x + r, z + r).some((s) => s.maxY > T.height(x, z) + 0.3 && s.minY < T.height(x, z) + h);
   // Höfe, Gärten, Plätze
   const areas = [...L.yards.filter((y) => !y.passage), ...L.squares];
@@ -166,7 +167,20 @@ function vegetation(world) {
     for (let i = 0; i < nt; i++) {
       const x = a.x0 + 2 + rnd() * (w - 4), z = a.z0 + 2 + rnd() * (d - 4);
       if (w < 4 || d < 4 || !free(x, z, 1.4, 6)) continue;
-      trees.push({ x, z, y: T.height(x, z), s: 0.7 + rnd() * 0.6, pine: rnd() < 0.15, r: rnd() * 6 });
+      const it = { x, z, y: T.height(x, z), s: 0.7 + rnd() * 0.6, pine: false, r: rnd() * 6 };
+      const k = rnd();
+      if (z < -2 && k < 0.45) birches.push(it);
+      else if (z >= -2 && k < 0.55) linden.push(it);
+      else { it.pine = k > 0.9; trees.push(it); }
+    }
+    // Blumen in Gärten und Innenhöfen
+    if (a.garden || a.court) {
+      const nf = Math.floor(area / 14 * (0.6 + rnd()));
+      for (let i = 0; i < nf; i++) {
+        const x = a.x0 + 0.6 + rnd() * (w - 1.2), z = a.z0 + 0.6 + rnd() * (d - 1.2);
+        if (w < 2 || d < 2 || !free(x, z, 0.4, 0.6)) continue;
+        flowers.push({ x, z, y: T.height(x, z), s: 0.7 + rnd() * 0.6, r: rnd() * 6 });
+      }
     }
     const nb = Math.floor(area / 30 * (0.5 + rnd()));
     for (let i = 0; i < nb; i++) {
@@ -195,9 +209,25 @@ function vegetation(world) {
     const green = g === 2 || g === 3;
     if (!green && n.fbm(x * 0.09 - 7, z * 0.09 + 3, 3) < 0.15) continue;
     if (!free(x, z, 0.3, 0.6)) continue;
-    grass.push({ x, z, y: T.height(x, z), s: (green ? 0.7 : 0.45) + rnd() * 0.6, r: rnd() * 6 });
+    const tuft = { x, z, y: T.height(x, z), s: (green ? 0.7 : 0.45) + rnd() * 0.6, r: rnd() * 6 };
+    if (!green && rnd() < 0.5) weeds.push(tuft);
+    else grass.push(tuft);
   }
-  return { trees, bushes, rocks, grass, extra: world.mapData.vegetationExtra || [] };
+  // Stämme von Linden und Birken
+  for (const t of linden) col.addCyl(t.x, t.z, 0.35 * t.s, t.y - 1, t.y + 4 * t.s, { tree: true });
+  for (const t of birches) col.addCyl(t.x, t.z, 0.18 * t.s, t.y - 1, t.y + 5 * t.s, { tree: true });
+  const leaf = (it, c) => {
+    const v = 0.82 + (it.r % 1) * 0.3;
+    return c.setRGB(v * (0.94 + (it.r % 0.37) * 0.3), v, v * (0.85 + (it.r % 0.53) * 0.25));
+  };
+  const upright = (it, p, q, sc, e) => { p.set(it.x, it.y - 0.08, it.z); q.setFromEuler(e.set(0, it.r, 0)); sc.setScalar(it.s); };
+  const extra = [
+    { name: 'v_linde', list: linden, place: upright, opts: { tint: leaf } },
+    { name: 'v_birke', list: birches, place: upright, opts: { tint: leaf } },
+    { name: 'v_flowers', list: flowers, place: upright, opts: { shadow: false, doubleSide: true } },
+    { name: 'v_weed', list: weeds, place: upright, opts: { shadow: false, doubleSide: true, tint: leaf } },
+  ];
+  return { trees, bushes, rocks, grass, extra };
 }
 
 // Übersichtskarte direkt aus dem Stadtplan

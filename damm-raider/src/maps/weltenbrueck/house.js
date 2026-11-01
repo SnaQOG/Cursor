@@ -13,6 +13,7 @@ export const PAL = {
   wood: [0x5a3e2a, 0x4e3624, 0x664630, 0x47321f],
   shutter: [0x3f6b4a, 0x6b2f2a, 0x3d5a73, 0x6a5232, 0x2f4f45, 0x7a6a3a],
   awning: [0x9b3a30, 0x2f5e55, 0xb48a2c, 0x5a4a7a, 0x8a5a2a],
+  door: [0x6a4a30, 0x5a3e2a, 0x3f5a46, 0x6b2f2a, 0x34495e, 0x7a5a3a],
   frameLight: 0xe8e2d4,
   frameDark: 0x2c2420,
   moss: 0x4f6234,
@@ -47,15 +48,24 @@ function wp(w, a, y, d) {
 const OUTN = { s: [0, 0, 1], n: [0, 0, -1], e: [1, 0, 0], w: [-1, 0, 0] };
 const AXIS = { s: [1, 0, 0], n: [1, 0, 0], e: [0, 0, 1], w: [0, 0, 1] };
 const neg = (v) => [-v[0], -v[1], -v[2]];
+// Drehung, damit die Modell-Vorderseite (+Z) bzw. die Modell-X-Achse in Richtung (dx, dz) zeigt
+const yawFront = (dx, dz) => Math.atan2(dx, dz);
+const yawX = (dx, dz) => Math.atan2(-dz, dx);
 
 export class HouseKit {
-  constructor(B, occ, lots) {
+  constructor(B, occ, lots, inst = null) {
     this.B = B;
     this.b = B.b;
     this.col = B.col;
     this.occ = occ;
     this.lots = lots;
+    this.inst = inst;
     this.stats = { houses: 0, ruins: 0 };
+  }
+
+  // Blender-Modell als Instanz (false, wenn es fehlt)
+  model(name, pos, ry, scale = 1, opts = {}) {
+    return !!this.inst && this.inst.add(name, pos[0], pos[1], pos[2], ry, scale, opts);
   }
 
   // Viereck mit gewünschter Normalen (Reihenfolge wird bei Bedarf umgedreht)
@@ -116,7 +126,11 @@ export class HouseKit {
         // Fensterbank etwas heller
         this.quad([wp(w, o.a0 - 0.06, Y0, -0.06), wp(w, o.a1 + 0.06, Y0, -0.06), wp(w, o.a1, Y0, T), wp(w, o.a0, Y0, T)], [0, 1, 0], o.frame ? frameCol : color, { inner, mat });
       }
-      if (o.frame) {
+      const out2 = OUTN[w.side];
+      if (o.frame && o.kind === 'win' && o.a1 - o.a0 <= 2.2 && o.y1 - o.y0 <= 2.6
+        && this.model('kc_window', wp(w, (o.a0 + o.a1) / 2, Y0, 0), yawFront(out2[0], out2[2]), [o.a1 - o.a0, Y1 - Y0, 1], { tint: frameCol, layer: 'det', double: true })) {
+        // Rahmen aus Blender
+      } else if (o.frame) {
         const f = 0.09, d = -0.025;
         const det = { layer: 'det' };
         this.quad([wp(w, o.a0 - f, Y0, d), wp(w, o.a0, Y0, d), wp(w, o.a0, Y1 + f, d), wp(w, o.a0 - f, Y1 + f, d)], out, frameCol, det);
@@ -129,7 +143,18 @@ export class HouseKit {
           this.quad([wp(w, o.a0, ym - 0.03, 0.08), wp(w, o.a1, ym - 0.03, 0.08), wp(w, o.a1, ym + 0.03, 0.08), wp(w, o.a0, ym + 0.03, 0.08)], out, frameCol, det);
         }
       }
-      if (o.shutter && shutterCol != null) {
+      if (o.shutter && shutterCol != null && this.inst && this.inst.has('kc_shutter')) {
+        // Fensterläden aus Blender: Flügel an beiden Seiten, Scharnier an der Öffnung
+        const hw = (o.a1 - o.a0) / 2;
+        const tilt = o.shutter === 'hang' ? 0.35 : 0;
+        for (const [edge, dir] of [[o.a1, 1], [o.a0, -1]]) {
+          if (dir > 0 ? edge + hw > w.a1 - 0.05 : edge - hw < w.a0 + 0.05) continue;
+          const ry = yawX(ax[0] * dir, ax[2] * dir);
+          const front = [Math.sin(ry), Math.cos(ry)];
+          const inward = front[0] * out2[0] + front[1] * out2[2] < 0;
+          this.model('kc_shutter', wp(w, edge, Y0, inward ? -0.12 : -0.01), ry, [hw / 0.5, Y1 - Y0, 1], { tint: shutterCol, layer: 'det', rz: dir > 0 ? -tilt : tilt, double: true });
+        }
+      } else if (o.shutter && shutterCol != null) {
         const sw = (o.a1 - o.a0) / 2, d = -0.05;
         const hang = o.shutter === 'hang';
         if (o.a0 - sw > w.a0 + 0.05) this.quad([wp(w, o.a0 - sw, Y0, d), wp(w, o.a0, Y0, d), wp(w, o.a0, Y1, d), wp(w, o.a0 - sw, Y1, d)], out, shutterCol, { layer: 'det' });
@@ -357,6 +382,16 @@ export class HouseKit {
         if (lot.style === 'schwarzwald' && f === 1 && anyOpen && k === front && rnd() < 0.5) this.balcony(w, fy, runs, pick(rnd, PAL.wood));
       }
 
+      // Offene Türflügel innen an der Wand
+      if (f === 0 && this.inst) {
+        for (const d of doors) {
+          if (rnd() < 0.25) continue;
+          const w = sides[d.side], axv = AXIS[d.side];
+          const shop = shopSide === d.side && d === doors[0];
+          const dw = shop ? 1.6 : DOOR_W;
+          this.model('kc_door', wp(w, d.a - dw / 2, fy, T + 0.05), yawX(-axv[0], -axv[2]), [dw, DOOR_H, 1], { tint: pick(rnd, PAL.door), layer: 'det' });
+        }
+      }
       // Böden
       if (f === 0) this.slab(rectUV(0, L, 0, S), y, yG, null, 0x8a6a4a, innerRect, true);
       // Treppe nach oben
@@ -512,13 +547,21 @@ export class HouseKit {
       if (d.side === sideB) return v > S - T - 1.4 && Math.abs(aOfU(u) - d.a) < 1.1;
       return v < T + 1.4 && Math.abs(aOfU(u) - d.a) < 1.1;
     });
-    // Tisch an Seite A
+    const du = [toX(1, 0) - toX(0, 0), toZ(1, 0) - toZ(0, 0)];
+    const dv = [toX(0, 1) - toX(0, 0), toZ(0, 1) - toZ(0, 0)];
+    const at = (u, v) => [toX(u, v), fy, toZ(u, v)];
+    const mopts = { layer: 'in', shade: 0.62 };
+    // Tisch mit Stühlen an Seite A
     if (S >= 4.6 && roomL >= 3.0) {
       const u = Math.min(T + roomL * 0.5, uEnd - 1.9), v = T + 0.75;
       if (u > T + 0.9 && !nearDoor(u, v)) {
         const r = rectUV(u - 0.7, u + 0.7, v - 0.4, v + 0.4);
-        this.b.box((r.x0 + r.x1) / 2, fy + 0.7, (r.z0 + r.z1) / 2, r.x1 - r.x0, 0.06, r.z1 - r.z0, wood, opts);
-        this.b.box((r.x0 + r.x1) / 2, fy, (r.z0 + r.z1) / 2, (r.x1 - r.x0) * 0.8, 0.7, (r.z1 - r.z0) * 0.7, darker(wood, 0.8), opts);
+        if (this.model('kc_table', at(u, v), yawX(du[0], du[1]), 1, mopts)) {
+          for (const k of [-0.35, 0.35]) if (rnd() < 0.8) this.model('kc_chair', at(u + k, v + 0.62), yawFront(-dv[0], -dv[1]) + (rnd() - 0.5) * 0.4, 1, mopts);
+        } else {
+          this.b.box((r.x0 + r.x1) / 2, fy + 0.7, (r.z0 + r.z1) / 2, r.x1 - r.x0, 0.06, r.z1 - r.z0, wood, opts);
+          this.b.box((r.x0 + r.x1) / 2, fy, (r.z0 + r.z1) / 2, (r.x1 - r.x0) * 0.8, 0.7, (r.z1 - r.z0) * 0.7, darker(wood, 0.8), opts);
+        }
         this.col.addBox(r.x0, fy, r.z0, r.x1, fy + 0.76, r.z1);
       }
     }
@@ -526,8 +569,10 @@ export class HouseKit {
     if (f > 0 && roomL >= 3.4 && rnd() < 0.6) {
       const u = T + 1.15, v = S - T - 0.55;
       const r = rectUV(u - 1.0, u + 1.0, v - 0.48, v + 0.48);
-      this.b.box((r.x0 + r.x1) / 2, fy, (r.z0 + r.z1) / 2, r.x1 - r.x0, 0.45, r.z1 - r.z0, 0xb9ae98, opts);
-      this.col.addBox(r.x0, fy, r.z0, r.x1, fy + 0.45, r.z1);
+      if (!this.model('kc_bed', at(u, v), yawFront(du[0], du[1]), 1, { ...mopts, tint: pick(rnd, PAL.awning) })) {
+        this.b.box((r.x0 + r.x1) / 2, fy, (r.z0 + r.z1) / 2, r.x1 - r.x0, 0.45, r.z1 - r.z0, 0xb9ae98, opts);
+      }
+      this.col.addBox(r.x0, fy, r.z0, r.x1, fy + 0.6, r.z1);
     } else {
       // Beuteplatz an Seite B vorn
       const u = T + 0.7, v = S - T - 0.6;
@@ -538,13 +583,18 @@ export class HouseKit {
       const u = uEnd - 0.75, v = S - T - 0.6;
       if (!nearDoor(u, v)) this.B.spots.push({ x: toX(u, v), y: fy, z: toZ(u, v), tier: lot.tier, poi: lot.poi, indoor: true });
     }
-    // Schrank oder Regal an der Vorderwand (Seite A)
-    if (rnd() < 0.45 && S >= 5) {
-      const u = T + 0.25, v = T + 0.4 + 0.6;
+    // Regal oder Kachelofen an der Vorderwand (Seite A)
+    if (rnd() < 0.5 && S >= 5) {
+      const stove = rnd() < 0.35;
+      const dep = stove ? 0.42 : 0.21, v = T + (stove ? 1.0 : 0.85);
+      const u = T + dep;
       if (!nearDoor(u + 0.4, v)) {
-        const r = rectUV(u - 0.22, u + 0.22, v - 0.6, v + 0.6);
-        this.b.box((r.x0 + r.x1) / 2, fy, (r.z0 + r.z1) / 2, r.x1 - r.x0, 1.9, r.z1 - r.z0, wood, opts);
-        this.col.addBox(r.x0, fy, r.z0, r.x1, fy + 1.9, r.z1);
+        const name = stove ? 'kc_stove' : 'kc_shelf';
+        const r = stove ? rectUV(T, T + 1.5, v - 0.55, v + 0.55) : rectUV(T, T + 0.42, v - 0.6, v + 0.6);
+        if (!this.model(name, at(u, v), yawFront(du[0], du[1]), 1, mopts)) {
+          this.b.box((r.x0 + r.x1) / 2, fy, (r.z0 + r.z1) / 2, r.x1 - r.x0, 1.9, r.z1 - r.z0, wood, opts);
+        }
+        this.col.addBox(r.x0, fy, r.z0, r.x1, fy + (stove ? 1.6 : 1.9), r.z1);
       }
     }
   }
@@ -619,7 +669,24 @@ export class HouseKit {
     if (rnd() < 0.7) {
       const cp = P0 + (P1 - P0) * (0.25 + rnd() * 0.5);
       const c = M(cp, 0, qc + hs * 0.3);
-      this.b.box(c[0], yr - rise * 0.35, c[2], 0.6, rise * 0.35 + 1.0, 0.6, pick(rnd, PAL.brick), { mat: 'brick' });
+      const ch = rise * 0.35 + 1.0;
+      if (!this.model('kc_chimney', [c[0], yr - rise * 0.35, c[2]], 0, [1, ch / 2.0, 1])) {
+        this.b.box(c[0], yr - rise * 0.35, c[2], 0.6, ch, 0.6, pick(rnd, PAL.brick), { mat: 'brick' });
+      }
+    }
+    // Gauben auf den Traufseiten
+    if (this.inst && !stepped && P1 - P0 >= 7.5 && rise >= 3) {
+      for (const side of [-1, 1]) {
+        if (rnd() < 0.4) continue;
+        const n = P1 - P0 >= 12 ? 2 : 1;
+        const q = side < 0 ? Q0 + hs * 0.42 : Q1 - hs * 0.42;
+        const yq = ye + hs * 0.42 * pitch;
+        const out = alongX ? [0, side] : [side, 0];
+        for (let i = 0; i < n; i++) {
+          const p = P0 + ((P1 - P0) / (n + 1)) * (i + 1);
+          this.model('kc_dormer', M(p, yq - 0.35, q), yawFront(out[0], out[1]), 0.9, { layer: 'det' });
+        }
+      }
     }
     // Kollision (Dachvolumen grob)
     const c1 = [M(P0, ye, Q0 + hs * 0.2), M(P1, ye + rise * 0.55, Q1 - hs * 0.2)];
@@ -695,6 +762,12 @@ export class HouseKit {
         if (free) [tx, tz] = free;
         else return;
       }
+      const k = r / 1.4;
+      if (this.model('kc_tank', [tx, ytop, tz], rnd() * 6, k)) {
+        this.col.addCyl(tx, tz, r, ytop + 1.9 * k, ytop + 5.4 * k);
+        this.col.addCyl(tx, tz, 0.5, ytop, ytop + 1.9 * k);
+        return;
+      }
       const legH = 1.6 + rnd() * 0.8, th = 2.4 + rnd() * 0.8;
       const rust = pick(rnd, [0x7a5236, 0x6b4a34, 0x5d6266, 0x86603e]);
       for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) this.b.box(tx + dx * r * 0.6, ytop, tz + dz * r * 0.6, 0.16, legH, 0.16, 0x3a3532, { mat: 'metal' });
@@ -721,6 +794,12 @@ export class HouseKit {
   shopSign(w, a, y, rnd) {
     const out = OUTN[w.side];
     const col = pick(rnd, PAL.awning);
+    if (this.inst && this.inst.has('kc_sign')) {
+      const ry = yawFront(out[0], out[2]);
+      this.model('kc_sign', wp(w, a + 0.9, y - 0.3, 0), ry, 1, { tint: col, layer: 'det' });
+      if (rnd() < 0.55) this.model('kc_awning', wp(w, a, y + 0.1, 0), ry, 1, { tint: pick(rnd, PAL.awning), layer: 'det' });
+      return;
+    }
     // Ausleger mit Schild quer zur Wand
     const p0 = wp(w, a + 0.9, y, -0.05), p1 = wp(w, a + 0.9, y, -1.1);
     this.b.box((p0[0] + p1[0]) / 2, y + 0.55, (p0[2] + p1[2]) / 2, Math.abs(p0[0] - p1[0]) + 0.06, 0.06, Math.abs(p0[2] - p1[2]) + 0.06, 0x2a2622, { mat: 'metal', layer: 'det' });

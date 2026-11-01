@@ -19,6 +19,7 @@ sys.path.insert(0, HERE)
 import bpy  # noqa: E402
 import kit  # noqa: E402
 import m_arc  # noqa: E402
+import m_city  # noqa: E402
 import m_items  # noqa: E402
 import m_weapons  # noqa: E402
 import m_world  # noqa: E402
@@ -49,7 +50,7 @@ def build_models():
     kit.reset()
     col = kit.new_collection('assets')
     builders = (m_weapons.BUILDERS + m_items.CONTAINERS + m_arc.BUILDERS + m_world.PROPS + m_world.KIT
-                + m_world.LANDMARKS + m_world.VEG + m_world.CHARS)
+                + m_world.LANDMARKS + m_world.VEG + m_world.CHARS + m_city.ALL)
     total = 0
     for b in builders:
         a = b(col)

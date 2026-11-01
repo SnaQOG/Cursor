@@ -494,12 +494,14 @@ def v_pine(col):
 def v_tree(col):
     a = Asset('v_tree', col)
     p = a.part('M')
+    rnd = random.Random(17)
     p.cyl(0.25, 3.2, loc=(0, 0, 1.6), r2=0.14, mat='bark', seg=7)
-    for (x, y, z) in [(0.9, 0.3, 3.4), (-0.8, 0.5, 3.1), (0.1, -0.9, 3.6)]:
+    for (x, y, z) in [(0.9, 0.3, 3.4), (-0.8, 0.5, 3.1), (0.1, -0.9, 3.6), (-0.4, -0.5, 4.0)]:
         p.beam((0, 0, 2.4), (x, y, z), 0.09, mat='bark', seg=5)
-    blobs = [((0, 0, 4.4), 1.7, 'leaves'), ((1.1, 0.4, 3.9), 1.2, 'leaves2'), ((-1.0, 0.6, 3.7), 1.25, 'leaves'), ((0.2, -1.0, 4.0), 1.2, 'leaves2'), ((0.1, 0.2, 5.4), 1.1, 'leaves')]
-    for i, (c, r, m) in enumerate(blobs):
-        p.ico(r, loc=c, mat=m, sub=1, jitter=0.25, seed=i + 3)
+    blobs = [((0, 0, 4.4), 1.6), ((1.1, 0.4, 3.9), 1.15), ((-1.0, 0.6, 3.7), 1.2), ((0.2, -1.0, 4.0), 1.15),
+             ((-0.6, -0.6, 4.6), 1.0), ((0.7, -0.3, 4.9), 1.0), ((0.1, 0.2, 5.4), 1.05), ((-0.3, 0.9, 4.8), 0.95)]
+    for i, (c, r) in enumerate(blobs):
+        p.ico(r, loc=c, mat=rnd.choice(['leaves', 'leaves2', 'leaves']), sub=1, jitter=0.35, seed=i + 3)
     a.add(p)
     return a
 

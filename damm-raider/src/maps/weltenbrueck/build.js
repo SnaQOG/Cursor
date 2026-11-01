@@ -14,7 +14,7 @@ const STONE_WALL = 0x9a917f;
 const METAL = 0x5c5650;
 const COPPER = 0x8a5a3a;
 
-export function buildCity({ batcher, col, terrain, assets, world, layout }) {
+export function buildCity({ batcher, col, terrain, assets, world, layout, instancer }) {
   const B = new Builder(batcher, col, terrain, assets);
   const b = batcher;
   const rnd = mulberry32(4711);
@@ -89,7 +89,8 @@ export function buildCity({ batcher, col, terrain, assets, world, layout }) {
   for (const t of GIANT_TREES) occ.mark({ x0: t.x - 2.6, x1: t.x + 2.6, z0: t.z - 2.6, z1: t.z + 2.6 }, -3);
 
   // ---------------------------------------------------------------- Häuser
-  const kit = new HouseKit(B, occ, lots);
+  const kit = new HouseKit(B, occ, lots, instancer);
+  const inst = (name, x, y, z, ry = 0, scale = 1, opts = {}) => instancer.add(name, x, y, z, ry, scale, opts);
   STYLE.dom = { fh: 3.0, roof: 'flat', pitch: 0, roofMat: 'stone', spacing: 3.2, winW: 0.8, winH: 1.8 };
   kit.styleHook = (lot) => (lot.style === 'dom' ? { wall: STONE_LIGHT, base: STONE_LIGHT, mat: 'stone', frame: STONE_WALL } : null);
   for (const l of lots) kit.house(l, rnd);
@@ -255,6 +256,9 @@ export function buildCity({ batcher, col, terrain, assets, world, layout }) {
   return {
     builder: B, spots: B.spots, enemySpawns, turrets, containers, barrels, labels, glowMats,
     spotChance: 0.24, stats: kit.stats, lots, trees: GIANT_TREES,
+    // Beutebehälter im Stadtstil
+    containerSkin: { crate: 'truhe', locker: 'schrank', drawer: 'kommode' },
+    containerNames: { crate: 'Truhe', locker: 'Schrank', drawer: 'Kommode' },
   };
 
   // ================================================================ Hilfen
@@ -269,6 +273,10 @@ export function buildCity({ batcher, col, terrain, assets, world, layout }) {
   }
 
   function lantern(x, z, y) {
+    if (inst('kc_lantern', x, y, z, rnd() * 6)) {
+      col.addCyl(x, z, 0.14, y, y + 3.6);
+      return;
+    }
     b.box(x, y, z, 0.14, 3.6, 0.14, 0x26221f, { mat: 'metal' });
     b.box(x, y + 3.6, z, 0.36, 0.08, 0.36, 0x26221f, { mat: 'metal' });
     b.box(x, y + 3.1, z, 0.26, 0.42, 0.26, 0xffcf7a, { mat: 'glow' });
@@ -279,6 +287,10 @@ export function buildCity({ batcher, col, terrain, assets, world, layout }) {
   function bench(x, z, y, ry) {
     const w = 1.8;
     const sw = Math.abs(Math.sin(ry)) > 0.5;
+    if (inst('kc_bench', x, y, z, ry)) {
+      col.addBox(x - (sw ? 0.22 : w / 2), y, z - (sw ? w / 2 : 0.22), x + (sw ? 0.22 : w / 2), y + 0.49, z + (sw ? w / 2 : 0.22));
+      return;
+    }
     b.box(x, y + 0.42, z, sw ? 0.45 : w, 0.07, sw ? w : 0.45, 0x6a4a30, { mat: 'wood' });
     b.box(x, y, z, sw ? 0.4 : w * 0.9, 0.42, sw ? w * 0.9 : 0.4, 0x3a3532, { mat: 'metal' });
     col.addBox(x - (sw ? 0.22 : w / 2), y, z - (sw ? w / 2 : 0.22), x + (sw ? 0.22 : w / 2), y + 0.49, z + (sw ? w / 2 : 0.22));
@@ -293,6 +305,11 @@ export function buildCity({ batcher, col, terrain, assets, world, layout }) {
 
   function cart(x, z, y, ry) {
     const ca = Math.cos(ry), sa = Math.sin(ry);
+    if (inst('kc_cart', x, y, z, ry)) {
+      const hw = Math.abs(ca) * 1.2 + Math.abs(sa) * 0.65, hd = Math.abs(sa) * 1.2 + Math.abs(ca) * 0.65;
+      col.addBox(x - hw, y, z - hd, x + hw, y + 1.1, z + hd);
+      return;
+    }
     b.box(x, y + 0.55, z, 2.4, 0.5, 1.3, 0x6a4a30, { ry, mat: 'wood' });
     for (const [lx, lz] of [[0.7, 0.72], [0.7, -0.72], [-0.7, 0.72], [-0.7, -0.72]]) {
       b.addPrim('torus', x + lx * ca + lz * sa, y + 0.5, z - lx * sa + lz * ca, 0.5, 0.5, 1.6, 0x3a2a1c, { ry: ry + Math.PI / 2, mat: 'wood' });
@@ -307,6 +324,10 @@ export function buildCity({ batcher, col, terrain, assets, world, layout }) {
     const sw = Math.abs(Math.sin(ry)) > 0.5;
     const w = 3.6, d = 2.2;
     const W = sw ? d : w, D = sw ? w : d;
+    if (inst('kc_stall', x, y, z, ry, 1, { tint: color })) {
+      col.addBox(x - (W - 0.3) / 2, y, z - (D - 0.6) / 2, x + (W - 0.3) / 2, y + 0.95, z + (D - 0.6) / 2);
+      return;
+    }
     for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) b.box(x + dx * (W / 2 - 0.1), y, z + dz * (D / 2 - 0.1), 0.1, 2.4, 0.1, 0x5a3e2a, { mat: 'wood' });
     B.solid(x, y, z, W - 0.3, 0.9, D - 0.6, 0x6e4e32, { mat: 'wood' });
     // Ware
@@ -350,7 +371,7 @@ export function buildCity({ batcher, col, terrain, assets, world, layout }) {
       for (let z = N.z0 + 1; z <= N.z1 - 1; z += 5) {
         const sx = k === 'e' ? N.x1 + 0.7 : N.x0 - 0.7;
         B.solid(sx, y, z, 1.4, wallH - 2, 1.4, STONE_WALL, { mat: 'stone' });
-        b.addPrim('cone4', sx, y + wallH - 0.5, z, 0.9, 2.2, 0.9, STONE_WALL, { mat: 'stone', ry: Math.PI / 4 });
+        if (!inst('kc_pinnacle', sx, y + wallH - 2, z, 0)) b.addPrim('cone4', sx, y + wallH - 0.5, z, 0.9, 2.2, 0.9, STONE_WALL, { mat: 'stone', ry: Math.PI / 4 });
       }
     }
     // Nordwand mit großem Bogen zum Chor, Südwand mit Tür zum Turm
@@ -399,25 +420,28 @@ export function buildCity({ batcher, col, terrain, assets, world, layout }) {
     // Erfinderturm über dem Turmsockel
     const ty = domTower.roofY;
     const tx = 0, tz = (DOM.tower.z0 + DOM.tower.z1) / 2;
-    b.addPrim('cyl8', tx, ty + 7, tz, 4.6, 14, 4.6, STONE_LIGHT, { mat: 'stone', ry: Math.PI / 8 });
-    col.addCyl(tx, tz, 4.6, ty, ty + 14);
-    // Schallöffnungen (dunkel)
-    for (let k = 0; k < 8; k++) {
-      const a = (k / 8) * Math.PI * 2 + Math.PI / 8;
-      const r = 4.45;
-      b.box(tx + Math.cos(a) * r, ty + 6, tz + Math.sin(a) * r, 1.2, 3.4, 0.12, 0x15171a, { ry: -a + Math.PI / 2 });
+    const spire = B.model('l_spire', tx, ty, tz, 0);
+    if (!spire) {
+      b.addPrim('cyl8', tx, ty + 7, tz, 4.6, 14, 4.6, STONE_LIGHT, { mat: 'stone', ry: Math.PI / 8 });
+      // Schallöffnungen (dunkel)
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * Math.PI * 2 + Math.PI / 8;
+        const r = 4.45;
+        b.box(tx + Math.cos(a) * r, ty + 6, tz + Math.sin(a) * r, 1.2, 3.4, 0.12, 0x15171a, { ry: -a + Math.PI / 2 });
+      }
+      b.addPrim('cone8', tx, ty + 14 + 13, tz, 4.9, 26, 4.9, pick(PAL.slate), { mat: 'slate', ry: Math.PI / 8 });
     }
-    b.addPrim('cone8', tx, ty + 14 + 13, tz, 4.9, 26, 4.9, pick(PAL.slate), { mat: 'slate', ry: Math.PI / 8 });
+    col.addCyl(tx, tz, 4.6, ty, ty + 14);
     col.addCyl(tx, tz, 3.2, ty + 14, ty + 30);
     // Kupferringe, Rohre, Zahnrad und Antenne
-    for (const yy of [ty + 2.2, ty + 12.6]) b.addPrim('torus', tx, yy, tz, 5.1, 5.1, 6, COPPER, { mat: 'metal', rx: Math.PI / 2 });
+    if (!spire) for (const yy of [ty + 2.2, ty + 12.6]) b.addPrim('torus', tx, yy, tz, 5.1, 5.1, 6, COPPER, { mat: 'metal', rx: Math.PI / 2 });
     for (let k = 0; k < 4; k++) {
       const a = (k / 4) * Math.PI * 2;
       b.box(tx + Math.cos(a) * 4.9, ty - 22, tz + Math.sin(a) * 4.9 * 0.85, 0.35, 34, 0.35, COPPER, { mat: 'metal' });
     }
     b.addPrim('torus', tx, 3 + 17, DOM.tower.z1 + 0.25, 2.6, 2.6, 4, METAL, { mat: 'metal' });
     for (let k = 0; k < 6; k++) b.box(tx, 3 + 17, DOM.tower.z1 + 0.25, 5.0, 0.3, 0.2, METAL, { rz: (k / 6) * Math.PI, mat: 'metal' });
-    b.addPrim('cyl8', tx, ty + 44, tz, 0.25, 8, 0.25, METAL, { mat: 'metal' });
+    if (!spire) b.addPrim('cyl8', tx, ty + 44, tz, 0.25, 8, 0.25, METAL, { mat: 'metal' });
     // Energiekern (pulsierend, eigene Materialien)
     const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
     const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
@@ -446,17 +470,20 @@ export function buildCity({ batcher, col, terrain, assets, world, layout }) {
     const y = 3;
     const fx = 0, fz = 96;
     // Brunnen: achteckiger Rand, Säule, Figur
-    for (let k = 0; k < 8; k++) {
+    const fountain = B.model('kc_fountain', fx, y, fz, 0);
+    for (let k = 0; k < 8 && !fountain; k++) {
       const a = (k / 8) * Math.PI * 2;
       const r = 4.8;
       const px = fx + Math.cos(a) * r, pz = fz + Math.sin(a) * r;
       b.box(px, y, pz, 3.9, 0.75, 0.55, STONE_LIGHT, { ry: -a + Math.PI / 2, mat: 'stone' });
     }
     col.addCyl(fx, fz, 5.1, y, y + 0.75);
-    b.addPrim('cyl8', fx, y + 1.8, fz, 0.6, 3.6, 0.6, STONE_LIGHT, { mat: 'stone' });
-    b.addPrim('cyl8', fx, y + 3.7, fz, 1.4, 0.3, 1.4, STONE_LIGHT, { mat: 'stone' });
-    b.addPrim('sphere', fx, y + 4.6, fz, 0.55, 0.65, 0.5, 0x8a8a82, { mat: 'metal' });
-    b.addPrim('cone8', fx, y + 5.8, fz, 0.35, 1.4, 0.35, 0x8a8a82, { mat: 'metal' });
+    if (!fountain) {
+      b.addPrim('cyl8', fx, y + 1.8, fz, 0.6, 3.6, 0.6, STONE_LIGHT, { mat: 'stone' });
+      b.addPrim('cyl8', fx, y + 3.7, fz, 1.4, 0.3, 1.4, STONE_LIGHT, { mat: 'stone' });
+      b.addPrim('sphere', fx, y + 4.6, fz, 0.55, 0.65, 0.5, 0x8a8a82, { mat: 'metal' });
+      b.addPrim('cone8', fx, y + 5.8, fz, 0.35, 1.4, 0.35, 0x8a8a82, { mat: 'metal' });
+    }
     col.addCyl(fx, fz, 0.7, y, y + 6);
     // Marktstände in zwei Reihen
     const cols = PAL.awning;
@@ -475,10 +502,12 @@ export function buildCity({ batcher, col, terrain, assets, world, layout }) {
     // Uhrtürmchen auf dem Rathaus
     const rx = (RATHAUS.x0 + RATHAUS.x1) / 2, rz = (RATHAUS.z0 + RATHAUS.z1) / 2;
     const ry0 = rathaus.roofY + (RATHAUS.x1 - RATHAUS.x0) / 2 * 1.2 * 0.55;
-    b.box(rx, ry0, rz, 3, 5, 3, pick(PAL.brick), { mat: 'brick' });
-    b.addPrim('cone4', rx, ry0 + 7, rz, 2.6, 4, 2.6, pick(PAL.slate), { mat: 'slate', ry: Math.PI / 4 });
-    b.addPrim('cyl16', rx, ry0 + 3.2, rz - 1.52, 0.95, 0.05, 0.95, 0xe8e2d4, { rx: Math.PI / 2 });
-    b.box(rx, ry0 + 3.2, rz - 1.56, 0.06, 0.7, 0.04, 0x1d1a17);
+    if (!B.model('l_clock', rx, ry0, rz, 0)) {
+      b.box(rx, ry0, rz, 3, 5, 3, pick(PAL.brick), { mat: 'brick' });
+      b.addPrim('cone4', rx, ry0 + 7, rz, 2.6, 4, 2.6, pick(PAL.slate), { mat: 'slate', ry: Math.PI / 4 });
+      b.addPrim('cyl16', rx, ry0 + 3.2, rz - 1.52, 0.95, 0.05, 0.95, 0xe8e2d4, { rx: Math.PI / 2 });
+      b.box(rx, ry0 + 3.2, rz - 1.56, 0.06, 0.7, 0.04, 0x1d1a17);
+    }
     turrets.push({ x: rx, y: ry0 + 5, z: rz });
   }
 
@@ -486,32 +515,35 @@ export function buildCity({ batcher, col, terrain, assets, world, layout }) {
   function giantTree(t) {
     const y = t.level;
     const bark = 0x4a3626, barkDark = 0x3a2a1e;
-    // Stamm in Abschnitten
-    let r = 2.4, yy = y;
-    for (let k = 0; k < 5; k++) {
-      const h = t.h * 0.14;
-      b.addPrim('cyl16', t.x, yy + h / 2, t.z, r, h, r, k % 2 ? bark : barkDark, { mat: 'wood' });
-      yy += h;
-      r *= 0.86;
+    const model = B.model('v_giant', t.x, y, t.z, rnd() * 6, { scale: t.h / 44 });
+    if (!model) {
+      // Stamm in Abschnitten
+      let r = 2.4, yy = y;
+      for (let k = 0; k < 5; k++) {
+        const h = t.h * 0.14;
+        b.addPrim('cyl16', t.x, yy + h / 2, t.z, r, h, r, k % 2 ? bark : barkDark, { mat: 'wood' });
+        yy += h;
+        r *= 0.86;
+      }
+      // Wurzeln
+      for (let k = 0; k < 7; k++) {
+        const a = (k / 7) * Math.PI * 2 + rnd();
+        b.box(t.x + Math.cos(a) * 2.6, y, t.z + Math.sin(a) * 2.6, 3.6, 1.4, 1.1, barkDark, { ry: -a, rz: 0.25, mat: 'wood' });
+      }
+      // Äste
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * Math.PI * 2 + rnd() * 0.5;
+        const ay = y + t.h * (0.5 + rnd() * 0.25), len = 6 + rnd() * 5;
+        b.box(t.x + Math.cos(a) * len / 2, ay, t.z + Math.sin(a) * len / 2, len, 0.7, 0.7, bark, { ry: -a, rz: 0.35, mat: 'wood' });
+      }
+      // Krone aus vielen Laubballen
+      for (let k = 0; k < 22; k++) {
+        const a = rnd() * Math.PI * 2, d = rnd() * 9;
+        const s = 4 + rnd() * 4;
+        b.addPrim('ico1', t.x + Math.cos(a) * d, y + t.h * (0.62 + rnd() * 0.35), t.z + Math.sin(a) * d, s, s * 0.75, s, mix(0x3e5a2c, 0x56702f, rnd()), { ry: rnd() * 6 });
+      }
     }
     col.addCyl(t.x, t.z, 2.3, y - 1, y + t.h * 0.7);
-    // Wurzeln
-    for (let k = 0; k < 7; k++) {
-      const a = (k / 7) * Math.PI * 2 + rnd();
-      b.box(t.x + Math.cos(a) * 2.6, y, t.z + Math.sin(a) * 2.6, 3.6, 1.4, 1.1, barkDark, { ry: -a, rz: 0.25, mat: 'wood' });
-    }
-    // Äste
-    for (let k = 0; k < 8; k++) {
-      const a = (k / 8) * Math.PI * 2 + rnd() * 0.5;
-      const ay = y + t.h * (0.5 + rnd() * 0.25), len = 6 + rnd() * 5;
-      b.box(t.x + Math.cos(a) * len / 2, ay, t.z + Math.sin(a) * len / 2, len, 0.7, 0.7, bark, { ry: -a, rz: 0.35, mat: 'wood' });
-    }
-    // Krone aus vielen Laubballen
-    for (let k = 0; k < 22; k++) {
-      const a = rnd() * Math.PI * 2, d = rnd() * 9;
-      const s = 4 + rnd() * 4;
-      b.addPrim('ico1', t.x + Math.cos(a) * d, y + t.h * (0.62 + rnd() * 0.35), t.z + Math.sin(a) * d, s, s * 0.75, s, mix(0x3e5a2c, 0x56702f, rnd()), { ry: rnd() * 6 });
-    }
     // Plattform auf Höhe der Turmdächer
     const dy = t.deckY;
     const D = DECK;
@@ -573,10 +605,14 @@ export function buildCity({ batcher, col, terrain, assets, world, layout }) {
   function buildCliff() {
     // Felswand mit großen Brocken verkleiden
     for (let x = -296; x < 296; x += R(5, 9)) {
-      const z = CITY.CLIFF_Z - R(2, 14);
+      // vor den Gesichtern frei lassen
+      if (FACES.some((f) => Math.abs(x - f.x) < 12)) continue;
+      const z = CITY.CLIFF_Z - R(3, 14);
       const s = R(4, 9);
       const yy = terrain.height(x, z);
-      b.addPrim('ico', x, yy + s * 0.2, z, s * 1.2, s * 0.9, s, mix(0x6f685c, 0x8a8274, rnd()), { mat: 'stone', ry: rnd() * 6, rx: rnd() * 0.5 });
+      if (!inst('v_rock' + (Math.floor(rnd() * 3) % 3), x, yy - s * 0.25, z, rnd() * 6, [s * 1.3, s * 1.1, s * 1.2])) {
+        b.addPrim('ico', x, yy + s * 0.2, z, s * 1.2, s * 0.9, s, mix(0x6f685c, 0x8a8274, rnd()), { mat: 'stone', ry: rnd() * 6, rx: rnd() * 0.5 });
+      }
     }
     // Gesichter der Gründer
     for (const f of FACES) founderFace(f);
@@ -660,9 +696,10 @@ export function buildCity({ batcher, col, terrain, assets, world, layout }) {
     const zp = layout.squares.find((q) => q.name === 'Zunftplatz');
     if (zp) {
       const zx = (zp.x0 + zp.x1) / 2, zz = (zp.z0 + zp.z1) / 2;
-      b.addPrim('cyl8', zx, y + 10, zz, 0.28, 20, 0.28, 0xd8d0bc, { mat: 'wood' });
-      b.addPrim('torus', zx, y + 19, zz, 1.4, 1.4, 3, 0x3e5a2c, { rx: Math.PI / 2 });
-      for (let k = 0; k < 5; k++) {
+      const pole = B.model('kc_maypole', zx, y, zz, 0);
+      if (!pole) b.addPrim('cyl8', zx, y + 10, zz, 0.28, 20, 0.28, 0xd8d0bc, { mat: 'wood' });
+      if (!pole) b.addPrim('torus', zx, y + 19, zz, 1.4, 1.4, 3, 0x3e5a2c, { rx: Math.PI / 2 });
+      for (let k = 0; k < 5 && !pole; k++) {
         const yy = y + 6 + k * 2.4, a = k * 1.3;
         b.box(zx + Math.cos(a) * 1.0, yy, zz + Math.sin(a) * 1.0, 1.4, 0.9, 0.06, pick(PAL.awning), { ry: -a });
       }
@@ -674,9 +711,11 @@ export function buildCity({ batcher, col, terrain, assets, world, layout }) {
     const bp = layout.squares.find((q) => q.name === 'Brunnenplatz');
     if (bp) {
       const bx = (bp.x0 + bp.x1) / 2, bz = (bp.z0 + bp.z1) / 2;
-      b.addPrim('cyl16', bx, y + 0.45, bz, 1.4, 0.9, 1.4, STONE_LIGHT, { mat: 'stone' });
-      for (const s of [-1, 1]) b.box(bx + s * 1.2, y + 0.9, bz, 0.18, 2.2, 0.18, 0x5a3e2a, { mat: 'wood' });
-      b.box(bx, y + 3.1, bz, 2.8, 0.12, 1.6, 0x7a4430, { mat: 'tile', rz: 0 });
+      if (!B.model('kc_well', bx, y, bz, 0)) {
+        b.addPrim('cyl16', bx, y + 0.45, bz, 1.4, 0.9, 1.4, STONE_LIGHT, { mat: 'stone' });
+        for (const s of [-1, 1]) b.box(bx + s * 1.2, y + 0.9, bz, 0.18, 2.2, 0.18, 0x5a3e2a, { mat: 'wood' });
+        b.box(bx, y + 3.1, bz, 2.8, 0.12, 1.6, 0x7a4430, { mat: 'tile', rz: 0 });
+      }
       col.addCyl(bx, bz, 1.45, y, y + 0.9);
       cart(bx - 6, bz + 4, y, 1.2);
       containers.push({ type: 'crate', x: bx + 5, y, z: bz - 4, tier: 1, ry: 0.3 });

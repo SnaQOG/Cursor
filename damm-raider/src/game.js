@@ -538,7 +538,7 @@ export class Game {
     this.camera.position.set(cx + Math.cos(a) * mc.r, mc.h + Math.sin(this.hubT * 0.1) * 8, cz + Math.sin(a) * mc.r);
     this.camera.lookAt(cx, mc.lookY, cz);
     if (this.camera.fov !== 60) { this.camera.fov = 60; this.camera.updateProjectionMatrix(); }
-    this.world.update(dt, _v.set(cx, mc.lookY + 2, cz), null);
+    this.world.update(dt, _v.set(cx, mc.lookY + 2, cz), null, false);
     this.effects.update(dt, this.width, this.height);
   }
 

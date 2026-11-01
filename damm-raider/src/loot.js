@@ -120,7 +120,8 @@ export class LootSystem {
       let lamps = null;
       let size = look.size;
       let base = new THREE.Color(look.color), lampCol = new THREE.Color(look.lid);
-      const asset = 'c_' + type;
+      const skin = mapData.containerSkin?.[type];
+      const asset = 'c_' + (skin && assets.has('c_' + skin) ? skin : type);
       if (assets.has(asset)) {
         const bb = assets.bounds(asset);
         size = [bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z];
@@ -155,7 +156,7 @@ export class LootSystem {
         for (const im of bodies) { im.setMatrixAt(i, m); im.setColorAt(i, base); }
         if (lamps) { lamps.setMatrixAt(i, m); lamps.setColorAt(i, lampCol); }
         this.containers.push({
-          type, name: CONTAINER_NAMES[type], pos: new THREE.Vector3(d.x, d.y + size[1] * 0.5, d.z),
+          type, name: (asset !== 'c_' + type && mapData.containerNames?.[type]) || CONTAINER_NAMES[type], pos: new THREE.Vector3(d.x, d.y + size[1] * 0.5, d.z),
           tier: d.tier || 1, bodies, lamps, idx: i, searched: false, items: null, base, lampCol,
         });
       });

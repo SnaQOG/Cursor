@@ -133,6 +133,7 @@ Alle Modelle entstehen reproduzierbar per Python-Skript in Blender (`blender/`):
 | `m_items.py` | Beutebehälter und Modelle für alle 50 Inventar-Icons |
 | `m_arc.py` | die neun ARC-Maschinen mit Gelenken, Rotoren und Trefferzonen |
 | `m_world.py` | Container, Autos, Strommasten, Fensterrahmen, Türen, Portalkran, Turbinen, Radar, Königinnen-Wrack, Aufzug, Bäume, Felsen, Gras, der Raider |
+| `m_city.py` | Weltenbrück: die vier Gründergesichter (verwitterter Stein mit Moos), Fenster, Fensterläden, Türen, Gauben, Schornsteine, Ladenschilder, Markisen, Möbel (Tisch, Stuhl, Bett, Regal, Kachelofen), Truhe/Schrank/Kommode als Beutebehälter, Laternen, Bänke, Marktstände, Karren, Wassertanks, Marktbrunnen, Ziehbrunnen, Zunftbaum, Fialen, Erfinderturm-Spitze, Uhrtürmchen, Riesenbaum, Linde, Birke, Blumen, Unkraut |
 | `build.py` | baut alles, exportiert `assets/models.glb` und rendert `assets/icons.webp` mit Cycles |
 
 Neu bauen (die fertigen Dateien liegen im Repo, für das Spielen ist Blender nicht nötig):
@@ -152,6 +153,15 @@ Konventionen, die das Spiel auswertet:
 - Lackflächen in Magenta (`key`) werden im Spiel pro Platzierung umgefärbt (Container, Autos).
 - Matte und metallische Materialien werden beim Export in Vertexfarben gebacken, damit das Spiel
   mit wenigen Materialien und Draw-Calls auskommt; leuchtende Teile behalten ihr Material.
+- Stadt-Modelle (`m_city.py`) zeigen mit der Vorderseite nach **-Y**, damit Fassadenteile mit derselben
+  Drehung wie ihre Wand nach außen zeigen. Teile namens `__Paint` werden pro Instanz eingefärbt
+  (Fensterrahmen, Läden, Türen, Markisen, Schilder, Bettdecken).
+- Wiederholte Modelle (Fenster, Läden, Möbel, Laternen …) zeichnet das Spiel als Instanzen
+  (`src/instancer.js`); Fassadendetails nur bis etwa 100 m, Möbel nur in der Nähe.
+
+Was nicht aus Blender kommt: Wände, Böden, Treppen und Dächer der Stadthäuser entstehen im Spiel aus
+dem Stadtplan, weil jedes Haus genau auf sein Grundstück passen und begehbar sein muss. Alles, was eine
+feste Form hat, kommt aus Blender.
 
 ## Projektstruktur
 
@@ -172,6 +182,7 @@ damm-raider/
 │   ├── map.js          Aufbau der Dammkarte
 │   ├── structures.js   Gebäude-Baukasten
 │   ├── batcher.js      Zusammenfassen statischer Geometrie
+│   ├── instancer.js    wiederholte Blender-Modelle als Instanzen (einfärbbar, mit Culling)
 │   ├── collision.js    Kollision und Raycasts
 │   ├── player.js       Spielfigur, Kamera, Waffen, Heilung
 │   ├── enemies.js      ARC-KI

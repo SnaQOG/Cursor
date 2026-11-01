@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { Terrain } from './terrain.js';
 import { CollisionWorld } from './collision.js';
 import { Batcher } from './batcher.js';
+import { Instancer } from './instancer.js';
 import { makeGrungeTexture, makeSignTexture } from './textures.js';
 import { Noise2D, clamp } from './util.js';
 
@@ -52,9 +53,10 @@ export class World {
     };
     if (def.materials) Object.assign(mats, def.materials(this));
     this.batcher = new Batcher(mats);
-    this.mapData = def.build({ batcher: this.batcher, col: this.col, terrain: this.terrain, assets: this.assets, world: this });
+    this.instancer = new Instancer(this.assets);
+    this.mapData = def.build({ batcher: this.batcher, col: this.col, terrain: this.terrain, assets: this.assets, world: this, instancer: this.instancer });
     this.plantVegetation();
-    this.staticMeshes = this.batcher.build(this.scene);
+    this.staticMeshes = [...this.batcher.build(this.scene), ...this.instancer.build(this.scene)];
     // Innenräume (Treppen, Möbel …) nur in der Nähe zeichnen
     this.interiorMeshes = this.staticMeshes.filter((m) => m.userData.layer === 'in');
     // Kleinkram (Rahmen, Läden, Efeu …) nur bis mittlere Entfernung
@@ -344,7 +346,7 @@ export class World {
     this.rainOffset = 0;
   }
 
-  update(dt, focus, sfx) {
+  update(dt, focus, sfx, near = true) {
     this.time += dt;
     this.skyUniforms.time.value = this.time;
     this.sky.position.copy(focus);
@@ -362,12 +364,12 @@ export class World {
     for (const m of this.interiorMeshes) {
       const c = m.userData.center;
       const dx = c.x - focus.x, dz = c.z - focus.z;
-      m.visible = dx * dx + dz * dz < 95 * 95 && Math.abs(c.y - focus.y) < 80;
+      m.visible = near && dx * dx + dz * dz < 95 * 95 && Math.abs(c.y - focus.y) < 80;
     }
     for (const m of this.detailMeshes) {
       const c = m.userData.center;
       const dx = c.x - focus.x, dz = c.z - focus.z;
-      m.visible = dx * dx + dz * dz < 135 * 135;
+      m.visible = near && dx * dx + dz * dz < 105 * 105;
     }
     if (this.rain.visible) {
       this.rainOffset = (this.rainOffset + dt * 30) % 40;

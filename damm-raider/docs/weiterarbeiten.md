@@ -92,6 +92,8 @@ Richtwerte aus `simready.mjs` (Apple M1, feste Kamera, vorher → nachher SimRea
 | Apple M1, 1440 × 900 Retina | mittel | 15–23 fps | 13–18 fps |
 | Apple M1, 1440 × 900 Retina | hoch (vor der Wiese) | 5–9 fps | 6–7 fps |
 
+Die 4080-Werte stammen von vor Linde, Birke, Ruinen und Mauerflecken und sind danach noch nicht nachgemessen.
+
 Woher die Draw-Calls kommen, zeigt `tools/tests/drawcalls.mjs`. Die Schattenkarte wird nur jedes zweite Bild gezeichnet
 und nie doppelt (`Game.renderFrame`), Sichtweiten stehen oben in `src/world.js`. Auf dem M1 begrenzt die Pixelmenge, die
 Einsparungen helfen dort kaum. Im Raid mit Gegnern, auf Bodenhöhe. M1 mit `tools/tests/fps.mjs` im normalen Spieltakt ohne Vsync, vor dem Ausblenden

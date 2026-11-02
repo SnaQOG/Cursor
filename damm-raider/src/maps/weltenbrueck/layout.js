@@ -396,6 +396,8 @@ export function generateLayout() {
         if (r < 0.2) { out.yards.push({ ...l, garden: true }); continue; }
         if (r < 0.26) lot.kind = 'ruin';
         lot.style = 'weiss';
+        // Musterabschnitt mit überarbeiteten Häusern (Ablauf: docs/hausstandard.md)
+        lot.pilot = cz < -94;
         lot.floors = 2 + Math.floor(outerRnd() * 2);
         lot.tier = 2;
         lot.shop = outerMains.some((s) => overlap(l, s, 0.6)) && outerRnd() < 0.5;

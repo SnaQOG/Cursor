@@ -9,7 +9,7 @@ import { Noise2D, clamp } from './util.js';
 
 const CONDITION_LOOK = {
   tag: {
-    sunElev: 0.72, sunAz: 2.3, sun: 0xffe8c8, sunI: 3.1, hemiSky: 0xcfe2ff, hemiGround: 0x6a5c44, hemiI: 0.6, envI: 0.5,
+    sunElev: 0.72, sunAz: 2.3, sun: 0xffe8c8, sunI: 3.1, hemiSky: 0xe2e6e8, hemiGround: 0x7d6e58, hemiI: 0.72, envI: 0.38,
     top: 0x4f86c2, horizon: 0xd6dccf, fog: 0xc6d0cc, fogNear: 90, fogFar: 620, exposure: 1.0,
   },
   daemmerung: {
@@ -42,7 +42,7 @@ export class World {
     this.setupLights();
     this.setupSky();
 
-    const terrainMesh = this.terrain.buildMesh(def.groundTexture ? def.groundTexture() : this.grunge);
+    const terrainMesh = this.terrain.buildMesh(def.groundTexture ? def.groundTexture(this) : this.grunge);
     this.scene.add(terrainMesh);
 
     const mats = {

@@ -643,7 +643,7 @@ export function buildCity({ batcher, col, terrain, assets, world, layout, instan
       const z = CITY.CLIFF_Z - R(3, 14);
       const s = R(4, 9);
       const yy = terrain.height(x, z);
-      if (!inst('v_rock' + (Math.floor(rnd() * 3) % 3), x, yy - s * 0.25, z, rnd() * 6, [s * 1.3, s * 1.1, s * 1.2])) {
+      if (!inst('v_rock' + (Math.floor(rnd() * 3) % 3), x, yy - s * 0.5, z, rnd() * 6, [s * 1.3, s * 1.1, s * 1.2])) {
         b.addPrim('ico', x, yy + s * 0.2, z, s * 1.2, s * 0.9, s, mix(0x6f685c, 0x8a8274, rnd()), { mat: 'stone', ry: rnd() * 6, rx: rnd() * 0.5 });
       }
     }

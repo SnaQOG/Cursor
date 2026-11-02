@@ -58,6 +58,7 @@ node tools/tests/stats.mjs                  # Ladezeit, Draw-Calls, Dreiecke
 node tools/tests/bewegung.mjs               # Türen, Treppen, Brücken, Spawns
 node tools/tests/raid.mjs                   # Raids auf beiden Karten
 node tools/tests/welt.mjs                   # Tore, äußere Viertel, Himmelsbrücken, Galeone, Strand
+node tools/tests/abschnitt.mjs v04 [grau]   # Prüfansichten des Musterabschnitts, grau = nur Form
 node tools/tests/details-stadt.mjs          # Detailbilder -> tools/tests/shots/
 node tools/tests/details-damm.mjs
 node tools/tests/simready.mjs nachher      # feste Kameras für Vergleichsbilder, Draw-Calls, Dreiecke
@@ -99,6 +100,9 @@ weil es noch rund 1.100 Draw-Calls sind. GTAO auf „hoch“ zeichnet die Szene 
 Fenster ist noch nicht geprüft. GTAO 0,85 und die Bloom-Werte in `LOOKS` wurden an Vergleichsbildern geprüft und bleiben.
 
 ## Nächste Schritte
+
+**Häuser abschnittsweise verbessern** nach [hausstandard.md](hausstandard.md). Fertig: Weiße Stadt Nord (`lot.pilot`).
+Nächster Schritt: übrige Weiße Stadt, danach die anderen Viertel.
 
 **Feinheiten der äußeren Viertel** (Grobausbau steht): Galeone ist ein Kasten mit Masten, Leuchtturm und Energieturm
 sind nicht begehbar, Hochhäuser haben schlichte Fassaden ohne eigene Sonderteile, die Himmelsbrücken sind Hängebrücken,

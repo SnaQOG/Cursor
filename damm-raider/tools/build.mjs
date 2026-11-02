@@ -2,7 +2,7 @@
 // Webserver per Doppelklick läuft: dist/damm-raider.html
 // Mit "--fragment <pfad>" zusätzlich eine Variante ohne <html>/<head>/<body>.
 import { build } from 'esbuild';
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, readdir, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -17,7 +17,11 @@ const embed = {
   simready: (await readFile(resolve(root, 'assets/simready.glb'))).toString('base64'),
   icons: 'data:image/webp;base64,' + (await readFile(resolve(root, 'assets/icons.webp'))).toString('base64'),
   iconMeta: JSON.parse(await readFile(resolve(root, 'assets/icons.json'), 'utf8')),
+  tex: {},
 };
+for (const file of await readdir(resolve(root, 'assets/tex'))) {
+  embed.tex[file.replace('.webp', '')] = 'data:image/webp;base64,' + (await readFile(resolve(root, 'assets/tex', file))).toString('base64');
+}
 const embedPlugin = {
   name: 'embed-assets',
   setup(b) {

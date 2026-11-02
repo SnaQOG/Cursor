@@ -40,3 +40,9 @@ Aus `drum_steel_a01` entsteht außerdem `sr_drum_red` (Sprengfass).
 
 Hinweis von Palatial: „NVIDIA and other product names identify compatibility or depicted objects; no
 trademark license or endorsement is granted.“ Das Spiel steht in keiner Verbindung zu den genannten Anbietern.
+
+## Texturen
+
+Putz (`white_plaster_02`), Dachziegel (`clay_roof_tiles_02`) und Pflaster (`cobblestone_floor_08`) stammen von
+[Poly Haven](https://polyhaven.com/license) und stehen unter CC0. Für das Spiel verkleinert und in Farbe und
+Helligkeit angepasst (`tools/fetch_textures.py`).

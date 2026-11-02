@@ -134,12 +134,13 @@ export class Batcher {
   }
 
   // Freies Viereck (a,b,c,d gegen den Uhrzeigersinn von vorn gesehen); double = beidseitig
-  addQuad(a, b, c, d, color, { mat = 'world', double = false, layer = '', inner = null, shade = true } = {}) {
-    this.addTri(a, b, c, color, { mat, double, layer, inner, shade });
-    this.addTri(a, c, d, color, { mat, double, layer, inner, shade });
+  addQuad(a, b, c, d, color, { mat = 'world', double = false, layer = '', inner = null, shade = true, kf = null } = {}) {
+    this.addTri(a, b, c, color, { mat, double, layer, inner, shade, kf });
+    this.addTri(a, c, d, color, { mat, double, layer, inner, shade, kf });
   }
 
-  addTri(a, b, c, color, { mat = 'world', double = false, layer = '', inner = null, shade = true } = {}) {
+  // kf: Helligkeit abhängig von der Höhe (für Schmutz am Sockel und Schatten unter der Traufe)
+  addTri(a, b, c, color, { mat = 'world', double = false, layer = '', inner = null, shade = true, kf = null } = {}) {
     const cx = (a[0] + b[0] + c[0]) / 3, cz = (a[2] + b[2] + c[2]) / 3;
     const bk = this.bucket(mat, cx, cz, layer);
     _a.set(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
@@ -150,7 +151,8 @@ export class Batcher {
       let k = shade ? 0.86 + 0.14 * (n.y * 0.5 + 0.5) : 1;
       for (const p of pts) {
         _v.set(p[0], p[1], p[2]);
-        const kk = inner ? k * Batcher.innerK(inner, p[0] - n.x * 0.01, p[1], p[2] - n.z * 0.01) : k;
+        let kk = inner ? k * Batcher.innerK(inner, p[0] - n.x * 0.01, p[1], p[2] - n.z * 0.01) : k;
+        if (kf) kk *= kf(p[1]);
         this.pushVertex(bk, _v, n, _c, kk);
       }
     };

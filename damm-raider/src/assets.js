@@ -20,8 +20,12 @@ export function materialClass(m) {
   return 'world';
 }
 
+// CC0-Texturen unter assets/tex/ (Ablauf in tools/fetch_textures.py)
+const TEXTURES = ['plaster', 'rooftile', 'cobble'];
+
 export class Assets {
   constructor() {
+    this.tex = {};
     this.roots = new Map();
     this.meshCache = new Map();
     this.boundsCache = new Map();
@@ -43,6 +47,7 @@ export class Assets {
     } catch (err) {
       console.warn('3D-Modelle nicht geladen, nutze einfache Formen:', err.message || err);
     }
+    await this.loadTextures();
     // SimReady-Requisiten mit Texturen (assets/simready.glb); fehlen sie, bleiben die Blender-Modelle
     if (this.ready) {
       try {
@@ -68,6 +73,25 @@ export class Assets {
       this.icons = null;
     }
     return this.ready;
+  }
+
+  async loadTextures() {
+    const loader = new THREE.TextureLoader();
+    await Promise.all(TEXTURES.map(async (name) => {
+      try {
+        const load = async (suffix, srgb) => {
+          const key = `${name}_${suffix}`;
+          const t = await loader.loadAsync(EMBED ? EMBED.tex[key] : `assets/tex/${key}.webp`);
+          t.wrapS = t.wrapT = THREE.RepeatWrapping;
+          t.anisotropy = 8;
+          if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+          return t;
+        };
+        this.tex[name] = { map: await load('c', true), normal: await load('n', false) };
+      } catch (err) {
+        console.warn(`Textur ${name} nicht geladen:`, err.message || err);
+      }
+    }));
   }
 
   async parse(buf) {

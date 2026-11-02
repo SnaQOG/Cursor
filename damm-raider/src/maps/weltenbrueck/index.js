@@ -31,18 +31,18 @@ function groundGrid() {
 }
 
 const C = {
-  cobble: new THREE.Color(0x8f877a), cobbleDark: new THREE.Color(0x6f695f), plaza: new THREE.Color(0xb3a993),
+  cobble: new THREE.Color(0xc4baa9), cobbleDark: new THREE.Color(0x9c9383), plaza: new THREE.Color(0xb3a993),
   grass: new THREE.Color(0x5d7337), grassDry: new THREE.Color(0x8a8a4e), garden: new THREE.Color(0x4f6a2f),
   moss: new THREE.Color(0x5a6a3a), rock: new THREE.Color(0x7a7366), rockDark: new THREE.Color(0x56514a),
   forest: new THREE.Color(0x3e4f2c), pale: new THREE.Color(0xc9c1ad), sand: new THREE.Color(0xa8986f), seabed: new THREE.Color(0x4f5a52),
-  main: new THREE.Color(0x7d766a),
+  main: new THREE.Color(0xaea594),
 };
 
 const terrain = {
   half: CITY.HALF,
   res: CITY.RES,
   seed: 1871,
-  uvScale: 4,
+  uvScale: 3,
 
   rawHeight(T, x, z) {
     const n = T.noise;
@@ -119,26 +119,39 @@ const terrain = {
   },
 };
 
-function materials() {
+function materials(world) {
   const mk = (set, roughness = 0.88, metalness = 0.03, ns = 0.9) => new THREE.MeshStandardMaterial({
     vertexColors: true, map: set.map, normalMap: set.normal, normalScale: new THREE.Vector2(ns, ns), roughness, metalness,
   });
+  // Fotografische CC0-Texturen; ohne sie gelten die prozeduralen
+  const tex = world.assets?.tex || {};
+  const photo = (t, roughness, ns, rot = 0) => {
+    const map = rot ? t.map.clone() : t.map, normal = rot ? t.normal.clone() : t.normal;
+    if (rot) for (const x of [map, normal]) { x.rotation = rot; x.needsUpdate = true; }
+    return new THREE.MeshStandardMaterial({ vertexColors: true, map, normalMap: normal, normalScale: new THREE.Vector2(ns, ns), roughness, metalness: 0 });
+  };
+  // Ziegel in echter Größe: eine Kachel sind rund 6,5 m Dach
+  if (tex.rooftile) for (const x of [tex.rooftile.map, tex.rooftile.normal]) x.repeat.set(0.6, 0.6);
+  const base = mk(makePlasterSet(), 0.93, 0, 0.7), tile = mk(makeTileSet(), 0.8, 0.02, 1.0);
   return {
-    world: mk(makePlasterSet(), 0.93, 0, 0.7),
+    wplaster: tex.plaster ? photo(tex.plaster, 0.95, 0.9) : base,
+    wtile: tex.rooftile ? photo(tex.rooftile, 0.82, 1.0) : tile,
+    wtile90: tex.rooftile ? photo(tex.rooftile, 0.82, 1.0, Math.PI / 2) : tile,
+    world: base,
     brick: mk(makeBrickSet(), 0.9),
     stone: mk(makeAshlarSet(), 0.92),
     wood: mk(makePlankSet(), 0.82),
     timber: mk(makeTimberSet(), 0.8, 0, 0.8),
     shingle: mk(makeShingleSet(), 0.85),
-    tile: mk(makeTileSet(), 0.8, 0.02, 1.0),
+    tile,
     slate: mk(makeSlateSet(), 0.62, 0.06),
     cloth: mk(makeClothSet(), 0.97, 0, 0.6),
   };
 }
 
 // Boden: Pflaster, in Höfen, Gärten und im Wald Gras
-function groundTexture() {
-  const c = makeCobbleSet(), g = makeGrassSet();
+function groundTexture(world) {
+  const c = world.assets?.tex?.cobble || makeCobbleSet(), g = makeGrassSet();
   return { map: c.map, normal: c.normal, grass: g.map, grassNormal: g.normal };
 }
 
@@ -238,8 +251,10 @@ function vegetation(world) {
     const g = gg.at(x, z);
     const green = g === 2 || g === 3;
     if (!green && n.fbm(x * 0.09 - 7, z * 0.09 + 3, 3) < 0.15) continue;
+    // auf Pflaster wächst Unkraut nur an geschützten Stellen: nah an Mauern, nie mitten auf der Straße
+    if (!green && (g === 4 || !col.query(x - 1, z - 1, x + 1, z + 1).some((s) => s.maxY > T.height(x, z) + 1))) continue;
     if (!free(x, z, 0.3, 0.6)) continue;
-    const tuft = { x, z, y: T.height(x, z), s: (green ? 0.7 : 0.45) + rnd() * 0.6, r: rnd() * 6 };
+    const tuft = { x, z, y: T.height(x, z), s: green ? 0.7 + rnd() * 0.6 : 0.3 + rnd() * 0.3, r: rnd() * 6 };
     if (!green && rnd() < 0.5) weeds.push(tuft);
     else if (green && rnd() < 0.24) meadow.push(tuft);
     else grass.push(tuft);

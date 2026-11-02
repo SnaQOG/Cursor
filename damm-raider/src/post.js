@@ -13,7 +13,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
 // Farblook je Wetterlage (im Anzeigeraum nach dem Tonemapping)
 const LOOKS = {
-  tag: { contrast: 1.07, saturation: 1.1, shadow: [0.95, 0.99, 1.06], high: [1.04, 1.0, 0.95], vignette: 0.26, bloom: 0.22 },
+  tag: { contrast: 1.07, saturation: 1.06, shadow: [0.99, 1.0, 1.02], high: [1.03, 1.0, 0.96], vignette: 0.24, bloom: 0.22 },
   daemmerung: { contrast: 1.1, saturation: 1.06, shadow: [0.92, 0.96, 1.1], high: [1.08, 0.99, 0.9], vignette: 0.32, bloom: 0.32 },
   sturm: { contrast: 1.05, saturation: 0.82, shadow: [0.95, 1.0, 1.06], high: [0.98, 1.0, 1.03], vignette: 0.36, bloom: 0.12 },
 };

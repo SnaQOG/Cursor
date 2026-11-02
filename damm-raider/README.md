@@ -193,6 +193,12 @@ Was nicht aus Blender kommt: Wände, Böden, Treppen und Dächer der Stadthäuse
 dem Stadtplan, weil jedes Haus genau auf sein Grundstück passen und begehbar sein muss. Alles, was eine
 feste Form hat, kommt aus Blender.
 
+## Hausstandard
+
+Häuser werden abschnittsweise nach festem Ablauf verbessert: [docs/hausstandard.md](docs/hausstandard.md). Der
+Musterabschnitt ist die Weiße Stadt Nord (`lot.pilot`). Putz, Ziegel und Pflaster sind CC0-Texturen von
+[Poly Haven](https://polyhaven.com/license) (`tools/fetch_textures.py`, abgelegt in `assets/tex/`).
+
 ## SimReady-Requisiten
 
 Fässer, Kisten, Paletten, Maschinen, Rohre und Schilder auf dem Damm sowie Kisten, Körbe, Steinplatten und

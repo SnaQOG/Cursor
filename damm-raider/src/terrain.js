@@ -61,6 +61,9 @@ export class Terrain {
     const set = detailTex && !detailTex.isTexture ? detailTex : null;
     const gmix = set && this.def.grassMix ? new Float32Array(N * N) : null;
     const rmix = set && set.rock && this.def.rockMix ? new Float32Array(N * N) : null;
+    // Abnutzung: x = Erde statt Gras, y = Moos in den Pflasterfugen
+    const wear = set && set.path && gmix && this.def.wearMix ? new Float32Array(N * N * 2) : null;
+    const wearOut = [0, 0];
 
     for (let iz = 0; iz < N; iz++) {
       for (let ix = 0; ix < N; ix++) {
@@ -73,6 +76,10 @@ export class Terrain {
         col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
         if (gmix) gmix[i] = this.def.grassMix(this, x, z, h);
         if (rmix) rmix[i] = this.def.rockMix(this, x, z, h, this.slope(x, z));
+        if (wear) {
+          this.def.wearMix(this, x, z, wearOut);
+          wear[i * 2] = wearOut[0]; wear[i * 2 + 1] = wearOut[1];
+        }
       }
     }
 
@@ -91,6 +98,7 @@ export class Terrain {
     geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     if (gmix) geo.setAttribute('gmix', new THREE.BufferAttribute(gmix, 1));
     if (rmix) geo.setAttribute('rmix', new THREE.BufferAttribute(rmix, 1));
+    if (wear) geo.setAttribute('wear', new THREE.BufferAttribute(wear, 2));
     geo.setIndex(new THREE.BufferAttribute(idx, 1));
     geo.computeVertexNormals();
     geo.computeBoundingSphere();
@@ -110,13 +118,24 @@ export class Terrain {
           sh.uniforms.grassMap = { value: set.grass };
           sh.uniforms.grassNormal = { value: set.grassNormal };
           if (rmix) sh.uniforms.rockMap = { value: set.rock };
+          if (wear) sh.uniforms.pathMap = { value: set.path };
           sh.vertexShader = sh.vertexShader
-            .replace('#include <common>', `#include <common>\nattribute float gmix;\nvarying float vGmix;${rmix ? '\nattribute float rmix;\nvarying float vRmix;\nvarying vec3 vWPos;\nvarying vec3 vWNrm;' : ''}`)
-            .replace('#include <uv_vertex>', `#include <uv_vertex>\nvGmix = gmix;${rmix ? '\nvRmix = rmix; vWPos = position; vWNrm = normal;' : ''}`);
+            .replace('#include <common>', `#include <common>\nattribute float gmix;\nvarying float vGmix;${rmix ? '\nattribute float rmix;\nvarying float vRmix;\nvarying vec3 vWPos;\nvarying vec3 vWNrm;' : ''}${wear ? '\nattribute vec2 wear;\nvarying vec2 vWear;' : ''}`)
+            .replace('#include <uv_vertex>', `#include <uv_vertex>\nvGmix = gmix;${rmix ? '\nvRmix = rmix; vWPos = position; vWNrm = normal;' : ''}${wear ? '\nvWear = wear;' : ''}`);
           sh.fragmentShader = sh.fragmentShader
-            .replace('#include <common>', `#include <common>\nuniform sampler2D grassMap;\nuniform sampler2D grassNormal;\nvarying float vGmix;${rmix ? '\nuniform sampler2D rockMap;\nvarying float vRmix;\nvarying vec3 vWPos;\nvarying vec3 vWNrm;' : ''}`)
+            .replace('#include <common>', `#include <common>\nuniform sampler2D grassMap;\nuniform sampler2D grassNormal;\nvarying float vGmix;${rmix ? '\nuniform sampler2D rockMap;\nvarying float vRmix;\nvarying vec3 vWPos;\nvarying vec3 vWNrm;' : ''}${wear ? '\nuniform sampler2D pathMap;\nvarying vec2 vWear;' : ''}`)
             .replace('#include <map_fragment>', `#ifdef USE_MAP
-  vec4 sampledDiffuseColor = mix(texture2D(map, vMapUv), texture2D(grassMap, vMapUv * 0.8), vGmix);
+  ${wear ? `// Große Flecken gegen sichtbare Wiederholung, unregelmäßige Ränder zwischen Pflaster, Gras und Erde
+  float macroA = texture2D(grassMap, vMapUv * 0.043).g, macroB = texture2D(grassMap, vMapUv * 0.0127).g;
+  vec4 cob = texture2D(map, vMapUv);
+  float jointL = dot(cob.rgb, vec3(0.333));
+  float joint = smoothstep(0.26, 0.1, jointL);
+  cob.rgb = mix(cob.rgb, mix(vec3(0.5, 0.45, 0.35), vec3(0.2, 0.27, 0.11), vWear.y), joint * (0.6 + 0.35 * vWear.y));
+  vec4 gra = texture2D(grassMap, vMapUv * 0.8);
+  gra.rgb = mix(gra.rgb, texture2D(pathMap, vMapUv * 0.6).rgb, smoothstep(0.32, 0.68, vWear.x + (macroA - 0.45) * 0.9));
+  float gEdge = smoothstep(0.32, 0.68, vGmix + (macroA - 0.45) * 1.4 * vGmix * (1.0 - vGmix) * 4.0);
+  vec4 sampledDiffuseColor = mix(cob, gra, gEdge);
+  sampledDiffuseColor.rgb *= 0.74 + macroB * 0.72;` : 'vec4 sampledDiffuseColor = mix(texture2D(map, vMapUv), texture2D(grassMap, vMapUv * 0.8), vGmix);'}
   ${rmix ? `// Fels: von der Seite projiziert, sonst wäre die Textur auf steilen Hängen verzerrt
   vec3 rw = abs(normalize(vWNrm)); rw = pow(rw, vec3(4.0)); rw /= rw.x + rw.y + rw.z;
   vec4 rockCol = texture2D(rockMap, vWPos.zy / 14.0) * rw.x + texture2D(rockMap, vWPos.xz / 14.0) * rw.y + texture2D(rockMap, vWPos.xy / 14.0) * rw.z;
@@ -127,7 +146,7 @@ export class Terrain {
               'vec3 mapN = texture2D( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0;',
               'vec3 mapN = mix(texture2D( normalMap, vNormalMapUv ).xyz, texture2D( grassNormal, vNormalMapUv * 0.8 ).xyz, vGmix) * 2.0 - 1.0;'));
         };
-        mat.customProgramCacheKey = () => (rmix ? 'terrain-grass-rock' : 'terrain-grass');
+        mat.customProgramCacheKey = () => `terrain-grass${rmix ? '-rock' : ''}${wear ? '-wear' : ''}`;
       }
     }
     const mesh = new THREE.Mesh(geo, mat);

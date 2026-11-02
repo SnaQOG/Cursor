@@ -21,7 +21,7 @@ export function materialClass(m) {
 }
 
 // CC0-Texturen unter assets/tex/ (Ablauf in tools/fetch_textures.py)
-const TEXTURES = ['plaster', 'rooftile', 'cobble', 'cliff', 'brick', 'ashlar', 'beam', 'planks'];
+const TEXTURES = ['plaster', 'rooftile', 'cobble', 'cliff', 'brick', 'ashlar', 'beam', 'planks', 'meadow', 'path'];
 
 export class Assets {
   constructor() {
@@ -80,6 +80,15 @@ export class Assets {
 
   async loadTextures() {
     const loader = new THREE.TextureLoader();
+    // Atlas der Bodenpflanzen: nur Farbe und Alpha, nicht wiederholt
+    try {
+      const t = await loader.loadAsync(EMBED ? EMBED.tex.cover_c : 'assets/tex/cover_c.webp');
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = 4;
+      this.tex.cover = { map: t };
+    } catch (err) {
+      console.warn('Pflanzenatlas nicht geladen:', err.message || err);
+    }
     await Promise.all(TEXTURES.map(async (name) => {
       try {
         const load = async (suffix, srgb) => {

@@ -303,7 +303,7 @@ function streetDetail(B, D, { lots, streets, squares, occ }) {
     // Mittelrinne in Abschnitten gleicher Höhe
     if (wid >= 5) {
       let t0 = null, y0 = 0;
-      const flush = (t1) => { if (t0 != null && t1 - t0 > 2) { strip(t0, t1, -0.26, 0.26, y0 + 0.014, 0x8a8478, 'stone'); strip(t0, t1, -0.07, 0.07, y0 + 0.02, 0x625e54, 'stone'); } t0 = null; };
+      const flush = (t1) => { if (t0 != null && t1 - t0 > 2) { strip(t0, t1, -0.28, 0.28, y0 + 0.012, 0xb4ac9c, 'cobble2'); } t0 = null; };
       for (let t = 0; t <= len; t += 1.5) {
         const [x, z] = P(t, 0), y = g(x, z);
         if (!open(x, z) || (t0 != null && Math.abs(y - y0) > 0.01)) flush(t);
@@ -336,7 +336,7 @@ function streetDetail(B, D, { lots, streets, squares, occ }) {
       if (!open(x, z)) continue;
       const dt = R(0.8, 2.4), du = Math.min(R(0.6, 1.5), wid / 2 - Math.abs(u) - 0.8);
       if (du < 0.4 || Math.abs(g(...P(t + dt, u)) - y) > 0.01 || Math.abs(g(...P(t - dt, u)) - y) > 0.01) continue;
-      const k = rnd() < 0.5 ? 0x8d8678 : 0xd8d0c0;
+      const k = rnd() < 0.5 ? 0xbcb4a4 : 0xeee6d4;
       strip(t - dt, t + dt, u - du, u + du, y + 0.01, k, 'cobble2');
       stats.patches++;
     }

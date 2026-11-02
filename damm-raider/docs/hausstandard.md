@@ -67,6 +67,18 @@ Zweite Runde, Läden, Türen und Hochhäuser:
 | Dächer der Turmstadt leer | Lüfter, Schächte, Antennen, Rohre (`roofClutter`), Feuertreppen als reine Ansicht (`fireEscape`) |
 | Turmstadt zu dunkel | Mehr Grundhelligkeit der Wände, helleres Pflaster, Vordach mit Lichtleiste über den Türen |
 
+Dritte Runde, Wiese und Boden, nach Fotos von Wiesen, Feldwegen und Altstadtpflaster (Wikimedia Commons):
+
+| Fehler | Änderung |
+| --- | --- |
+| Gras ist eine glatte grüne Fläche | Dichte Wiese aus Pflanzen-Atlas in einem Mesh je 40-m-Kachel, weniger Pflanzen mit der Entfernung (`groundcover.js`) |
+| Wiese gleichmäßig und einfarbig | Flecken aus hohem Gras, Blumen und trockenen Stellen, Spitzen strohfarben |
+| Harte Kante zwischen Gras und Pflaster | Unregelmäßiger Übergang im Terrain-Shader, ausgetretene Erde, Trampelpfade durch längere Höfe |
+| Pflaster dunkel mit schwarzen Fugen | Sand und Moos in den Fugen, helleres Pflaster, große Flecken gegen die Wiederholung |
+| Damm einfarbig mit Cartoon-Pflanzen | Fotos für Wiese, Erde und Fels, dieselben Pflanzen und Bäume wie in der Stadt, Wiese in dichten Flecken um Orte |
+
+Prüfbilder: `node tools/tests/boden.mjs <version> [damm]`.
+
 Noch offen: Das Bruchsteinfoto wiederholt sich auf langen Wänden erkennbar, Feuertreppen sind nicht begehbar, Ruinen sind
 glatt, Schilder tragen keine Schrift, Stoffe bewegen sich nicht.
 

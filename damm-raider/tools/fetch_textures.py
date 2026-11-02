@@ -22,6 +22,8 @@ TEXTURES = {
     'ashlar': ('rustic_stone_wall', 768, 78, 0.45, 0.78),
     'beam': ('rough_wood', 512, 78, 0.3, 0.8),
     'planks': ('weathered_brown_planks', 768, 78, 0.45, 0.72),
+    'meadow': ('grass_ground', 768, 78, 1.0, 0.62),
+    'path': ('grass_path_3', 768, 78, 0.8, 0.5),
 }
 UA = {'User-Agent': 'damm-raider-texture-fetch'}
 
@@ -35,6 +37,8 @@ def main():
     out = os.path.join(ROOT, 'assets', 'tex')
     os.makedirs(out, exist_ok=True)
     for name, (asset, size, q, sat, level) in TEXTURES.items():
+        if os.path.exists(os.path.join(out, f'{name}_c.webp')) and '--all' not in sys.argv:
+            continue
         files = json.loads(get(f'https://api.polyhaven.com/files/{asset}'))
         for key, suffix in (('Diffuse', 'c'), ('nor_gl', 'n')):
             im = Image.open(io.BytesIO(get(files[key]['1k']['jpg']['url']))).convert('RGB').resize((size, size), Image.LANCZOS)

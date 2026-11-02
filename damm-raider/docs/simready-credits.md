@@ -49,6 +49,13 @@ Helligkeit angepasst (`tools/fetch_textures.py`). Der Fels am Gründerfelsen ist
 
 Dazu für Wände und Holz: `brick_wall_001`, `rustic_stone_wall`, `rough_wood`, `weathered_brown_planks`.
 
+Boden: `grass_ground`, `grass_path_3`.
+
+## Bodenpflanzen
+
+`assets/tex/cover_c.webp`, ebenfalls Poly Haven, CC0 (`blender/ground_build.py`): `grass_medium_01`, `grass_medium_02`,
+`dandelion_01`, `flower_ursinia`, `shrub_sorrel_01`, `nettle_plant`, `weed_plant_02`, `fern_02`.
+
 ## Felsen und Pflanzen
 
 `assets/nature.glb`, ebenfalls Poly Haven, CC0: `rock_moss_set_01`, `namaqualand_boulder_05`, `namaqualand_cliff_01`,

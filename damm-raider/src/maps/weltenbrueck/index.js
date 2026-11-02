@@ -5,6 +5,7 @@ import {
   EXTRACTS, POIS, PLAYER_SPAWNS, levelAt, stairRamp, generateLayout, Occupancy,
 } from './layout.js';
 import { buildCity } from './build.js';
+import { COVER, COVER_COLS, COVER_ROWS, COVER_BUDGET, placeMeadowPlant } from '../../groundcover.js';
 import {
   makeCobbleSet, makeBrickSet, makePlankSet, makeTileSet, makeSlateSet, makeAshlarSet, makeShingleSet, makePlasterSet, makeTimberSet, makeGrassSet, makeClothSet,
 } from '../../textures.js';
@@ -32,11 +33,40 @@ function groundGrid() {
 
 const C = {
   cobble: new THREE.Color(0xc4baa9), cobbleDark: new THREE.Color(0x9c9383), plaza: new THREE.Color(0xb3a993),
-  grass: new THREE.Color(0x5d7337), grassDry: new THREE.Color(0x8a8a4e), garden: new THREE.Color(0x4f6a2f),
+  grass: new THREE.Color(0x66754a), grassDry: new THREE.Color(0x8a8a5c), garden: new THREE.Color(0x5a6c42),
   moss: new THREE.Color(0x5a6a3a), rock: new THREE.Color(0xb9b2a5), rockDark: new THREE.Color(0x938c80),
   forest: new THREE.Color(0x3e4f2c), pale: new THREE.Color(0xc9c1ad), sand: new THREE.Color(0xa8986f), seabed: new THREE.Color(0x4f5a52),
   main: new THREE.Color(0xaea594),
 };
+
+// Jeder zweite längere Hof hat einen Trampelpfad entlang seiner langen Seite, sonst nur ausgetretene Flecken
+let YARD_GRID = null;
+function yardGrid() {
+  if (YARD_GRID) return YARD_GRID;
+  const g = new Occupancy(CITY.OUTER + 2, 2);
+  layout().yards.forEach((y, i) => g.mark(y, i));
+  YARD_GRID = g;
+  return g;
+}
+function wearAt(noise, x, z, out) {
+  const g = groundGrid().at(x, z);
+  if (g === 2 || g === 3) {
+    let dirt = smoothstep(0.08, 0.5, noise.fbm(x * 0.11 + 11, z * 0.11 - 5, 3)) * 0.65;
+    const id = yardGrid().at(x, z), y = id >= 0 ? layout().yards[id] : null;
+    if (y) {
+      const w = y.x1 - y.x0, d = y.z1 - y.z0;
+      if (id % 2 === 0 && Math.max(w, d) > 11 && Math.min(w, d) > 5) {
+        const along = w > d, t = along ? x : z, c = along ? (y.z0 + y.z1) / 2 : (y.x0 + y.x1) / 2, q = along ? z : x;
+        const off = Math.sin(t * 0.21 + id) * Math.min(w, d) * 0.16;
+        dirt = Math.max(dirt, 1 - smoothstep(0.5, 2.1, Math.abs(q - c - off)));
+      }
+    }
+    out[0] = dirt; out[1] = 0;
+  } else {
+    out[0] = 0;
+    out[1] = smoothstep(-0.02, 0.4, noise.fbm(x * 0.09 - 7, z * 0.09 + 3, 3)) * (g === 4 ? 0.45 : 1);
+  }
+}
 
 const terrain = {
   half: CITY.HALF,
@@ -79,6 +109,7 @@ const terrain = {
     const n = T.noise;
     const nv = n.fbm(x * 0.05 + 3, z * 0.05 - 9, 3);
     const inside = Math.abs(x) <= CITY.OUTER && z <= CITY.QUAY && z >= CITY.CLIFF_Z;
+    const gridG = inside ? groundGrid().at(x, z) : 0, g2 = gridG === 2 || gridG === 3; // Gras etwas dunkler, die Pflanzen stehen darauf
     if (z > CITY.QUAY - 8 && x > -135 && x < -45) {
       c.copy(C.sand).lerp(C.seabed, smoothstep(CITY.QUAY + 4, CITY.QUAY + 24, z));
     } else if (inside) {
@@ -91,7 +122,7 @@ const terrain = {
       // Moos und Unkraut zwischen den Steinen (verlassene Stadt)
       if (g !== 2 && g !== 3) {
         const m = smoothstep(0.05, 0.45, n.fbm(x * 0.09 - 7, z * 0.09 + 3, 3));
-        if (m > 0) c.lerp(C.moss, m * 0.55);
+        if (m > 0) c.lerp(C.moss, m * 0.18);
       }
       // Weiße Stadt hell, Turmstadt dunkel
       if (x < -205 && z < 205) c.lerp(C.pale, 0.4);
@@ -103,7 +134,7 @@ const terrain = {
     } else if (z > CITY.QUAY) {
       c.copy(C.seabed);
     } else c.copy(C.forest).lerp(C.grass, clamp(0.5 + nv, 0, 1));
-    c.multiplyScalar(1.1 + n.noise(x * 0.4, z * 0.4) * 0.12);
+    c.multiplyScalar((g2 ? 0.92 : 1.3) + n.noise(x * 0.4, z * 0.4) * 0.12);
   },
 
   mapColor() { return [40, 44, 46]; },
@@ -113,6 +144,9 @@ const terrain = {
     if (z > CITY.CLIFF_Z + 1) return 0;
     return clamp(Math.max(smoothstep(CITY.CLIFF_Z + 1, CITY.CLIFF_Z - 1, z) * (1 - smoothstep(CITY.CLIFF_Z - 18, CITY.CLIFF_Z - 26, z)), smoothstep(0.7, 1.3, sl)), 0, 1);
   },
+
+  // Abnutzung des Bodens: Erde in Höfen und Moos in den Pflasterfugen
+  wearMix(T, x, z, out) { wearAt(T.noise, x, z, out); },
 
   // Anteil Gras-Textur am Boden (0 = Pflaster)
   grassMix(T, x, z) {
@@ -149,7 +183,9 @@ function materials(world) {
     if (!tex.cobble) return base;
     const c = { map: tex.cobble.map.clone(), normal: tex.cobble.normal.clone() };
     for (const x of [c.map, c.normal]) { x.repeat.set(4 / 3, 4 / 3); x.needsUpdate = true; }
-    return photo(c, 0.96, 0.9);
+    const mat = photo(c, 0.96, 0.9);
+    mat.color.setScalar(1.45); // Das Pflaster der Karte wird im Shader aufgehellt, hier gleicht die Materialfarbe das aus
+    return mat;
   };
   return {
     wplaster: tex.plaster ? photo(tex.plaster, 0.95, 0.9) : base,
@@ -172,7 +208,8 @@ function materials(world) {
 // Boden: Pflaster, in Höfen, Gärten und im Wald Gras
 function groundTexture(world) {
   const c = world.assets?.tex?.cobble || makeCobbleSet(), g = makeGrassSet();
-  return { map: c.map, normal: c.normal, grass: g.map, grassNormal: g.normal, rock: world.assets?.tex?.cliff?.map };
+  const m = world.assets?.tex?.meadow || g;
+  return { map: c.map, normal: c.normal, grass: m.map, grassNormal: m.normal, rock: world.assets?.tex?.cliff?.map, path: world.assets?.tex?.path?.map };
 }
 
 // Meer, Brunnenwasser
@@ -207,6 +244,38 @@ function updateDecor(world) {
 }
 
 // Bäume in Höfen und Gärten, Wald auf dem Plateau, Gras in Ritzen
+// Bis hierher reicht die Wiese in Pflanzen je Quadratmeter, die Obergrenze hängt von der Grafikstufe ab
+const COVER_DENSITY = 7;
+function placeCover(world, n, rnd, free) {
+  const budget = COVER_BUDGET[world.quality] ?? COVER_BUDGET.mittel;
+  if (!budget) return;
+  const T = world.terrain, gg = groundGrid(), col = world.col, b = world.batcher, wear = [0, 0];
+  const W = CITY.OUTER - 2, Z0 = CITY.CLIFF_Z + 2, Z1 = CITY.QUAY - 2;
+  const tries = 2 * W * (Z1 - Z0) * COVER_DENSITY;
+  const put = (id, x, z, y, s, color) => {
+    const c = COVER[id];
+    b.addCover(x, y, z, c[2] * s, rnd() * 6.28, c, COVER_COLS, COVER_ROWS, color);
+  };
+  const stats = { wiese: 0, unkraut: 0, versuche: tries | 0 };
+  for (let i = 0; i < tries && stats.wiese + stats.unkraut < budget; i++) {
+    const x = (rnd() * 2 - 1) * W, z = Z0 + rnd() * (Z1 - Z0);
+    const g = gg.at(x, z), y = T.height(x, z);
+    if (g === 2 || g === 3) {
+      wearAt(T.noise, x, z, wear);
+      if (rnd() < wear[0] * 1.25 || !free(x, z, 0.22, 0.5)) continue;
+      placeMeadowPlant(b, n, rnd, x, y, z);
+      stats.wiese++;
+    } else if (g !== 4 && n.fbm(x * 0.09 - 7, z * 0.09 + 3, 3) > 0.12) {
+      // Auf Pflaster nur an geschützten Stellen: nah an Mauern, nie mitten auf der Straße
+      if (rnd() > 0.05 || !col.query(x - 0.8, z - 0.8, x + 0.8, z + 0.8).some((s) => s.maxY > y + 1) || !free(x, z, 0.14, 0.4)) continue;
+      const u = rnd(), id = u < 0.45 ? 'klein' : u < 0.7 ? 'kraut' : u < 0.85 ? 'loewenzahn' : 'mittel';
+      put(id, x, z, y - 0.01, 0.8 + rnd() * 0.6, 0xc8d0a8);
+      stats.unkraut++;
+    }
+  }
+  world.coverStats = stats;
+}
+
 function vegetation(world) {
   const rnd = mulberry32(77);
   const T = world.terrain;
@@ -264,21 +333,26 @@ function vegetation(world) {
     const x = (rnd() * 2 - 1) * 396, z = CITY.CLIFF_Z - 2 - rnd() * 20;
     rocks.push({ x, z, y: T.height(x, z), s: 1.5 + rnd() * 3.5, r: rnd() * 6, t: rnd() * 6 });
   }
-  // Gras zwischen Pflaster und in Höfen
-  const maxGrass = { niedrig: 0, mittel: 14000, hoch: 28000 }[world.quality] ?? 14000;
-  const gg = groundGrid();
-  for (let i = 0; i < maxGrass * 8 && grass.length < maxGrass; i++) {
-    const x = (rnd() * 2 - 1) * (CITY.OUTER - 2), z = CITY.CLIFF_Z + 2 + rnd() * (CITY.QUAY - 4 - CITY.CLIFF_Z - 2);
-    const g = gg.at(x, z);
-    const green = g === 2 || g === 3;
-    if (!green && n.fbm(x * 0.09 - 7, z * 0.09 + 3, 3) < 0.15) continue;
-    // auf Pflaster wächst Unkraut nur an geschützten Stellen: nah an Mauern, nie mitten auf der Straße
-    if (!green && (g === 4 || !col.query(x - 1, z - 1, x + 1, z + 1).some((s) => s.maxY > T.height(x, z) + 1))) continue;
-    if (!free(x, z, 0.3, 0.6)) continue;
-    const tuft = { x, z, y: T.height(x, z), s: green ? 0.7 + rnd() * 0.6 : 0.3 + rnd() * 0.3, r: rnd() * 6 };
-    if (!green && rnd() < 0.5) weeds.push(tuft);
-    else if (green && rnd() < 0.24) meadow.push(tuft);
-    else grass.push(tuft);
+  // Wiese und Unkraut aus dem Pflanzenatlas
+  if (world.assets?.tex?.cover) {
+    placeCover(world, n, rnd, free);
+  } else {
+    // Gras zwischen Pflaster und in Höfen
+    const maxGrass = { niedrig: 0, mittel: 14000, hoch: 28000 }[world.quality] ?? 14000;
+    const gg = groundGrid();
+    for (let i = 0; i < maxGrass * 8 && grass.length < maxGrass; i++) {
+      const x = (rnd() * 2 - 1) * (CITY.OUTER - 2), z = CITY.CLIFF_Z + 2 + rnd() * (CITY.QUAY - 4 - CITY.CLIFF_Z - 2);
+      const g = gg.at(x, z);
+      const green = g === 2 || g === 3;
+      if (!green && n.fbm(x * 0.09 - 7, z * 0.09 + 3, 3) < 0.15) continue;
+      // auf Pflaster wächst Unkraut nur an geschützten Stellen: nah an Mauern, nie mitten auf der Straße
+      if (!green && (g === 4 || !col.query(x - 1, z - 1, x + 1, z + 1).some((s) => s.maxY > T.height(x, z) + 1))) continue;
+      if (!free(x, z, 0.3, 0.6)) continue;
+      const tuft = { x, z, y: T.height(x, z), s: green ? 0.7 + rnd() * 0.6 : 0.3 + rnd() * 0.3, r: rnd() * 6 };
+      if (!green && rnd() < 0.5) weeds.push(tuft);
+      else if (green && rnd() < 0.24) meadow.push(tuft);
+      else grass.push(tuft);
+    }
   }
   // Stämme von Linden und Birken
   for (const t of linden) col.addCyl(t.x, t.z, 0.35 * t.s, t.y - 1, t.y + 4 * t.s, { tree: true });

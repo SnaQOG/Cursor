@@ -1,6 +1,7 @@
 // Karte "Der Damm": Terrain, Wasser, Vegetation und Aufbau.
 import * as THREE from 'three';
 import { MAP, PADS, ROADS, POIS, EXTRACTS, PLAYER_SPAWNS } from '../config.js';
+import { COVER_BUDGET, placeMeadowPlant } from '../groundcover.js';
 import { buildMap } from '../map.js';
 import { makeSignTexture, makeSoftDot } from '../textures.js';
 import { Noise2D, clamp, lerp, smoothstep, distToPolyline, mulberry32 } from '../util.js';
@@ -23,7 +24,7 @@ function swampMask(T, x, z) {
   return 1 - smoothstep(S.r, S.r + S.blend, d);
 }
 
-const grass = new THREE.Color(0x5f7a36), dry = new THREE.Color(0xa09a55), lush = new THREE.Color(0x46652c);
+const grass = new THREE.Color(0x64865a), dry = new THREE.Color(0x868e6a), lush = new THREE.Color(0x547450);
 const rock = new THREE.Color(0x77705f), rockDark = new THREE.Color(0x4f4a42), mud = new THREE.Color(0x5b4c38);
 const sand = new THREE.Color(0x9b8d6a), swamp = new THREE.Color(0x3c4526), road = new THREE.Color(0x6f685a);
 const gravel = new THREE.Color(0x8b867a);
@@ -34,6 +35,7 @@ const terrain = {
   half: MAP.HALF,
   res: MAP.RES,
   seed: 4242,
+  uvScale: 3,
 
   init(T) {
     T.pads = PADS.map((p) => ({ ...p, h: p.h === 'auto' ? this.rawHeight(T, p.x, p.z, false) : p.h }));
@@ -93,6 +95,31 @@ const terrain = {
     if (z < MAP.DAM_Z && Math.abs(x) < MAP.LAKE.hx + 2) return { level: MAP.LAKE_LEVEL, toxic: false };
     if (z > MAP.DAM_Z + 4) return { level: MAP.VALLEY_WATER, toxic: false };
     return null;
+  },
+
+  // Fotos statt Einheitsfarbe: Wiese, Erde auf Wegen und Bauplätzen, Fels an steilen Hängen
+  grassMix(T, x, z, h) {
+    let rd = Infinity;
+    for (const r of ROADS) rd = Math.min(rd, distToPolyline(x, z, r));
+    let m = smoothstep(2.5, 6, rd);
+    for (const pad of T.pads) {
+      if (pad.r < 20) continue;
+      m = Math.min(m, smoothstep(pad.r * 0.55, pad.r * 0.95, Math.hypot(x - pad.x, z - pad.z)));
+    }
+    const w = T.waterAt(x, z);
+    if (w) m = Math.min(m, smoothstep(0.1, 1.2, h - w.level));
+    return m;
+  },
+
+  rockMix(T, x, z, h, sl) {
+    return clamp(smoothstep(0.55, 1.0, sl) + smoothstep(290, 310, Math.max(Math.abs(x), Math.abs(z))) * 0.6, 0, 1);
+  },
+
+  wearMix(T, x, z, out) {
+    let rd = Infinity;
+    for (const r of ROADS) rd = Math.min(rd, distToPolyline(x, z, r));
+    out[0] = Math.max(smoothstep(0.1, 0.5, T.noise.fbm(x * 0.06 + 11, z * 0.06 - 5, 3)) * 0.6, 1 - smoothstep(4, 10, rd));
+    out[1] = 0;
   },
 
   groundColor(T, x, z, h, sl, c) {
@@ -221,6 +248,28 @@ function updateDecor(world, dt) {
 }
 
 // Bäume, Büsche, Felsen und Gras
+// Die Karte ist zu groß für eine geschlossene Wiese: dichte Flecken um Orte und Straßen, dazwischen nur wenig
+function placeDamMeadow(world, n, rnd) {
+  const budget = COVER_BUDGET[world.quality] ?? COVER_BUDGET.mittel;
+  const T = world.terrain, col = world.col, b = world.batcher;
+  let placed = 0;
+  for (let i = 0; i < budget * 14 && placed < budget; i++) {
+    const x = (rnd() * 2 - 1) * 290, z = (rnd() * 2 - 1) * 290;
+    const patch = n.fbm(x * 0.045 - 4, z * 0.045 + 2, 2);
+    if (rnd() > clamp(0.12 + (patch + 0.05) * 2.4, 0.04, 1)) continue;
+    let near = Infinity;
+    for (const p of POIS) near = Math.min(near, Math.hypot(x - p.x, z - p.z));
+    if (near > 90 && rnd() > 0.2) continue;
+    const y = T.height(x, z);
+    if (T.slope(x, z) > 0.6 || terrain.grassMix(T, x, z, y) < 0.8) continue;
+    if (Math.abs(z - MAP.DAM_Z) < 12 && Math.abs(x) < MAP.DAM_HALF_X + 4) continue;
+    if (col.query(x - 0.3, z - 0.3, x + 0.3, z + 0.3).some((s) => s.maxY > y + 0.3 && s.minY < y + 0.8)) continue;
+    placeMeadowPlant(b, n, rnd, x, y, z, 1.35);
+    placed++;
+  }
+  world.coverStats = { wiese: placed };
+}
+
 function vegetation(world) {
   const rnd = mulberry32(2024);
   const T = world.terrain;
@@ -259,7 +308,9 @@ function vegetation(world) {
   }
   // Grasbüschel auf den Wiesen
   const grassTufts = [];
-  const maxGrass = { niedrig: 0, mittel: 7000, hoch: 14000 }[world.quality] ?? 7000;
+  const cover = !!world.assets?.tex?.cover;
+  const maxGrass = cover ? 0 : ({ niedrig: 0, mittel: 7000, hoch: 14000 }[world.quality] ?? 7000);
+  if (cover) placeDamMeadow(world, n, rnd);
   for (let i = 0; i < maxGrass * 7 && grassTufts.length < maxGrass; i++) {
     const x = (rnd() * 2 - 1) * 290, z = (rnd() * 2 - 1) * 290;
     if (n.fbm(x * 0.03 - 4, z * 0.03 + 2, 2) < -0.05) continue;
@@ -293,6 +344,17 @@ export const DAMM = {
   spawns: PLAYER_SPAWNS,
   menuCamera: { x: 0, z: -30, r: 200, h: 85, lookY: 18 },
   terrain,
+  // Fotografische Modelle wie in der Stadt (blender/nature_build.py)
+  models: {
+    pine: ['n_fir0', 'n_fir1', 'n_fir2'],
+    tree: ['n_leaf0'],
+    bush: ['n_bush0', 'n_bush1'],
+    rock: ['n_rock0', 'n_rock1', 'n_rock2', 'n_rock3', 'n_rock4', 'n_rock5', 'n_rock6', 'n_rock7'],
+  },
+  groundTexture: (world) => {
+    const t = world.assets?.tex;
+    return t?.meadow && t?.path ? { map: t.path.map, normal: t.path.normal, grass: t.meadow.map, grassNormal: t.meadow.normal, rock: t.cliff?.map, path: t.path.map } : world.grunge;
+  },
   decorate,
   updateDecor,
   vegetation,

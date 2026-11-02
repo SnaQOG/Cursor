@@ -220,6 +220,28 @@ export class Batcher {
     }
   }
 
+  // Bodenpflanze aus dem Atlas: zwei gekreuzte Bildflächen, Normalen nach oben, damit sie wie der Boden beleuchtet wird.
+  // cell: [Spalte, Zeile (von oben)], color: Farbe oben, unten wird sie dunkler und läuft in den Boden aus
+  addCover(x, y, z, size, ry, cell, cols, rows, color, k = 1) {
+    const b = this.bucket('cover', x, z, 'det');
+    const u0 = (cell[0] + 0.004) / cols, u1 = (cell[0] + 0.996) / cols;
+    const v0 = (rows - 1 - cell[1] + 0.004) / rows, v1 = (rows - cell[1] - 0.004) / rows;
+    _c.set(color).multiplyScalar(k);
+    const h = size * 0.5, base = 0.62;
+    for (let i = 0; i < 2; i++) {
+      const a = ry + i * Math.PI / 2, dx = Math.cos(a) * h, dz = Math.sin(a) * h;
+      const corners = [[-1, 0, u0, v0, base], [1, 0, u1, v0, base], [1, 1, u1, v1, 1], [-1, 0, u0, v0, base], [1, 1, u1, v1, 1], [-1, 1, u0, v1, 1]];
+      for (const [s, t, u, v, kk] of corners) {
+        b.pos.push3(x + dx * s, y + t * size, z + dz * s);
+        b.nor.push3(0, 1, 0);
+        b.col.push3(_c.r * kk, _c.g * kk, _c.b * kk);
+        b.uv.push2(u, v);
+        b.ySum += y;
+        this.vertexCount++;
+      }
+    }
+  }
+
   // Box mit Unterkante bei y
   box(x, y, z, w, h, d, color, opts) {
     this.addPrim('box', x, y + h / 2, z, w, h, d, color, opts);
@@ -243,6 +265,7 @@ export class Batcher {
       mesh.matrixAutoUpdate = false;
       mesh.updateMatrix();
       mesh.userData.layer = b.layer;
+      mesh.userData.cover = b.mat === 'cover';
       mesh.userData.center = b.center.clone().setY(b.ySum / (b.pos.n / 3));
       if (inside) mesh.visible = false;
       scene.add(mesh);

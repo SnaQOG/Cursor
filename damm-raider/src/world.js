@@ -4,6 +4,7 @@ import { Terrain } from './terrain.js';
 import { CollisionWorld } from './collision.js';
 import { Batcher } from './batcher.js';
 import { Instancer } from './instancer.js';
+import { coverMaterial } from './groundcover.js';
 import { makeGrungeTexture, makeSignTexture } from './textures.js';
 import { Noise2D, clamp } from './util.js';
 
@@ -59,6 +60,8 @@ export class World {
     if (def.materials) Object.assign(mats, def.materials(this));
     const dress = this.assets?.dressMaterial();
     if (dress) mats.dress = dress;
+    const cover = coverMaterial(this);
+    if (cover) mats.cover = cover;
     this.batcher = new Batcher(mats);
     this.farMeshes = [];
     this.instancer = new Instancer(this.assets);
@@ -457,7 +460,13 @@ export class World {
     for (const m of this.detailMeshes) {
       const c = m.userData.center;
       const dx = c.x - focus.x, dz = c.z - focus.z;
-      m.visible = near && dx * dx + dz * dz < DETAIL_RANGE * DETAIL_RANGE;
+      const d2 = dx * dx + dz * dz;
+      m.visible = near && d2 < DETAIL_RANGE * DETAIL_RANGE;
+      // Wiese: mit der Entfernung weniger Pflanzen zeichnen. Sie liegen zufällig sortiert im Mesh
+      if (m.userData.cover && m.visible) {
+        const n = m.geometry.attributes.position.count, frac = d2 < 32 * 32 ? 1 : d2 < 58 * 58 ? 0.5 : 0.22;
+        m.geometry.setDrawRange(0, Math.floor((n * frac) / 12) * 12);
+      }
     }
     for (const m of this.farMeshes) {
       const c = m.userData.center, r = m.userData.far;

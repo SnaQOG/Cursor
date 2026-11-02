@@ -86,13 +86,13 @@ Richtwerte aus `simready.mjs` (Apple M1, feste Kamera, vorher → nachher SimRea
 
 | Gerät | Stufe | Damm | Stadt |
 | --- | --- | --- | --- |
-| RTX 4080, 1920 × 1080 | mittel | 103–137 fps | 66–76 fps |
-| RTX 4080, 1920 × 1080 | hoch | nicht neu gemessen | 43–53 fps |
+| RTX 4080, 1920 × 1080 | mittel | 103–137 fps | 68–90 fps |
+| RTX 4080, 1920 × 1080 | hoch | nicht neu gemessen | 41–63 fps |
 | Apple M1, 1440 × 900 Retina | niedrig | 65–93 fps | 33–55 fps |
 | Apple M1, 1440 × 900 Retina | mittel | 21–27 fps | 14–20 fps |
 | Apple M1, 1440 × 900 Retina | hoch | 5–7 fps | 5–6 fps |
 
-Im Raid mit Gegnern, auf Bodenhöhe. M1 mit `tools/tests/fps.mjs` im normalen Spieltakt ohne Vsync, vor dem Ausblenden
+Stadt auf der 4080 mit Musterabschnitt und neuen Felsen und Pflanzen, Damm auf dem Stand davor. Im Raid mit Gegnern, auf Bodenhöhe. M1 mit `tools/tests/fps.mjs` im normalen Spieltakt ohne Vsync, vor dem Ausblenden
 ferner ARC. Die 4080 lief über die Chrome-Erweiterung in einem verdeckten Fenster: Bild für Bild warten, bis die GPU
 fertig ist, ohne Bildausgabe. Dabei gab es Ausreißer nach oben (ein Durchlauf auf „hoch“ mit 85–114 fps), die Werte
 schwanken also je nach Auslastung des PCs. Die Stadt ist CPU-lastig: rund 10 ms Hauptthread gegen 5 ms GPU auf „mittel“,
@@ -102,7 +102,7 @@ Fenster ist noch nicht geprüft. GTAO 0,85 und die Bloom-Werte in `LOOKS` wurden
 ## Nächste Schritte
 
 **Häuser abschnittsweise verbessern** nach [hausstandard.md](hausstandard.md). Fertig: Weiße Stadt Nord (`lot.pilot`).
-Nächster Schritt: übrige Weiße Stadt, danach die anderen Viertel.
+Felsen, Pflanzen und Hang der Stadt sind fotografisch (`assets/nature.glb`). Nächster Schritt: übrige Weiße Stadt, danach die anderen Viertel.
 
 **Feinheiten der äußeren Viertel** (Grobausbau steht): Galeone ist ein Kasten mit Masten, Leuchtturm und Energieturm
 sind nicht begehbar, Hochhäuser haben schlichte Fassaden ohne eigene Sonderteile, die Himmelsbrücken sind Hängebrücken,

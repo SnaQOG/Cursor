@@ -202,10 +202,16 @@ export class Barrel {
     this.game = game;
     const gy = game.col.groundAt(x, z, 0.4, 999, 0);
     this.pos = new THREE.Vector3(x, gy, z);
-    let g;
-    if (assets.has('p_barrel')) {
-      g = assets.clone('p_barrel');
+    // Höhe und Radius kommen vom Modell (das SimReady-Fass hat echte Maße)
+    const model = assets.has('sr_drum_red') ? 'sr_drum_red' : 'p_barrel';
+    let g, r = 0.42;
+    this.h = 1.2;
+    if (assets.has(model)) {
+      g = assets.clone(model);
       g.rotation.y = Math.random() * Math.PI * 2;
+      const bb = assets.bounds(model);
+      this.h = bb.max.y - bb.min.y;
+      r = Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) / 2;
     } else {
       g = new THREE.Group();
       const body = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 1.2, 12), new THREE.MeshStandardMaterial({ color: 0xb8352a, roughness: 0.6, metalness: 0.3 }));
@@ -218,7 +224,7 @@ export class Barrel {
     g.position.copy(this.pos);
     game.scene.add(g);
     this.mesh = g;
-    this.shape = game.col.addCyl(x, z, 0.42, gy, gy + 1.2, { barrel: this });
+    this.shape = game.col.addCyl(x, z, r, gy, gy + this.h, { barrel: this });
     this.reset();
   }
 
@@ -241,13 +247,13 @@ export class Barrel {
     this.alive = false;
     this.mesh.visible = false;
     this.shape.active = false;
-    this.game.explode(this.pos.clone().add(new THREE.Vector3(0, 0.7, 0)), 6.5, 80, null);
+    this.game.explode(this.pos.clone().add(new THREE.Vector3(0, this.h * 0.6, 0)), 6.5, 80, null);
   }
 
   update(dt) {
     if (this.fuse >= 0 && this.alive) {
       this.fuse -= dt;
-      this.game.effects.fire(this.pos.clone().add(new THREE.Vector3(0, 1.2, 0)));
+      this.game.effects.fire(this.pos.clone().add(new THREE.Vector3(0, this.h, 0)));
       if (this.fuse <= 0) this.explode();
     }
   }

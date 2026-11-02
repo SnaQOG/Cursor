@@ -14,6 +14,7 @@ const fragmentOut = fragIdx >= 0 ? resolve(args[fragIdx + 1]) : null;
 // Blender-Assets einbetten (models.glb als Base64, Icon-Atlas als data-URI)
 const embed = {
   models: (await readFile(resolve(root, 'assets/models.glb'))).toString('base64'),
+  simready: (await readFile(resolve(root, 'assets/simready.glb'))).toString('base64'),
   icons: 'data:image/webp;base64,' + (await readFile(resolve(root, 'assets/icons.webp'))).toString('base64'),
   iconMeta: JSON.parse(await readFile(resolve(root, 'assets/icons.json'), 'utf8')),
 };

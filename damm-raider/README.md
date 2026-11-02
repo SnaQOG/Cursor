@@ -5,13 +5,14 @@ Siedlung Speranza an die Oberfläche, plünderst eine der Karten **„Der Damm�
 kämpfst gegen ARC-Maschinen und musst es rechtzeitig zu einem Aufzug schaffen – sonst ist deine
 Ausrüstung weg.
 
-Fanprojekt ohne Verbindung zu Embark Studios. Alle 3D-Modelle und Inventar-Icons werden per Skript in
-**Blender** gebaut (siehe unten), Sounds und Texturen entstehen zur Laufzeit.
+Fanprojekt ohne Verbindung zu Embark Studios. Fast alle 3D-Modelle und alle Inventar-Icons werden per
+Skript in **Blender** gebaut (siehe unten), Sounds und Texturen entstehen zur Laufzeit. Einige Requisiten
+stammen aus dem SimReady-Katalog, CC BY 4.0, siehe [Modellquellen](docs/simready-credits.md).
 
 ## Spielen
 
 **Einfachste Variante:** `dist/damm-raider.html` im Browser öffnen (Doppelklick). Die Datei enthält
-alles – three.js, alle Blender-Modelle und den Icon-Atlas – und läuft ohne Server und ohne Internet
+alles – three.js, alle Modelle und den Icon-Atlas – und läuft ohne Server und ohne Internet
 (nur die Schriften kommen von Google Fonts).
 
 **Entwicklung (ohne Build):**
@@ -147,7 +148,7 @@ Zerstörte ARC hinterlassen Wracks mit wertvollen Teilen.
 
 ## 3D-Modelle mit Blender
 
-Alle Modelle entstehen reproduzierbar per Python-Skript in Blender (`blender/`):
+Die eigenen Modelle entstehen reproduzierbar per Python-Skript in Blender (`blender/`):
 
 | Datei | Inhalt |
 | --- | --- |
@@ -186,6 +187,36 @@ Was nicht aus Blender kommt: Wände, Böden, Treppen und Dächer der Stadthäuse
 dem Stadtplan, weil jedes Haus genau auf sein Grundstück passen und begehbar sein muss. Alles, was eine
 feste Form hat, kommt aus Blender.
 
+## SimReady-Requisiten
+
+Fässer, Kisten, Paletten, Maschinen, Rohre und Schilder auf dem Damm sowie Kisten, Körbe, Steinplatten und
+Möbel in der Stadt stammen aus dem SimReady-Katalog (CC BY 4.0, Liste in
+[docs/simready-credits.md](docs/simready-credits.md)). Sie liegen getrennt in `assets/simready.glb`,
+`assets/models.glb` bleibt davon unberührt. Das Spiel läuft auch ohne diese Datei, dann mit den Blender-Modellen.
+
+```bash
+python3 -m venv .venv-hf && .venv-hf/bin/pip install huggingface_hub
+.venv-hf/bin/python -I blender/simready_fetch.py --out <downloads>     # rund 1,6 GB, nicht ins Repo
+blender -b --factory-startup -P blender/simready_build.py -- --dl <downloads> --work <arbeitsordner>
+npm run build
+```
+
+| Datei | Inhalt |
+| --- | --- |
+| `blender/simready_assets.json` | die Assets mit fester Version, Dreiecksziel (`tris`) und Texturgröße (`tex`) |
+| `blender/simready_fetch.py` | lädt nur diese Pakete, ohne Skripte und ohne Physik |
+| `blender/simready_build.py` | USD einlesen, reduzieren, neue UVs, Materialien backen, GLB schreiben |
+
+Konventionen:
+
+- Modelle heißen `sr_*`, haben echte Maße und behalten ihre Texturen. Sie werden deshalb als Instanzen gezeichnet
+  (`Builder.prop` in `src/structures.js`), nicht wie die Blender-Modelle in Vertexfarben gebacken.
+- Das Sprengfass `sr_drum_red` entsteht beim Zusammensetzen aus dem Stahlfass. Rot mit gelbem Band bedeutet im
+  Spiel: Es explodiert. Die schwarzen und blauen Fässer sind nur Deko.
+- Mit Asset-IDs backt `simready_build.py` nur diese neu. Unter `<arbeitsordner>/preview/` liegen Vergleichsbilder
+  (Original links, reduziert rechts). Sie gehören nach jeder Änderung angesehen, denn schlechte Reduktion fällt
+  nur dort auf. `area`, `remesh` und `small` im Manifest helfen bei schwierigen Modellen.
+
 ## Tests
 
 Browser-Tests mit Playwright liegen in `tools/tests/` (Ladezeit, Bewegung durch Türen und Treppen,
@@ -196,14 +227,14 @@ nächste Schritte stehen in [`docs/weiterarbeiten.md`](docs/weiterarbeiten.md).
 
 ```
 damm-raider/
-├── blender/            Blender-Skripte für alle Modelle und Icons
-├── assets/             exportierte Modelle (models.glb) und Icon-Atlas
-├── docs/               Kartenentwurf Weltenbrück
+├── blender/            Blender-Skripte für Modelle und Icons, Umwandlung der SimReady-Assets
+├── assets/             exportierte Modelle (models.glb, simready.glb) und Icon-Atlas
+├── docs/               Kartenentwurf Weltenbrück, Übergabe, Modellquellen
 ├── index.html          HTML-Gerüst (Hub, HUD, Fenster)
 ├── css/style.css       Oberfläche
 ├── src/
 │   ├── main.js         Einstieg
-│   ├── assets.js       lädt models.glb, liefert Klone und Instanz-Geometrie
+│   ├── assets.js       lädt models.glb und simready.glb, liefert Klone und Instanz-Geometrie
 │   ├── game.js         Spielablauf, Treffer, Explosionen, Extraktion
 │   ├── world.js        Szene, Licht, Wetter, Wasser, Vegetation
 │   ├── terrain.js      Höhenfeld (Form kommt aus der Kartendefinition)

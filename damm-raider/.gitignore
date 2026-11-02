@@ -1,6 +1,7 @@
 node_modules/
 __pycache__/
 .venv-blender/
+.venv-hf/
 # Die spielbare Einzeldatei wird bewusst mit eingecheckt
 !dist/
 blender/preview/

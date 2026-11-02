@@ -296,5 +296,5 @@ export const DAMM = {
   decorate,
   updateDecor,
   vegetation,
-  build: ({ batcher, col, terrain: T, assets }) => buildMap(batcher, col, T, assets),
+  build: ({ batcher, col, terrain: T, assets, instancer }) => buildMap(batcher, col, T, assets, instancer),
 };

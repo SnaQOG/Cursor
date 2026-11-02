@@ -331,7 +331,16 @@ export class UI {
             : '<button class="btn ghost" data-act="wipe">Spielstand zurücksetzen</button>'}
         </div>
       </section>
-      <section class="panel"><h2>Steuerung</h2><ul class="controls">${ctr}</ul></section>
+      <section class="panel"><h2>Steuerung</h2><ul class="controls">${ctr}</ul>
+        <h3>Modellquellen</h3>
+        <p class="muted">Einige Requisiten stammen aus dem SimReady-Katalog, lizenziert unter
+          <a href="https://creativecommons.org/licenses/by/4.0/deed.de" target="_blank" rel="noopener">CC BY 4.0</a>
+          und für das Spiel verändert (Polygone reduziert, Texturen neu gebacken, Sprengfass umgefärbt):
+          <a href="https://huggingface.co/datasets/nvidia/simready-assets" target="_blank" rel="noopener">NVIDIA SimReady Assets</a>,
+          <a href="https://huggingface.co/datasets/ForgeCAD/simready-assets" target="_blank" rel="noopener">ForgeCAD SimReady Assets</a>,
+          <a href="https://huggingface.co/datasets/ALLSIDES/simready-scanned-objects" target="_blank" rel="noopener">Allsides SimReady Assets</a>,
+          <a href="https://huggingface.co/datasets/PalatialSim/palatial-nv-asset-library" target="_blank" rel="noopener">Palatial Platforms — Palatial NV Asset Library</a>.</p>
+      </section>
     </div>`;
   }
 

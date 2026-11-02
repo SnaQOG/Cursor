@@ -38,21 +38,24 @@ export class Assets {
         if (!r.ok) throw new Error(`models.glb: ${r.status}`);
         buf = await r.arrayBuffer();
       }
-      const gltf = await new GLTFLoader().parseAsync(buf, '');
-      for (const child of gltf.scene.children) {
-        child.updateMatrixWorld(true);
-        this.roots.set(child.name, child);
-      }
-      gltf.scene.traverse((o) => {
-        if (!o.isMesh) return;
-        o.castShadow = true;
-        o.receiveShadow = true;
-        const m = o.material;
-        if (m.transparent) m.depthWrite = false;
-      });
+      await this.parse(buf);
       this.ready = true;
     } catch (err) {
       console.warn('3D-Modelle nicht geladen, nutze einfache Formen:', err.message || err);
+    }
+    // SimReady-Requisiten mit Texturen (assets/simready.glb); fehlen sie, bleiben die Blender-Modelle
+    if (this.ready) {
+      try {
+        let buf;
+        if (EMBED) buf = EMBED.simready ? b64ToBuffer(EMBED.simready) : null;
+        else {
+          const r = await fetch('assets/simready.glb');
+          buf = r.ok ? await r.arrayBuffer() : null;
+        }
+        if (buf) await this.parse(buf);
+      } catch (err) {
+        console.warn('SimReady-Modelle nicht geladen:', err.message || err);
+      }
     }
     try {
       if (EMBED) this.icons = { url: EMBED.icons, ...EMBED.iconMeta };
@@ -65,6 +68,21 @@ export class Assets {
       this.icons = null;
     }
     return this.ready;
+  }
+
+  async parse(buf) {
+    const gltf = await new GLTFLoader().parseAsync(buf, '');
+    for (const child of gltf.scene.children) {
+      child.updateMatrixWorld(true);
+      this.roots.set(child.name, child);
+    }
+    gltf.scene.traverse((o) => {
+      if (!o.isMesh) return;
+      o.castShadow = true;
+      o.receiveShadow = true;
+      const m = o.material;
+      if (m.transparent) m.depthWrite = false;
+    });
   }
 
   has(name) {

@@ -69,6 +69,20 @@ export class Builder {
     return true;
   }
 
+  // SimReady-Requisit als Instanz (behält seine Texturen, nicht eingebacken).
+  // collide: 'box' = AABB aus den Modellgrenzen, 'cyl' = stehender Zylinder, null = begehbar
+  prop(name, x, z, ry = 0, { y = null, scale = 1, collide = 'box', shrink = 0.9, rx = 0, rz = 0, layer = 'det', shadow = true } = {}) {
+    if (!this.inst || !this.inst.has(name)) return false;
+    const gy = y ?? this.ground(x, z);
+    this.inst.add(name, x, gy, z, ry, scale, { layer, rx, rz, shadow });
+    const bb = this.assets.bounds(name);
+    const sc = typeof scale === 'number' ? [scale, scale, scale] : scale;
+    const w = (bb.max.x - bb.min.x) * sc[0], d = (bb.max.z - bb.min.z) * sc[2], h = (bb.max.y - bb.min.y) * sc[1];
+    if (collide === 'box') this.solidCol(x, gy, z, w, h, d, ry, shrink);
+    else if (collide === 'cyl') this.col.addCyl(x, z, (Math.max(w, d) / 2) * shrink, gy, gy + h);
+    return true;
+  }
+
   // Nur Kollision (Box mit Unterkante y)
   solidCol(x, y, z, w, h, d, ry = 0, shrink = 1) {
     let hw = w / 2, hd = d / 2;
@@ -329,7 +343,12 @@ export class Builder {
 
   crate(x, z, s = 1.2, y = null, color = COL.wood) {
     const gy = y ?? this.ground(x, z);
-    if (this.model('p_crate', x, gy, z, this.rand() * Math.PI, { scale: s / 1.2 })) {
+    const ry = this.rand() * Math.PI;
+    if (this.prop('sr_crate', x, z, ry, { y: gy, scale: s, collide: null, layer: '' })) {
+      this.solidCol(x, gy, z, s, s, s);
+      return;
+    }
+    if (this.model('p_crate', x, gy, z, ry, { scale: s / 1.2 })) {
       this.solidCol(x, gy, z, s, s, s);
       return;
     }

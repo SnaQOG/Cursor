@@ -22,14 +22,14 @@ export class Instancer {
   }
 
   // layer: '' (immer), 'det' (mittlere Entfernung), 'in' (Innenräume, nah)
-  add(name, x, y, z, ry = 0, scale = 1, { tint = null, layer = '', rx = 0, rz = 0, shade = 1, double = false } = {}) {
+  add(name, x, y, z, ry = 0, scale = 1, { tint = null, layer = '', rx = 0, rz = 0, shade = 1, double = false, shadow = false } = {}) {
     if (!this.has(name)) return false;
     const size = layer ? 40 : 80;
     const ix = Math.floor(x / size), iz = Math.floor(z / size);
     const key = `${name}|${layer}|${ix}|${iz}`;
     let g = this.groups.get(key);
     if (!g) {
-      g = { name, layer, double, items: [], cx: (ix + 0.5) * size, cz: (iz + 0.5) * size, ySum: 0 };
+      g = { name, layer, double, shadow, items: [], cx: (ix + 0.5) * size, cz: (iz + 0.5) * size, ySum: 0 };
       this.groups.set(key, g);
     }
     const sc = typeof scale === 'number' ? [scale, scale, scale] : scale;
@@ -59,6 +59,7 @@ export class Instancer {
         const paint = part.name.includes('__Paint');
         const lamp = part.name.includes('__Lamp');
         const im = new THREE.InstancedMesh(part.geometry, g.double ? this.doubleSided(part.material) : part.material, n);
+        im.name = g.name;
         g.items.forEach((it, i) => {
           _e.set(it.rx, it.ry, it.rz, 'YXZ');
           _q.setFromEuler(_e);
@@ -72,7 +73,7 @@ export class Instancer {
         im.instanceMatrix.needsUpdate = true;
         im.instanceColor.needsUpdate = true;
         im.computeBoundingSphere();
-        im.castShadow = !g.layer && !lamp;
+        im.castShadow = (!g.layer || g.shadow) && !lamp;
         im.receiveShadow = true;
         im.userData.layer = g.layer;
         im.userData.center = new THREE.Vector3(g.cx, g.ySum / n, g.cz);

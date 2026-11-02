@@ -1,0 +1,30 @@
+{
+  "_info": "SimReady-Assets aus den Hugging-Face-Repos des Verzeichnisses NVIDIA-Omniverse/simready-central. rev = fest eingetragene Version, tris = Ziel beim Reduzieren, tex = Texturgröße in Pixeln.",
+  "sources": {
+    "nvidia/simready-assets": "NVIDIA SimReady Assets",
+    "ForgeCAD/simready-assets": "ForgeCAD SimReady Assets",
+    "ALLSIDES/simready-scanned-objects": "Allsides SimReady Assets",
+    "PalatialSim/palatial-nv-asset-library": "Palatial Platforms — Palatial NV Asset Library"
+  },
+  "assets": [
+    {"id": "sr_drum_steel", "name": "Stahlfass", "repo": "nvidia/simready-assets", "folder": "drum_steel_a01", "rev": "653d91e182011f357cf1644013cc94ddf194d349", "tris": 2500, "tex": 512, "area": 0.8},
+    {"id": "sr_oil_drum", "name": "Ölfass", "repo": "ForgeCAD/simready-assets", "folder": "oil_drum", "rev": "b94ea770666b6c0f82e09a78e9fcb375b223e3b1", "tris": 2000, "tex": 512},
+    {"id": "sr_crate", "name": "Sperrholzkiste 1 m", "repo": "nvidia/simready-assets", "folder": "crate_plywood_b02", "rev": "653d91e182011f357cf1644013cc94ddf194d349", "tris": 1500, "tex": 512},
+    {"id": "sr_crate_long", "name": "Sperrholzkiste 2 m", "repo": "nvidia/simready-assets", "folder": "crate_plywood_b04", "rev": "653d91e182011f357cf1644013cc94ddf194d349", "tris": 2000, "tex": 512},
+    {"id": "sr_pallet", "name": "Holzpalette", "repo": "nvidia/simready-assets", "folder": "pallet_block_b02", "rev": "653d91e182011f357cf1644013cc94ddf194d349", "tris": 1200, "tex": 384},
+    {"id": "sr_pallet_load", "name": "Beladene Palette", "repo": "nvidia/simready-assets", "folder": "pallet_composition_a13", "rev": "653d91e182011f357cf1644013cc94ddf194d349", "tris": 4000, "tex": 384},
+    {"id": "sr_ibc", "name": "IBC-Tank", "repo": "nvidia/simready-assets", "folder": "ibcTank_a02", "rev": "653d91e182011f357cf1644013cc94ddf194d349", "tris": 6000, "tex": 384},
+    {"id": "sr_compressor", "name": "Kompressor", "repo": "nvidia/simready-assets", "folder": "equipment_airCompressor_a01", "rev": "653d91e182011f357cf1644013cc94ddf194d349", "tris": 8000, "tex": 640, "area": 0.8},
+    {"id": "sr_valve", "name": "Absperrschieber", "repo": "ForgeCAD/simready-assets", "folder": "gate_valve", "rev": "0573053fa2c9174ca2a4678a462ec4dfd3035d59", "tris": 6000, "tex": 384, "area": 0.92},
+    {"id": "sr_pipes", "name": "Rohrbündel", "repo": "nvidia/simready-assets", "folder": "pipe_plastic_gray_b06", "rev": "653d91e182011f357cf1644013cc94ddf194d349", "tris": 3000, "tex": 384},
+    {"id": "sr_sign", "name": "Warnaufsteller", "repo": "nvidia/simready-assets", "folder": "sign_warning_a04", "rev": "653d91e182011f357cf1644013cc94ddf194d349", "tris": 3000, "tex": 384},
+    {"id": "sr_cones", "name": "Leitkegel und Absperrgitter", "repo": "ForgeCAD/simready-assets", "folder": "traffic_cones_barriers", "rev": "11da4ca51b2bd4b44d2ba7a5f46bb37342615e42", "tris": 8000, "tex": 384, "small": false, "area": 0.9},
+    {"id": "sr_stone", "name": "Steinplatte", "repo": "ALLSIDES/simready-scanned-objects", "folder": "stone_tile_KQKG74NK1J", "rev": "50a309f9dda21778808cbea1c10f0918c2b9e42a", "tris": 250, "tex": 256, "lod1": true},
+    {"id": "sr_slat_crate", "name": "Lattenkiste", "repo": "PalatialSim/palatial-nv-asset-library", "folder": "D00480", "rev": "69a87329036cec0440403351c12230970c4e67d8", "tris": 1500, "tex": 384},
+    {"id": "sr_wood_box", "name": "Holzkiste", "repo": "PalatialSim/palatial-nv-asset-library", "folder": "D00953", "rev": "69a87329036cec0440403351c12230970c4e67d8", "tris": 1000, "tex": 384},
+    {"id": "sr_basket_tall", "name": "Hoher Weidenkorb", "repo": "ALLSIDES/simready-scanned-objects", "folder": "basket_KN6XD9DJXF", "rev": "9ef058fe70e02669a8afd9d52fd44ce8815b0af1", "tris": 1800, "tex": 384, "lod1": true, "area": 0.6, "remesh": 0.0028, "sharp": 75},
+    {"id": "sr_basket", "name": "Korb mit Leinen", "repo": "PalatialSim/palatial-nv-asset-library", "folder": "D00016", "rev": "69a87329036cec0440403351c12230970c4e67d8", "tris": 1800, "tex": 384},
+    {"id": "sr_chair", "name": "Holzstuhl", "repo": "ForgeCAD/simready-assets", "folder": "dining_chair", "rev": "0573053fa2c9174ca2a4678a462ec4dfd3035d59", "tris": 1400, "tex": 384},
+    {"id": "sr_stool", "name": "Fußbank", "repo": "ALLSIDES/simready-scanned-objects", "folder": "footstool_RP2B4ZW65H", "rev": "8ea302b2d721a31ee53a44875a34900982cca6d8", "tris": 700, "tex": 384, "lod1": true}
+  ]
+}

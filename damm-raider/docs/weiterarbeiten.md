@@ -10,13 +10,16 @@ Sitzung (z. B. Claude Code auf dem eigenen Rechner) direkt weitermachen kann.
 - Weltenbrück verbindet vier Viertel-Ideen zu einer eigenen Stadt: Hafen- und Seefahrer-Stimmung,
   Waldsiedlung auf Terrassen mit Riesenbäumen, ein Erfinderturm mit Energiekern und ein düsterer
   Gründerfelsen. Bewusst nur Archetypen – keine Figuren, Logos oder Nachbauten aus bestehenden Werken.
-- Alle festen Formen (Möbel, Fassadenteile, Requisiten, Bäume, Autos, Waffen, Figuren, Gesichter)
-  kommen aus Blender-Skripten. Wände, Böden, Treppen und Dächer der Stadthäuser erzeugt das Spiel aus
+- Fast alle festen Formen (Möbel, Fassadenteile, Requisiten, Bäume, Autos, Waffen, Figuren, Gesichter)
+  kommen aus Blender-Skripten, Ausnahme sind die SimReady-Requisiten (siehe unten). Wände, Böden, Treppen und Dächer der Stadthäuser erzeugt das Spiel aus
   dem Stadtplan, weil jedes Haus genau auf sein Grundstück passen muss.
 - Detail-Runde: Oberflächen mit Normal-Maps, Fassadendetails, Stuben, Wiesen, Autos, Bäume.
 - Grafik-Runde: Nachbearbeitung in `src/post.js` (GTAO auf „hoch“, Bloom, Farblook je Wetter,
   Vignette, Korn), weichere und schärfere Schatten, Himmel mit beleuchteten Wolken, Wind in der
   Vegetation (`World.addWind`), tiefere Tagessonne mit längeren Schatten.
+- SimReady-Runde: 19 Requisiten aus dem SimReady-Katalog (CC BY 4.0) in `assets/simready.glb`, per Skript
+  aus USD umgewandelt. Stahlfass und Sperrholzkiste ersetzen `p_barrel` und `p_crate`, der Rest ist neue Deko.
+  Das Sprengfass ist das Stahlfass in Rot mit gelbem Band und hat echte Maße (0,86 m statt 1,2 m).
 - Referenzen bisher nur aus Texten (Bildseiten waren in der Cloud-Umgebung gesperrt): Fachwerk
   (Mannfigur, Andreaskreuz, Balkenköpfe), Schwarzwaldhaus (Walmdach, Holzschindeln), Bauernmöbel
   (Brettstuhl mit Herz, Eckbank, Kachelofen, Kuckucksuhr), Wiesenpflanzen (Mohn, Kornblume, Margerite,
@@ -36,6 +39,8 @@ Sitzung (z. B. Claude Code auf dem eigenen Rechner) direkt weitermachen kann.
 | `src/batcher.js` / `src/instancer.js` | zusammengefasste Geometrie bzw. Instanzen mit Culling |
 | `blender/m_city.py` | Stadt-Modelle (Vorderseite **-Y**, `__Paint`-Teile einfärbbar) |
 | `blender/m_world.py` | Welt-Modelle (Vorderseite **+Y**, `key`-Farbe wird umgefärbt) |
+| `blender/simready_*` | SimReady-Assets: Liste, Download, Umwandlung (Ablauf im README) |
+| `docs/simready-credits.md` | Namensnennung für CC BY 4.0, bei neuen Assets ergänzen |
 
 ## Bauen und Testen
 
@@ -51,7 +56,11 @@ node tools/tests/bewegung.mjs               # Türen, Treppen, Brücken, Spawns
 node tools/tests/raid.mjs                   # Raids auf beiden Karten
 node tools/tests/details-stadt.mjs          # Detailbilder -> tools/tests/shots/
 node tools/tests/details-damm.mjs
+node tools/tests/simready.mjs nachher      # feste Kameras für Vergleichsbilder, Draw-Calls, Dreiecke
 ```
+
+Ohne Server und ohne Playwright-Browser geht es auch: `GAME_URL=file://$PWD/dist/damm-raider.html PW_CHANNEL=chrome`
+vor den Testaufruf setzen, dann nutzt der Test das installierte Chrome samt echter Grafikeinheit.
 
 Blender-Modelle neu bauen und prüfen (Blender 4.5 als Python-Modul, siehe README):
 
@@ -64,13 +73,19 @@ Richtwerte der Stadt (Software-Rendering in der Cloud): ca. 670 Draw-Calls, 2,3 
 621 Häuser, 52 Ruinen. Bewegungstests: Treppen 60/60, Türen 59/60 (Haus 154 ist ein Durchlauf
 durch die Hintertür, kein Fehler), Brücken 6/6, Spawns 11/11.
 
+Richtwerte aus `simready.mjs` (Apple M1, feste Kamera, vorher → nachher SimReady): Damm 196 → 223 Draw-Calls,
+0,74 → 0,94 Mio. Dreiecke; Stadt 872 → 899 Draw-Calls, 2,95 → 3,09 Mio. Dreiecke; Einzeldatei 7,8 → 14,2 MB.
+
 ## Nächste Schritte
 
 1. **Echte Fotos als Vorlage** (Wikimedia Commons, Unsplash): Fachwerk- und Schwarzwaldhäuser,
    Bauernstuben, Blumenwiesen, verlassene Autos. Danach Modelle, Farben und Texturen angleichen.
 2. **Mit Grafikkarte testen:** echte Bildrate auf allen drei Grafikstufen messen (Ziel 60 fps auf
    „mittel“), GTAO-Stärke und Bloom nach Augenmaß nachstellen (`src/post.js`, `LOOKS`).
-3. Offene Ideen: Krüppelwalmdächer, mehr Innenraum-Vielfalt (Herrgottswinkel, Bilder, Geschirrschrank),
+3. **SimReady:** Natursteine, Felsen und Industrieschilder gibt es im Katalog nicht; das Schild ist ein
+   „Wet Floor“-Aufsteller und bleibt ein Notbehelf. Der Sprossenstuhl steht nur in jedem dritten Stein- oder
+   Backsteinhaus, die Fußbank nur in jedem vierten Haus, damit die Stadt nicht zu viele Dreiecke bekommt.
+4. Offene Ideen: Krüppelwalmdächer, mehr Innenraum-Vielfalt (Herrgottswinkel, Bilder, Geschirrschrank),
    Stadttore öffnen, Autos auch in Weltenbrück, Licht und Schatten feiner abstimmen.
 
 Commits gehen auf den Branch `claude/arc-raiders-browser-game-h181ag`.

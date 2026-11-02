@@ -16,8 +16,12 @@ const COPPER = 0x8a5a3a;
 
 export function buildCity({ batcher, col, terrain, assets, world, layout, instancer }) {
   const B = new Builder(batcher, col, terrain, assets);
+  B.inst = instancer;
   const b = batcher;
   const rnd = mulberry32(4711);
+  // eigener Zufall für die SimReady-Requisiten, damit der übrige Aufbau gleich bleibt
+  const pr = mulberry32(2718);
+  const PR = (a, c) => a + pr() * (c - a);
   const R = (a, c) => a + rnd() * (c - a);
   const pick = (arr) => arr[Math.floor(rnd() * arr.length) % arr.length];
   const enemySpawns = [], turrets = [], containers = [], barrels = [], labels = [];
@@ -301,6 +305,39 @@ export function buildCity({ batcher, col, terrain, assets, world, layout, instan
       const s = R(0.4, 1.2);
       b.addPrim('ico', x + R(-spread, spread), y + s * 0.3, z + R(-spread, spread), s * 1.3, s * 0.6, s, pick(PAL.rubble), { mat: 'stone', ry: rnd() * 6 });
     }
+    // lose Steinplatten zwischen dem Schutt
+    for (let i = 0; i < 3; i++) stoneTile(x + PR(-spread, spread), z + PR(-spread, spread), y);
+  }
+
+  function stoneTile(x, z, y) {
+    B.prop('sr_stone', x, z, PR(0, 6.28), { y: y + 0.02, scale: PR(1.8, 3), rx: PR(-0.07, 0.07), rz: PR(-0.07, 0.07), collide: null, shadow: false });
+  }
+
+  // Waren neben einem Marktstand
+  function wares(x, z, y, W) {
+    const side = pr() < 0.5 ? -1 : 1;
+    const wx = x + side * (W / 2 + 0.6), k = pr();
+    if (k < 0.4) {
+      B.prop('sr_slat_crate', wx, z - 0.3, PR(-0.3, 0.3), { y, scale: 1.7 });
+      B.prop('sr_basket', wx + side * 0.15, z + 0.75, PR(0, 6.28), { y, scale: 1.05, collide: null });
+    } else if (k < 0.75) {
+      B.prop('sr_basket_tall', wx, z + 0.4, PR(0, 6.28), { y, scale: 3, collide: 'cyl' });
+      B.prop('sr_wood_box', wx + side * 0.1, z - 0.55, PR(-0.3, 0.3), { y, scale: 1.5 });
+    } else {
+      B.prop('sr_wood_box', wx, z, PR(-0.3, 0.3), { y, scale: 1.6 });
+      B.prop('sr_slat_crate', wx + PR(-0.04, 0.04), z, PR(-0.2, 0.2), { y: y + 0.58, scale: 1.3, collide: null });
+    }
+  }
+
+  // Stapel in einer Hofecke
+  function yardGoods(yard, lvl) {
+    const left = pr() < 0.5, top = pr() < 0.5;
+    const cx = left ? yard.x0 + 0.9 : yard.x1 - 0.9, cz = top ? yard.z0 + 0.9 : yard.z1 - 0.9;
+    const dx = left ? 1 : -1, dz = top ? 1 : -1;
+    B.prop('sr_slat_crate', cx, cz, PR(-0.2, 0.2), { y: lvl, scale: 1.7 });
+    if (pr() < 0.6) B.prop('sr_slat_crate', cx + PR(-0.05, 0.05), cz + PR(-0.05, 0.05), PR(-0.25, 0.25), { y: lvl + 0.66, scale: 1.5, collide: null });
+    if (pr() < 0.7) B.prop('sr_basket_tall', cx + dx * 0.95, cz + dz * 0.1, PR(0, 6.28), { y: lvl, scale: 3.2, collide: 'cyl' });
+    if (pr() < 0.5) B.prop('sr_wood_box', cx + dx * 0.1, cz + dz * 0.95, PR(-0.3, 0.3), { y: lvl, scale: 1.5 });
   }
 
   function cart(x, z, y, ry) {
@@ -308,6 +345,7 @@ export function buildCity({ batcher, col, terrain, assets, world, layout, instan
     if (inst('kc_cart', x, y, z, ry)) {
       const hw = Math.abs(ca) * 1.2 + Math.abs(sa) * 0.65, hd = Math.abs(sa) * 1.2 + Math.abs(ca) * 0.65;
       col.addBox(x - hw, y, z - hd, x + hw, y + 1.1, z + hd);
+      if (pr() < 0.6) B.prop('sr_basket', x + sa * 1.15, z + ca * 1.15, PR(0, 6.28), { y, scale: 1.05, collide: null });
       return;
     }
     b.box(x, y + 0.55, z, 2.4, 0.5, 1.3, 0x6a4a30, { ry, mat: 'wood' });
@@ -326,6 +364,7 @@ export function buildCity({ batcher, col, terrain, assets, world, layout, instan
     const W = sw ? d : w, D = sw ? w : d;
     if (inst('kc_stall', x, y, z, ry, 1, { tint: color })) {
       col.addBox(x - (W - 0.3) / 2, y, z - (D - 0.6) / 2, x + (W - 0.3) / 2, y + 0.95, z + (D - 0.6) / 2);
+      wares(x, z, y, W);
       return;
     }
     for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) b.box(x + dx * (W / 2 - 0.1), y, z + dz * (D / 2 - 0.1), 0.1, 2.4, 0.1, 0x5a3e2a, { mat: 'wood' });
@@ -717,6 +756,7 @@ export function buildCity({ batcher, col, terrain, assets, world, layout, instan
         b.box(bx, y + 3.1, bz, 2.8, 0.12, 1.6, 0x7a4430, { mat: 'tile', rz: 0 });
       }
       col.addCyl(bx, bz, 1.45, y, y + 0.9);
+      B.prop('sr_basket', bx + 2.2, bz - 1.1, 0.7, { y, scale: 1.05, collide: null });
       cart(bx - 6, bz + 4, y, 1.2);
       containers.push({ type: 'crate', x: bx + 5, y, z: bz - 4, tier: 1, ry: 0.3 });
     }
@@ -736,6 +776,8 @@ export function buildCity({ batcher, col, terrain, assets, world, layout, instan
         col.addCyl(vx, vz, 1.3, y, y + 1.2);
       }
       containers.push({ type: 'medical', x: gh.x1 - 3, y, z: gh.z0 + 3, tier: 1, ry: 0 });
+      B.prop('sr_wood_box', gh.x0 + 2.2, gh.z1 - 2.2, 0.2, { y, scale: 1.6 });
+      B.prop('sr_basket_tall', gh.x0 + 2.2, gh.z1 - 3.4, 1.4, { y, scale: 3.2, collide: 'cyl' });
     }
     // Höfe: Karren, Kisten, Schutt, Fässer
     let nb = 0;
@@ -749,6 +791,7 @@ export function buildCity({ batcher, col, terrain, assets, world, layout, instan
       else if (r < 0.45) rubble(cx, cz, lvl, 5, Math.min(w, d) / 3);
       else if (r < 0.6) containers.push({ type: 'crate', x: cx, y: lvl, z: cz, tier: 1, ry: rnd() < 0.5 ? 0 : Math.PI / 2 });
       if (rnd() < 0.12 && nb < 14) { barrels.push({ x: cx + R(-1, 1), z: cz + R(-1, 1) }); nb++; }
+      if (pr() < 0.35) yardGoods(yard, lvl);
     }
   }
 

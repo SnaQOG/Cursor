@@ -4,8 +4,9 @@ import { Builder, COL } from './structures.js';
 import { MAP } from './config.js';
 import { mulberry32 } from './util.js';
 
-export function buildMap(batcher, col, terrain, assets = null) {
+export function buildMap(batcher, col, terrain, assets = null, instancer = null) {
   const B = new Builder(batcher, col, terrain, assets);
+  B.inst = instancer;
   const rnd = mulberry32(99);
   const R = (a, b) => a + rnd() * (b - a);
   const enemySpawns = []; // {type, x, z, y?, poi, patrol}
@@ -425,11 +426,80 @@ export function buildMap(batcher, col, terrain, assets = null) {
       for (let i = 0; i < 3; i++) B.crate(x + R(-3, 3), z + R(-3, 3), R(0.9, 1.4));
       C('crate', x, gy, z, 1);
       barrels.push({ x: x + 3.5, z: z - 2.5 });
+      B.prop('sr_pallet', x - 4.4, z + 3.6, (x + z) * 0.7, { collide: null });
     } else {
       // kleine Hütte
       B.building({ x, z, w: 6, d: 5, floors: 1, fh: 3, wall: [COL.pale, COL.concrete, COL.teal][Math.floor(rnd() * 3)], doors: { s: [0.5] }, roofAccess: false, parapet: 0, tier: 1, poi: null });
     }
   }
+  // ------------------------------------------------------------------ SimReady-Requisiten
+  // [Modell, x, z, Drehung, Optionen]. Ohne y stehen sie auf dem Gelände; Wege und Türen bleiben frei.
+  const hallY = B.ground(60, -50) + 0.15;
+  const onHall = { y: hallY, layer: 'in' };
+  const onDam = { y: top };
+  const PROPS = [
+    // Kraftwerk: Vorplatz links und rechts der Zufahrt
+    ['sr_pallet_load', 46.5, -34.4, 0.15],
+    ['sr_crate', 50, -35, 0.4],
+    ['sr_crate_long', 42.2, -35.2, 0.05],
+    ['sr_pallet', 44, -31.9, 1.3, { collide: null }],
+    ['sr_ibc', 70, -35.3, 0],
+    ['sr_ibc', 71.45, -35.25, 0.03],
+    ['sr_drum_steel', 73.4, -35.1, 0.2],
+    ['sr_drum_steel', 74.1, -34.4, 1.7],
+    ['sr_oil_drum', 74.75, -35.2, 0.8],
+    ['sr_sign', 65.5, -36, 0.5, { collide: null }],
+    // Kraftwerk: Halle
+    ['sr_compressor', 51, -52.5, Math.PI / 2, onHall],
+    ['sr_valve', 69, -56, 0, { ...onHall, scale: 2 }],
+    ['sr_pipes', 89.6, -55, 0, onHall],
+    ['sr_drum_steel', 47, -43, 0.9, onHall],
+    ['sr_drum_steel', 46.3, -43.7, 2.2, onHall],
+    ['sr_oil_drum', 47.1, -44.3, 0.4, onHall],
+    ['sr_sign', 66, -41, -0.4, { ...onHall, collide: null }],
+    // Dammkrone: Baustelle
+    ['sr_cones', -28, -75.6, 0.3, onDam],
+    ['sr_sign', -25, -76.2, 0.6, { ...onDam, collide: null }],
+    ['sr_cones', 30, -84.2, 2.9, onDam],
+    // Wasseraufbereitung
+    ['sr_ibc', 143, 29.2, 0],
+    ['sr_ibc', 144.5, 29.25, 0.04],
+    ['sr_drum_steel', 146.6, 29.3, 0.5],
+    ['sr_sign', 147.6, 27.6, -0.3, { collide: null }],
+    ['sr_valve', 135, 7, 0.5, { scale: 2 }],
+    ['sr_pipes', 151, 6, Math.PI / 2],
+    ['sr_pallet_load', 145.5, 8.2, 0.2],
+    ['sr_pallet', 148.2, 8.8, 1.1, { collide: null }],
+    // Pumpstation
+    ['sr_valve', -216, -164.5, Math.PI / 2, { scale: 2 }],
+    ['sr_oil_drum', -218, -170, 0.3],
+    ['sr_oil_drum', -217.2, -170.7, 1.9],
+    ['sr_drum_steel', -216.4, -170.1, 2.6],
+    ['sr_pipes', -231, -172.5, Math.PI / 2],
+    // Forschungsanlage
+    ['sr_pallet_load', -117.5, 29, 0.3],
+    ['sr_crate_long', -117, 33.4, Math.PI / 2],
+    ['sr_crate', -119.3, 25.3, 0.7],
+    ['sr_ibc', -131, -5.5, 0.1],
+    // Umspannwerk
+    ['sr_cones', -46, 127, 0.1],
+    ['sr_sign', -50.5, 127.5, 0.8, { collide: null }],
+    ['sr_drum_steel', -76, 121, 0.4],
+    ['sr_oil_drum', -75.2, 121.7, 1.3],
+    // Wohnblöcke
+    ['sr_cones', 55, 180, 0.4],
+    ['sr_sign', 51.5, 181, 1.1, { collide: null }],
+    ['sr_pallet', 82, 148, 0.5, { collide: null }],
+    // Schlachtfeld: Vorplatz nördlich vom Bunker
+    ['sr_oil_drum', 160, 159.6, 0.5],
+    ['sr_oil_drum', 160.8, 158.9, 2.1],
+    ['sr_crate', 162.8, 160, 0.9],
+  ];
+  for (const [name, x, z, ry, opts] of PROPS) B.prop(name, x, z, ry, opts);
+  // Kiste auf der Palette bei den Wohnblöcken, liegendes Fass am Bunker
+  B.prop('sr_crate', 82, 148, 0.45, { y: B.ground(82, 148) + 0.21 });
+  B.prop('sr_drum_steel', 157.6, 158.6, 0.8, { y: B.ground(157.6, 158.6) + 0.32, rx: Math.PI / 2, collide: null });
+
   // Umherstreifende ARC zwischen den Orten
   for (const [x, z] of [[0, 60], [-100, 60], [100, 100], [-200, 100], [200, 80], [0, 150], [-60, -30], [150, -120], [-150, -110]]) {
     enemySpawns.push({ type: rnd() < 0.7 ? 'wasp' : 'pop', x, z, roam: true });

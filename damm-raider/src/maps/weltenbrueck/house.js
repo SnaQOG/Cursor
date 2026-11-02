@@ -1,6 +1,7 @@
 // Begehbare Stadthäuser für Weltenbrück: Treppenhaus, Zimmer, Türen,
 // echte Fensteröffnungen, Fachwerk, Läden, Möbel, Beuteplätze und Dächer.
 // Wände bestehen aus Flächen (sparsamer als Boxen) plus Kollisionsboxen.
+import { mulberry32 } from '../../util.js';
 
 export const PAL = {
   plaster: [0xe6dcc4, 0xdcc79c, 0xd8ab90, 0xcbbda4, 0xadc0c8, 0xbcc6a4, 0xebe3d3, 0xd6b68c, 0xcaa18a, 0xe0cfa6],
@@ -669,7 +670,9 @@ export class HouseKit {
       if (u > T + 0.9 && !nearDoor(u, v)) {
         const r = rectUV(u - 0.7, u + 0.7, v - 0.4, v + 0.4);
         if (this.model('kc_table', at(u, v), yawX(du[0], du[1]), 1, mopts)) {
-          for (const k of [-0.35, 0.35]) if (rnd() < 0.8) this.model('kc_chair', at(u + k, v + 0.62), yawFront(-dv[0], -dv[1]) + (rnd() - 0.5) * 0.4, 1, mopts);
+          // Ein Teil der Stein- und Backsteinhäuser hat Sprossenstühle, die Bauernhäuser Brettstühle
+          const chair = !rustic && lot.id % 3 === 0 && this.inst.has('sr_chair') ? 'sr_chair' : 'kc_chair';
+          for (const k of [-0.35, 0.35]) if (rnd() < 0.8) this.model(chair, at(u + k, v + 0.62), yawFront(-dv[0], -dv[1]) + (rnd() - 0.5) * 0.4, 1, mopts);
         } else {
           this.b.box((r.x0 + r.x1) / 2, fy + 0.7, (r.z0 + r.z1) / 2, r.x1 - r.x0, 0.06, r.z1 - r.z0, wood, opts);
           this.b.box((r.x0 + r.x1) / 2, fy, (r.z0 + r.z1) / 2, (r.x1 - r.x0) * 0.8, 0.7, (r.z1 - r.z0) * 0.7, darker(wood, 0.8), opts);
@@ -685,6 +688,8 @@ export class HouseKit {
         this.b.box((r.x0 + r.x1) / 2, fy, (r.z0 + r.z1) / 2, r.x1 - r.x0, 0.45, r.z1 - r.z0, 0xb9ae98, opts);
       }
       this.col.addBox(r.x0, fy, r.z0, r.x1, fy + 0.6, r.z1);
+      // Fußbank am Bettende
+      if (lot.id % 4 === 0 && u + 1.3 < uEnd - 1.4 && !nearDoor(u + 1.3, v)) this.model('sr_stool', at(u + 1.3, v), yawFront(du[0], du[1]), 1.3, mopts);
     } else {
       // Beuteplatz an Seite B vorn
       const u = T + 0.7, v = S - T - 0.6;
@@ -1035,6 +1040,13 @@ export class HouseKit {
       const px = x0 + 1 + rnd() * (x1 - x0 - 2), pz = z0 + 1 + rnd() * (z1 - z0 - 2), s = 0.6 + rnd() * 1.3;
       this.b.addPrim('ico', px, y + s * 0.3, pz, s * 1.3, s * 0.65, s, pick(rnd, PAL.rubble), { mat: 'stone', ry: rnd() * 6 });
       if (s > 1.1) this.col.addBox(px - s * 0.7, y, pz - s * 0.6, px + s * 0.7, y + s * 0.7, pz + s * 0.6);
+    }
+    // lose Steinplatten (eigener Zufall, damit der übrige Aufbau gleich bleibt)
+    const pr = mulberry32(lot.id + 31);
+    for (let i = 0; i < 5; i++) {
+      this.B.prop('sr_stone', x0 + 1 + pr() * (x1 - x0 - 2), z0 + 1 + pr() * (z1 - z0 - 2), pr() * 6.28, {
+        y: y + 0.17, scale: 2.4 + pr() * 1.6, rx: (pr() - 0.5) * 0.14, rz: (pr() - 0.5) * 0.14, collide: null, shadow: false,
+      });
     }
     // Balken liegen herum
     for (let i = 0; i < 2; i++) {

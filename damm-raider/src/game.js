@@ -590,9 +590,12 @@ export class Game {
     p.update(dt);
     this.updateInteraction(dt);
 
+    // Ferne ARC nicht zeichnen: jede Maschine kostet in jedem Durchgang (Bild, Schatten, GTAO) viele
+    // Draw-Calls. Wer den Spieler angreift, bleibt sichtbar.
+    const draw = this.map.enemyDraw ?? 300;
     for (const e of this.enemies) {
       const d2 = e.pos.distanceToSquared(p.pos);
-      e.root.visible = d2 < 300 * 300 && (e.alive || e.type !== 'pop');
+      e.root.visible = (d2 < draw * draw || e.state === 'attack') && (e.alive || e.type !== 'pop');
       if (d2 > 240 * 240 && e.state !== 'attack' && e.alive) {
         e.farT += dt;
         if (e.farT < 0.5) continue;

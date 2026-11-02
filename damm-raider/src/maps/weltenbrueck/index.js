@@ -320,6 +320,7 @@ export const WELTENBRUECK = {
   half: CITY.HALF,
   bound: CITY.BOUND,
   mapHalf: 300,
+  enemyDraw: 170, // enge Gassen, Wände verdecken das meiste
   pois: POIS,
   extracts: EXTRACTS,
   spawns: PLAYER_SPAWNS,

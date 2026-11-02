@@ -47,6 +47,8 @@ Putz (`white_plaster_02`), Dachziegel (`clay_roof_tiles_02`) und Pflaster (`cobb
 [Poly Haven](https://polyhaven.com/license) und stehen unter CC0. Für das Spiel verkleinert und in Farbe und
 Helligkeit angepasst (`tools/fetch_textures.py`). Der Fels am Gründerfelsen ist `cliff_side`.
 
+Dazu für Wände und Holz: `brick_wall_001`, `rustic_stone_wall`, `rough_wood`, `weathered_brown_planks`.
+
 ## Felsen und Pflanzen
 
 `assets/nature.glb`, ebenfalls Poly Haven, CC0: `rock_moss_set_01`, `namaqualand_boulder_05`, `namaqualand_cliff_01`,

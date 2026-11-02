@@ -18,6 +18,10 @@ TEXTURES = {
     'rooftile': ('clay_roof_tiles_02', 768, 80, 0.62, 0.42),
     'cobble': ('cobblestone_floor_08', 1024, 78, 0.8, None),
     'cliff': ('cliff_side', 1024, 78, 0.22, 0.46),
+    'brick': ('brick_wall_001', 768, 78, 0.5, 0.72),
+    'ashlar': ('rustic_stone_wall', 768, 78, 0.45, 0.78),
+    'beam': ('rough_wood', 512, 78, 0.3, 0.8),
+    'planks': ('weathered_brown_planks', 768, 78, 0.45, 0.72),
 }
 UA = {'User-Agent': 'damm-raider-texture-fetch'}
 

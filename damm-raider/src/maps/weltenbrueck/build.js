@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { Builder } from '../../structures.js';
 import { HouseKit, PAL, STYLE, mix } from './house.js';
 import {
-  CITY, STAIRS, STAIR_RUN, PLAZA, DOM, RATHAUS, STREETS, GIANT_TREES, FACES, STEIG, WHITE_TOWER, ENERGY_TOWER, Occupancy, levelAt, overlap,
+  CITY, STAIRS, STAIR_RUN, PLAZA, DOM, RATHAUS, STREETS, OUTER_STREETS, GIANT_TREES, FACES, STEIG, WHITE_TOWER, ENERGY_TOWER, Occupancy, levelAt, overlap,
 } from './layout.js';
 import { prepareOuter, buildOuter } from './outer.js';
 import { dressCity } from '../../dressing.js';
@@ -253,6 +253,7 @@ export function buildCity({ batcher, col, terrain, assets, world, layout, instan
   // Ausstattung kommt zuletzt, damit sie Häuser, Plätze und Sonderbauten kennt
   const dressed = dressCity({
     B, lots, layout, kit, occ,
+    streets: [...STREETS, ...OUTER_STREETS],
     camps: [[-262, 32], [262, 28], [-120, 122], [116, 66], [-56, 172], [-274, 120], [272, 150], [150, 226], [-268, 222], [-100, -40], [60, -142], [-160, 60], [40, 40]],
     barricades: [[-30, 96, false], [30, 96, false], [-214, 92, false], [214, 100, false], [0, 214, true], [252.5, -30, true], [-252.5, -32, true], [0, 150, true], [-140, 96, false], [140, 96, false]],
     cannons: [[-280, 236, Math.PI], [-168, 236, Math.PI], [-20, 236, Math.PI], [52, 236, Math.PI], [130, 236, Math.PI], [282, 236, Math.PI]],

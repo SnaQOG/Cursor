@@ -84,12 +84,12 @@ export class Builder {
   }
 
   // Requisit aus dem gemeinsamen Atlas: ein Draw-Call je Kachel, egal wie viele Objekte
-  dress(name, x, z, ry = 0, { y = null, scale = 1, rx = 0, rz = 0, color = 0xffffff, collide = null, shrink = 0.9, layer = 'det' } = {}) {
+  dress(name, x, z, ry = 0, { y = null, scale = 1, rx = 0, rz = 0, color = 0xffffff, bright = 1, collide = null, shrink = 0.9, layer = 'det' } = {}) {
     if (!this.has(name)) return false;
     const gy = y ?? this.ground(x, z);
     const sc = typeof scale === 'number' ? [scale, scale, scale] : scale;
     const m = new THREE.Matrix4().compose(new THREE.Vector3(x, gy, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz, 'YXZ')), new THREE.Vector3(...sc));
-    this.b.addModelUV(this.assets.meshes(name), m, color, 'dress', layer);
+    this.b.addModelUV(this.assets.meshes(name), m, color, 'dress', layer, bright);
     if (collide) {
       const bb = this.assets.bounds(name);
       const w = (bb.max.x - bb.min.x) * sc[0], d = (bb.max.z - bb.min.z) * sc[2], h = (bb.max.y - bb.min.y) * sc[1];

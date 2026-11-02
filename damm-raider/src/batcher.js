@@ -197,9 +197,9 @@ export class Batcher {
   }
 
   // Modell mit eigener Textur einbacken (Requisiten im gemeinsamen Atlas): UVs bleiben erhalten
-  addModelUV(meshes, matrix, color, mat = 'dress', layer = 'det') {
+  addModelUV(meshes, matrix, color, mat = 'dress', layer = 'det', bright = 1) {
     const b = this.bucket(mat, matrix.elements[12], matrix.elements[14], layer);
-    _c.set(color);
+    _c.set(color).multiplyScalar(bright);
     for (const m of meshes) {
       const g = m.geometry;
       _m.multiplyMatrices(matrix, m.matrix);

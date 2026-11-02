@@ -103,7 +103,7 @@ const terrain = {
     } else if (z > CITY.QUAY) {
       c.copy(C.seabed);
     } else c.copy(C.forest).lerp(C.grass, clamp(0.5 + nv, 0, 1));
-    c.multiplyScalar(0.92 + n.noise(x * 0.4, z * 0.4) * 0.1);
+    c.multiplyScalar(1.1 + n.noise(x * 0.4, z * 0.4) * 0.12);
   },
 
   mapColor() { return [40, 44, 46]; },
@@ -139,15 +139,29 @@ function materials(world) {
   // Ziegel in echter Größe: eine Kachel sind rund 6,5 m Dach
   if (tex.rooftile) for (const x of [tex.rooftile.map, tex.rooftile.normal]) x.repeat.set(0.6, 0.6);
   const base = mk(makePlasterSet(), 0.93, 0, 0.7), tile = mk(makeTileSet(), 0.8, 0.02, 1.0);
+  // Welt-UV: eine Kachel sind 4 m, die Fotos zeigen weniger
+  const scaled = (t, rep, roughness, ns) => {
+    if (!t) return null;
+    for (const x of [t.map, t.normal]) x.repeat.set(rep, rep);
+    return photo(t, roughness, ns);
+  };
+  const cobble2 = () => {
+    if (!tex.cobble) return base;
+    const c = { map: tex.cobble.map.clone(), normal: tex.cobble.normal.clone() };
+    for (const x of [c.map, c.normal]) { x.repeat.set(4 / 3, 4 / 3); x.needsUpdate = true; }
+    return photo(c, 0.96, 0.9);
+  };
   return {
     wplaster: tex.plaster ? photo(tex.plaster, 0.95, 0.9) : base,
     wtile: tex.rooftile ? photo(tex.rooftile, 0.82, 1.0) : tile,
     wtile90: tex.rooftile ? photo(tex.rooftile, 0.82, 1.0, Math.PI / 2) : tile,
     world: base,
-    brick: mk(makeBrickSet(), 0.9),
-    stone: mk(makeAshlarSet(), 0.92),
-    wood: mk(makePlankSet(), 0.82),
-    timber: mk(makeTimberSet(), 0.8, 0, 0.8),
+    brick: scaled(tex.brick, 2, 0.9, 1.0) || mk(makeBrickSet(), 0.9),
+    stone: scaled(tex.ashlar, 1.7, 0.92, 1.0) || mk(makeAshlarSet(), 0.92),
+    wood: scaled(tex.planks, 1.5, 0.84, 0.9) || mk(makePlankSet(), 0.82),
+    timber: scaled(tex.beam, 2.5, 0.82, 0.9) || mk(makeTimberSet(), 0.8, 0, 0.8),
+    cobble2: cobble2(),
+    puddle: new THREE.MeshStandardMaterial({ vertexColors: true, transparent: true, opacity: 0.34, roughness: 0.1, metalness: 0.3, depthWrite: false }),
     shingle: mk(makeShingleSet(), 0.85),
     tile,
     slate: mk(makeSlateSet(), 0.62, 0.06),

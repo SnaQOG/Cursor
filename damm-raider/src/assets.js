@@ -21,7 +21,7 @@ export function materialClass(m) {
 }
 
 // CC0-Texturen unter assets/tex/ (Ablauf in tools/fetch_textures.py)
-const TEXTURES = ['plaster', 'rooftile', 'cobble', 'cliff'];
+const TEXTURES = ['plaster', 'rooftile', 'cobble', 'cliff', 'brick', 'ashlar', 'beam', 'planks'];
 
 export class Assets {
   constructor() {

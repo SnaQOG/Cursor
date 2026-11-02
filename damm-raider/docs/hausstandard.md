@@ -40,6 +40,25 @@ Ein Ergebnis wird nie als fotorealistisch bezeichnet, solange es sichtbar ein 3D
 | v06 | Farben stimmen, Kronen frei | Felsen am Hangfuß zu groß und unscharf |
 | v07 | Felsen kleiner, auf „mittel“ und „hoch“ geprüft | offen, siehe unten |
 
+## Detailrunde ganze Stadt (November 2026)
+
+Fehlerliste aus der Prüfung auf Augenhöhe und was daraus wurde. Gilt für alle Viertel, nicht nur für `lot.pilot`:
+
+| Fehler | Änderung |
+| --- | --- |
+| Wände gezeichnet, Blöcke zu groß | Fotos für Ziegel, Bruchstein, Balken und Bretter in echter Größe (`tools/fetch_textures.py`) |
+| Fachwerk flach aufgemalt | Balken stehen 5,5 cm vor der Wand und haben Seitenflächen |
+| Fenster bündig in der Wand | Rahmen 13 cm in der Laibung, alle mit Rahmen und Fensterbank, im Backstein mit Sturz |
+| Fleckiger Putz ohne Alter | Foto-Putz, Schmutz am Sockel und Schatten unter der Traufe je nach `lot.age` |
+| Dächer dünn | Überstand, Sparrenköpfe, Gaubenfenster und Ziegelfoto auch außerhalb des Musterabschnitts |
+| Kantiger Efeu, schiefe Läden | Efeu entfernt, nur noch selten ein einzelner Laden leicht schief, Farben gedämpft |
+| Sockel ohne Anschluss | Kellerfenster, Steinstreifen und Rinnstein an der Wand, Unkraut an der Mauer |
+| Straße überall gleich | Mittelrinne, Kanaldeckel, Roste, Flickstellen, Pfützen, Prellsteine, Wegweiser (`streetDetail`) |
+| Objekte zu klein und zu dunkel | Handkarren und Schwengelpumpe, Holz und Stoff mit eigenem Material, Müllsäcke heller |
+
+Noch offen: Ladenmarkisen sind flache Flächen, Türen schlicht, die Turmstadt bleibt in den Schluchten sehr dunkel,
+Hochhäuser haben kaum Fassadendetails, das Bruchsteinfoto wiederholt sich auf langen Wänden erkennbar.
+
 Offen im Abschnitt, jeweils außerhalb der Häuser oder als nächste Runde:
 
 - Pflanzen sind gekreuzte Bildflächen: aus der Nähe flach, Stämme ohne Volumen. Der Laubbaum ist knorrig und nicht

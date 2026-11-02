@@ -1,20 +1,22 @@
 // Stadtplan von Weltenbrück: reine Daten ohne three.js. Wird für Terrain,
 // 3D-Aufbau, Übersichtskarte und den Kartenentwurf benutzt.
-// Etappe 1: Kreuzmarkt mit Dom (Süden) und die Waldsiedlung am Gründerfelsen
-// (Norden). Die übrigen Viertel liegen als Kulisse hinter der Stadtmauer.
+// Innerhalb der Stadtmauer: Kreuzmarkt mit Dom (Süden) und die Waldsiedlung am
+// Gründerfelsen (Norden). Durch die Tore: Weiße Stadt (Westen), Turmstadt (Osten)
+// und Hafenviertel (Süden).
 // Koordinaten in Metern, +X = Osten, -Z = Norden.
 import { mulberry32 } from '../../util.js';
 
 export const CITY = {
-  HALF: 300, // Terrain von -300 bis +300
-  RES: 301, // 2-m-Raster
-  BOUND: 196.6, // spielbarer Bereich (Mauer innen bei 197)
+  HALF: 400, // Terrain von -400 bis +400 (hinter den Vierteln Hügel und Meer)
+  RES: 401, // 2-m-Raster
+  BOUND: 292, // spielbarer Bereich
   WALL: 197, // Innenkante der Stadtmauer
   WALL_T: 3,
   GROUND: 3, // Höhe von Markt und unterster Terrasse
   CLIFF_Z: -166, // Fuß des Gründerfelsens
   CLIFF_TOP: 52,
-  SEA_Z: 255, // dahinter das Meer (Kulisse)
+  QUAY: 240, // Kaikante, dahinter das Meer
+  OUTER: 293, // Außenmauer der Viertel
 };
 
 // Terrassen der Waldsiedlung: z0 = Nordrand (Stützmauer zur nächsten Terrasse), z1 = Südrand
@@ -36,8 +38,8 @@ export const STAIRS = [
 ];
 
 // Ebene (ohne Treppen-Rampen) an Position z
-export function levelAt(z) {
-  if (z > -40) return 3;
+export function levelAt(z, x = 0) {
+  if (Math.abs(x) > 200 || z > -40) return 3; // die Viertel vor der Mauer liegen eben
   if (z > -80) return 8;
   if (z > -120) return 13;
   return 18;
@@ -127,6 +129,9 @@ export const EXTRACTS = [
   { id: 'wasser', name: 'Aufzug Wassertürme', x: 168, z: -100, yaw: -Math.PI / 2 },
   { id: 'gerber', name: 'Aufzug Gerberhof', x: -172, z: 176, yaw: 0 },
   { id: 'hafentor', name: 'Aufzug Hafentor', x: 120, z: 180, yaw: 0 },
+  { id: 'weiss', name: 'Aufzug Weiße Stadt', x: -272, z: 176, yaw: 0 },
+  { id: 'turm', name: 'Aufzug Turmstadt', x: 272, z: -70, yaw: -Math.PI / 2 },
+  { id: 'kai', name: 'Aufzug Kai', x: -240, z: 222, yaw: 0 },
 ];
 
 export const POIS = [
@@ -142,23 +147,63 @@ export const POIS = [
   { id: 'eiche', name: 'Weise Eiche', x: 92, z: -100, tier: 2 },
   { id: 'wurzel', name: 'Wurzelthron', x: -48, z: -142, tier: 2 },
   { id: 'felsen', name: 'Gründerfelsen', x: 0, z: -170, tier: 3 },
+  { id: 'weiss', name: 'Weiße Stadt', x: -252, z: 96, tier: 2 },
+  { id: 'weissturm', name: 'Weißer Turm', x: -252.5, z: 37, tier: 3 },
+  { id: 'turm', name: 'Turmstadt', x: 252, z: 96, tier: 2 },
+  { id: 'energie', name: 'Energieturm', x: 252.5, z: 37, tier: 3 },
+  { id: 'hafen', name: 'Hafenviertel', x: 120, z: 222, tier: 1 },
+  { id: 'galeone', name: 'Gestrandete Galeone', x: 70, z: 274, tier: 3 },
+  { id: 'leuchtturm', name: 'Leuchtturm', x: -150, z: 259, tier: 2 },
 ];
 
 // auf Straßen und Promenaden (nicht auf Dächern)
 export const PLAYER_SPAWNS = [
   [-180, 96], [180, 96], [0, 190], [-149.5, 175], [149.5, 175], [-185, 2], [185, 2],
   [-170, -43.5], [170, -83.5], [-160, -123.5], [160, -123.5],
+  [-285, 96], [285, 96], [-285, -97], [285, -97], [-200, 236], [200, 236],
 ];
 
-// Kulisse hinter der Mauer: künftige Viertel
-export const BACKDROP = [
-  { id: 'weiss', name: 'Weiße Stadt', x0: -300, x1: -199, z0: -170, z1: 300, stage: 2 },
-  { id: 'turm', name: 'Turmstadt', x0: 199, x1: 300, z0: -170, z1: 300, stage: 3 },
-  { id: 'hafen', name: 'Hafenviertel', x0: -199, x1: 199, z0: 199, z1: 300, stage: 4 },
+// Viertel vor der Mauer. Sonderbauten stehen auf den Kreuzungen der Hauptstraßen.
+export const WHITE_TOWER = R(-258.5, -246.5, 31, 43);
+export const ENERGY_TOWER = { x: 252.5, z: 37, r: 9 };
+const ROWS = [[-160, -100], [-94, -34], [-28, 34], [40, 91], [101, 150], [156, 205]];
+const crossStreets = (x0, x1, side) => [
+  R(x0, x1, 91, 101, { name: side === 'w' ? 'Weststraße' : 'Oststraße', main: true }),
+  R(x0, x1, -100, -94, {}), R(x0, x1, -34, -28, {}), R(x0, x1, 34, 40, {}), R(x0, x1, 150, 156, {}),
+];
+const QUAY_LANES = [[-210, -205], [-150, -145], [-90, -85], [85, 90], [145, 150], [205, 210]];
+export const OUTER_STREETS = [
+  R(-211, -205, -160, 211, { name: 'Ringstraße West', main: true }),
+  R(205, 211, -160, 211, { name: 'Ringstraße Ost', main: true }),
+  R(-255, -250, -160, 205, { name: 'Lange Gasse', main: true }),
+  R(250, 255, -160, 205, { name: 'Hochstraße', main: true }),
+  ...crossStreets(-292, -205, 'w'),
+  ...crossStreets(205, 292, 'o'),
+  R(-292, 292, 205, 211, { name: 'Kaistraße', main: true }),
+  R(-292, 292, 232, CITY.QUAY, { name: 'Kai', main: true }),
+  R(-5, 5, 205, 232, { name: 'Hafenstraße', main: true }),
+  ...QUAY_LANES.map(([a, c]) => R(a, c, 211, 232, {})),
 ];
 
 // ------------------------------------------------------------------ Generator
 const MARKET_CFG = { block: 30, alley: [2, 3.2], alleyWide: [3, 4], deep: 14, minW: 6.5, maxW: 11, minD: 6.5 };
+const OUTER_DISTRICTS = [
+  {
+    id: 'weiss',
+    cfg: { block: 44, alley: [3, 4.5], alleyWide: [3.5, 5], deep: 15, minW: 9, maxW: 14, minD: 8 },
+    xs: [[-292, -255], [-250, -211]], zs: ROWS,
+  },
+  {
+    id: 'turm',
+    cfg: { block: 30, alley: [4, 6], alleyWide: [5, 7], deep: 16, minW: 11, maxW: 16, minD: 10 },
+    xs: [[211, 250], [255, 292]], zs: ROWS,
+  },
+  {
+    id: 'hafen',
+    cfg: { block: 40, alley: [3, 4.5], alleyWide: [4, 6], deep: 13, minW: 9, maxW: 16, minD: 8 },
+    xs: [[-292, -210], [-205, -150], [-145, -90], [-85, -5], [5, 85], [90, 145], [150, 205], [210, 292]], zs: [[211, 232]],
+  },
+];
 const WALD_CFG = { block: 38, alley: [2.5, 3.5], alleyWide: [3, 4.5], deep: 16, minW: 10, maxW: 15, minD: 9 };
 
 function bsp(r, rnd, cfg, out, depth = 0) {
@@ -224,7 +269,10 @@ export function generateLayout() {
   for (const t of GIANT_TREES) reserved.push(R(t.x - t.r - 1, t.x + t.r + 1, t.z - t.r - 1, t.z + t.r + 1, { kind: 'tree' }));
   reserved.push(R(STEIG.tower.x0 - 3, STEIG.tower.x1 + 3, STEIG.tower.z0 - 2, STEIG.tower.z1 + 4, { kind: 'steig' }));
   // Brunnenplatz in den Südgassen und kleiner Platz im Zunftviertel
-  const squares = [R(-70, -44, 164, 186, { name: 'Brunnenplatz' }), R(104, 128, 56, 80, { name: 'Zunftplatz' }), R(-132, -108, 110, 134, { name: 'Gerberhof' })];
+  const squares = [
+    R(-70, -44, 164, 186, { name: 'Brunnenplatz' }), R(104, 128, 56, 80, { name: 'Zunftplatz' }), R(-132, -108, 110, 134, { name: 'Gerberhof' }),
+    R(-268, -237, 21, 53, { name: 'Turmplatz' }), R(237, 268, 21, 53, { name: 'Energieplatz' }), R(-30, 30, 211, 232, { name: 'Fischmarkt' }),
+  ];
   for (const s of squares) reserved.push({ ...s, kind: 'square' });
 
   // --- Kreuzmarkt-Viertel
@@ -324,6 +372,50 @@ export function generateLayout() {
   const mains = [...STREETS.filter((s) => s.main), PLAZA];
   for (const l of lots) l.shop = l.district === 'markt' && mains.some((s) => overlap(l, s, 0.6));
 
+  // --- Viertel vor der Mauer. Eigener Zufall, damit Altstadt und Waldsiedlung gleich bleiben.
+  const outerRnd = mulberry32(1872);
+  const outerMains = OUTER_STREETS.filter((s) => s.main);
+  for (const dist of OUTER_DISTRICTS) {
+    const parts = { lots: [], yards: out.yards };
+    for (const [x0, x1] of dist.xs) {
+      for (const [z0, z1] of dist.zs) {
+        const sub = { blocks: [], alleys: [] };
+        bsp(R(x0, x1, z0, z1), outerRnd, dist.cfg, sub);
+        for (const bb of sub.blocks) blockLots(bb, outerRnd, dist.cfg, parts);
+        out.alleys.push(...sub.alleys);
+      }
+    }
+    for (const l of parts.lots) {
+      const w = l.x1 - l.x0, d = l.z1 - l.z0;
+      if (reserved.some((r) => overlap(l, r))) { out.yards.push({ ...l }); continue; }
+      if (Math.min(w, d) < 5) { out.yards.push({ ...l, passage: true }); continue; }
+      const cx = (l.x0 + l.x1) / 2, cz = (l.z0 + l.z1) / 2;
+      const lot = { ...l, cx, cz, w, d, id: lots.length, district: dist.id, level: CITY.GROUND, kind: 'house', poi: dist.id };
+      const r = outerRnd();
+      if (dist.id === 'weiss') {
+        if (r < 0.2) { out.yards.push({ ...l, garden: true }); continue; }
+        if (r < 0.26) lot.kind = 'ruin';
+        lot.style = 'weiss';
+        lot.floors = 2 + Math.floor(outerRnd() * 2);
+        lot.tier = 2;
+        lot.shop = outerMains.some((s) => overlap(l, s, 0.6)) && outerRnd() < 0.5;
+      } else if (dist.id === 'turm') {
+        if (r < 0.08) { out.yards.push({ ...l }); continue; }
+        if (r < 0.18) lot.kind = 'ruin';
+        lot.style = 'hochhaus';
+        lot.floors = outerRnd() < 0.2 ? 11 + Math.floor(outerRnd() * 4) : 5 + Math.floor(outerRnd() * 5);
+        lot.tier = Math.hypot(cx - ENERGY_TOWER.x, cz - ENERGY_TOWER.z) < 70 ? 3 : 2;
+      } else {
+        if (r < 0.07) { out.yards.push({ ...l }); continue; }
+        if (r < 0.15) lot.kind = 'ruin';
+        lot.style = 'speicher';
+        lot.floors = 2 + Math.floor(outerRnd() * 3);
+        lot.tier = 1;
+      }
+      lots.push(lot);
+    }
+  }
+
   return {
     lots,
     yards: out.yards,
@@ -335,7 +427,7 @@ export function generateLayout() {
 
 // Belegungsraster (0,5 m) für "Was liegt neben dieser Wand?"
 export class Occupancy {
-  constructor(half = CITY.WALL + 2, cell = 0.5) {
+  constructor(half = CITY.OUTER + 2, cell = 0.5) {
     this.half = half;
     this.cell = cell;
     this.n = Math.ceil((half * 2) / cell);

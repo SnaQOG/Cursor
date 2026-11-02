@@ -10,6 +10,8 @@ Sitzung (z. B. Claude Code auf dem eigenen Rechner) direkt weitermachen kann.
 - Weltenbrück verbindet vier Viertel-Ideen zu einer eigenen Stadt: Hafen- und Seefahrer-Stimmung,
   Waldsiedlung auf Terrassen mit Riesenbäumen, ein Erfinderturm mit Energiekern und ein düsterer
   Gründerfelsen. Bewusst nur Archetypen – keine Figuren, Logos oder Nachbauten aus bestehenden Werken.
+- Die ganze Stadt ist begehbar (Grobausbau): Weiße Stadt, Turmstadt und Hafenviertel liegen hinter offenen Toren,
+  Code in `src/maps/weltenbrueck/outer.js`, neue Hausstile `weiss`, `weissturm`, `hochhaus`, `speicher`.
 - Fast alle festen Formen (Möbel, Fassadenteile, Requisiten, Bäume, Autos, Waffen, Figuren, Gesichter)
   kommen aus Blender-Skripten, Ausnahme sind die SimReady-Requisiten (siehe unten). Wände, Böden, Treppen und Dächer der Stadthäuser erzeugt das Spiel aus
   dem Stadtplan, weil jedes Haus genau auf sein Grundstück passen muss.
@@ -34,6 +36,7 @@ Sitzung (z. B. Claude Code auf dem eigenen Rechner) direkt weitermachen kann.
 | `src/maps/weltenbrueck/layout.js` | Stadtplan: Terrassen, Straßen, Plätze, Grundstücke (BSP) |
 | `src/maps/weltenbrueck/house.js` | Hausgenerator: Wände mit Öffnungen, Treppen, Fassaden, Dächer, Möbel |
 | `src/maps/weltenbrueck/build.js` | Sonderbauten: Dom, Rathaus, Stadtmauer, Riesenbäume, Gründerfelsen |
+| `src/maps/weltenbrueck/outer.js` | Viertel vor der Mauer: Weißer Turm, Energieturm, Himmelsbrücken, Kai, Galeone, Leuchtturm |
 | `src/maps/weltenbrueck/index.js` | Terrain, Materialien, Vegetation, Übersichtskarte |
 | `src/textures.js` | prozedurale Texturen mit Normal-Maps (Putz, Backstein, Pflaster …) |
 | `src/batcher.js` / `src/instancer.js` | zusammengefasste Geometrie bzw. Instanzen mit Culling |
@@ -54,6 +57,7 @@ npx --yes http-server -c-1 -p 8790 .        # in einem zweiten Terminal
 node tools/tests/stats.mjs                  # Ladezeit, Draw-Calls, Dreiecke
 node tools/tests/bewegung.mjs               # Türen, Treppen, Brücken, Spawns
 node tools/tests/raid.mjs                   # Raids auf beiden Karten
+node tools/tests/welt.mjs                   # Tore, äußere Viertel, Himmelsbrücken, Galeone, Strand
 node tools/tests/details-stadt.mjs          # Detailbilder -> tools/tests/shots/
 node tools/tests/details-damm.mjs
 node tools/tests/simready.mjs nachher      # feste Kameras für Vergleichsbilder, Draw-Calls, Dreiecke
@@ -95,6 +99,10 @@ und 26,3 fps, nachher 17,5 und 25,9 fps. GTAO 0,85 und die Bloom-Werte in `LOOKS
 geprüft und bleiben unverändert.
 
 ## Nächste Schritte
+
+**Feinheiten der äußeren Viertel** (Grobausbau steht): Galeone ist ein Kasten mit Masten, Leuchtturm und Energieturm
+sind nicht begehbar, Hochhäuser haben schlichte Fassaden ohne eigene Sonderteile, die Himmelsbrücken sind Hängebrücken,
+der Gründerwald ist nicht erreichbar, `docs/weltenbrueck-entwurf.png` zeigt noch Etappe 1.
 
 1. **Echte Fotos als Vorlage** (Wikimedia Commons, Unsplash): Fachwerk- und Schwarzwaldhäuser,
    Bauernstuben, Blumenwiesen, verlassene Autos. Danach Modelle, Farben und Texturen angleichen.

@@ -12,7 +12,7 @@ const SAVE = 'damm-raider.save.v1';
 // Ort: x, z, Blick (Yaw), Höhe über Grund. Blick über die Karte ist der schwerste Fall.
 const VIEWS = {
   damm: [['Kraftwerk Vorplatz', 60, -22, 0], ['Halle', 60, -44, 0], ['Talblick Süd', 0, 60, 0], ['Aufbereitung', 150, 40, 0]],
-  weltenbrueck: [['Kreuzmarkt', 0, 96, 0], ['Markt Richtung Dom', 0, 118, 0], ['Gasse Süd', -60, 150, 0], ['Waldterrasse', 60, -30, 0]],
+  weltenbrueck: [['Kreuzmarkt', 0, 96, 0], ['Markt Richtung Dom', 0, 118, 0], ['Gasse Süd', -60, 150, 0], ['Waldterrasse', 60, -30, 0], ['Weiße Stadt', -252, 96, 0], ['Turmstadt', 252, 96, 0], ['Kai', 40, 236, 0]],
 };
 
 const browser = await chromium.launch({
@@ -45,7 +45,7 @@ for (const q of QUALITIES) {
     for (const [name, x, z, yaw] of VIEWS[map]) {
       const r = await page.evaluate(([x, z, yaw, secs]) => new Promise((done) => {
         const g = window.__game, p = g.player;
-        p.pos.set(x, g.col.groundAt(x, z, 200, 999, 0) + 0.05, z);
+        p.pos.set(x, g.col.groundAt(x, z, 0.4, 999, 0) + 0.05, z);
         p.vel.set(0, 0, 0);
         p.camYaw = yaw; p.yaw = yaw; p.camPitch = -0.02;
         const times = [];

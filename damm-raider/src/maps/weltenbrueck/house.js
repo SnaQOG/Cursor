@@ -24,6 +24,8 @@ export const PAL = {
   bloom: [0xc8322a, 0xd8507a, 0xe8e2d8, 0x9a4ac0, 0xe07a2a, 0xc8322a],
   rug: [0x7a2e26, 0x2e4a6a, 0x6a5a2a, 0x4a3a5a, 0x3a5a3e],
   rubble: [0x8f877a, 0x7d766a, 0x9c9384],
+  white: [0xf1ede3, 0xe9e4d7, 0xf5f2ea, 0xe3ded0],
+  concrete: [0x7b8086, 0x6a7077, 0x8b8c88, 0x5f656c, 0x8a7c6c],
 };
 
 // Stilparameter: Geschosshöhe, Dach, Materialien
@@ -33,6 +35,10 @@ export const STYLE = {
   backstein: { fh: 3.2, roof: 'gable', pitch: 1.2, roofMat: 'tile', spacing: 2.4, winW: 1.0, winH: 1.5, stepped: true },
   schwarzwald: { fh: 3.0, roof: 'hip', pitch: 1.15, roofMat: 'wood', spacing: 2.2, winW: 1.0, winH: 1.15 },
   turm: { fh: 3.0, roof: 'flat', pitch: 0, roofMat: 'world', spacing: 2.4, winW: 0.9, winH: 1.2 },
+  weiss: { fh: 3.2, roof: 'gable', pitch: 1.05, roofMat: 'tile', spacing: 2.6, winW: 1.1, winH: 1.6 },
+  weissturm: { fh: 3.0, roof: 'flat', pitch: 0, roofMat: 'world', spacing: 2.8, winW: 0.8, winH: 1.5 },
+  hochhaus: { fh: 3.2, roof: 'flat', pitch: 0, roofMat: 'world', spacing: 2.7, winW: 1.2, winH: 1.7 },
+  speicher: { fh: 3.6, roof: 'gable', pitch: 0.85, roofMat: 'tile', spacing: 3.0, winW: 1.0, winH: 1.3 },
 };
 
 const T = 0.3; // Wandstärke
@@ -194,7 +200,7 @@ export class HouseKit {
     const k = w.side, out = OUTN[k];
     const ry = yawFront(out[0], out[2]);
     const rnd = c.rnd;
-    const stone = lot.style === 'stein' || lot.style === 'backstein';
+    const stone = lot.style === 'stein' || lot.style === 'backstein' || lot.style === 'weiss' || lot.style === 'speicher';
     // Sockel aus Naturstein (Putz- und Backsteinhäuser)
     if (f === 0 && stone) {
       for (const [r0, r1] of runs) {
@@ -207,7 +213,7 @@ export class HouseKit {
       }
     }
     // Eckquader
-    if (lot.style === 'stein') {
+    if (lot.style === 'stein' || lot.style === 'weiss') {
       for (const [r0, r1] of runs) {
         for (const [edge, dir] of [[w.a0, 1], [w.a1, -1]]) {
           if (Math.abs((dir > 0 ? r0 : r1) - edge) > 0.3) continue;
@@ -230,7 +236,7 @@ export class HouseKit {
         if (f > 0) this.ledge(w, o.a0 - b - 0.12, o.a1 + b + 0.12, Y1 + b + 0.04, Y1 + b + 0.18, 0.14, c.fasche, 'stone', 'det');
       }
       // Blumenkästen unter Fenstern der Obergeschosse
-      if (o.kind === 'win' && f > 0 && ow <= 2.2 && lot.style !== 'turm' && lot.style !== 'dom' && rnd() < 0.22) {
+      if (o.kind === 'win' && f > 0 && ow <= 2.2 && !['turm', 'dom', 'hochhaus', 'speicher', 'weissturm'].includes(lot.style) && rnd() < 0.22) {
         this.model('kc_flowerbox', wp(w, m, Y0 - 0.02, 0), ry, [ow + 0.1, 1, 1], { tint: pick(rnd, PAL.bloom), layer: 'det' });
       }
       // Türgewände und Stufe
@@ -339,16 +345,20 @@ export class HouseKit {
     const frontRoomEnd = hasPart ? uPart - 0.08 : canStairs ? uS0 - 0.1 : L - T;
 
     // Farben
-    const wallCol = lot.style === 'backstein' ? pick(rnd, PAL.brick) : lot.style === 'fachwerk' ? pick(rnd, PAL.infill) : pick(rnd, PAL.plaster);
+    const wallCol = lot.style === 'backstein' || lot.style === 'speicher' ? pick(rnd, PAL.brick)
+      : lot.style === 'fachwerk' ? pick(rnd, PAL.infill)
+        : lot.style === 'weiss' || lot.style === 'weissturm' ? pick(rnd, PAL.white)
+          : lot.style === 'hochhaus' ? pick(rnd, PAL.concrete) : pick(rnd, PAL.plaster);
     const baseCol = lot.style === 'fachwerk' || lot.style === 'schwarzwald' || lot.style === 'turm' ? pick(rnd, PAL.stone) : wallCol;
     const upperCol = lot.style === 'schwarzwald' || lot.style === 'turm' ? pick(rnd, PAL.wood) : wallCol;
     const timber = pick(rnd, PAL.timber);
     const frameCol = lot.style === 'schwarzwald' || lot.style === 'turm' ? pick(rnd, PAL.wood) : PAL.frameLight;
     const shutterCol = rnd() < 0.6 ? pick(rnd, PAL.shutter) : null;
-    const wallMat = lot.style === 'backstein' ? 'brick' : 'world';
+    const wallMat = lot.style === 'backstein' || lot.style === 'speicher' ? 'brick' : 'world';
     let baseMat = lot.style === 'fachwerk' || lot.style === 'schwarzwald' || lot.style === 'turm' ? 'stone' : wallMat;
     let upperMat = lot.style === 'schwarzwald' ? 'wood' : lot.style === 'turm' ? 'wood' : wallMat;
-    let baseColor = baseCol, upperColor = upperCol, frameColor = frameCol, shutters = shutterCol;
+    let baseColor = baseCol, upperColor = upperCol, frameColor = lot.style === 'hochhaus' ? PAL.frameDark : frameCol;
+    let shutters = lot.style === 'hochhaus' || lot.style === 'speicher' ? null : shutterCol;
     // Schwarzwald: Hälfte der Häuser mit Schindelfassade
     if (lot.style === 'schwarzwald' && rnd() < 0.5) { upperMat = 'shingle'; upperColor = pick(rnd, PAL.shingle); }
     const facadeCtx = {
@@ -792,7 +802,7 @@ export class HouseKit {
           this.b.box(c[0], yy0, c[2], alongX ? T : q1 - q0, yy1 - yy0, alongX ? q1 - q0 : T, wallCol, { mat: 'brick' });
         }
       } else {
-        this.tri([M(p, ye, Q0), M(p, ye, Q1), M(p, yr, qc)], N(s, 0, 0), wallCol, { mat: lot.style === 'backstein' ? 'brick' : 'world' });
+        this.tri([M(p, ye, Q0), M(p, ye, Q1), M(p, yr, qc)], N(s, 0, 0), wallCol, { mat: lot.style === 'backstein' || lot.style === 'speicher' ? 'brick' : 'world' });
         if (lot.style === 'fachwerk') {
           const ww = { side: alongX ? (s > 0 ? 'e' : 'w') : (s > 0 ? 's' : 'n'), fixed: p };
           this.beam(ww, [Q0 + 0.1, ye + 0.08], [Q1 - 0.1, ye + 0.08], 0.17, timber);

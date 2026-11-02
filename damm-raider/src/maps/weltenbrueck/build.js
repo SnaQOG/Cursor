@@ -1,12 +1,13 @@
 // Baut Weltenbrück aus dem Stadtplan: Häuser, Dom, Rathaus, Markt,
-// Terrassen, Stadtmauer, Riesenbäume mit Hängebrücken, Gründerfelsen und
-// die Kulisse der künftigen Viertel.
+// Terrassen, Stadtmauer, Riesenbäume mit Hängebrücken und Gründerfelsen.
+// Die Viertel vor der Mauer stehen in outer.js.
 import * as THREE from 'three';
 import { Builder } from '../../structures.js';
 import { HouseKit, PAL, STYLE, mix } from './house.js';
 import {
-  CITY, STAIRS, STAIR_RUN, PLAZA, DOM, RATHAUS, STREETS, GIANT_TREES, FACES, STEIG, Occupancy, levelAt, overlap,
+  CITY, STAIRS, STAIR_RUN, PLAZA, DOM, RATHAUS, STREETS, GIANT_TREES, FACES, STEIG, WHITE_TOWER, ENERGY_TOWER, Occupancy, levelAt, overlap,
 } from './layout.js';
+import { prepareOuter, buildOuter } from './outer.js';
 import { mulberry32 } from '../../util.js';
 
 const STONE_LIGHT = 0xb7ab92;
@@ -81,6 +82,8 @@ export function buildCity({ batcher, col, terrain, assets, world, layout, instan
     }
   }
 
+  const outerBridges = prepareOuter(lots, addLot);
+
   // ---------------------------------------------------------------- Belegung
   const occ = new Occupancy();
   for (const l of lots) occ.mark(l, l.id);
@@ -149,7 +152,8 @@ export function buildCity({ batcher, col, terrain, assets, world, layout, instan
   ];
   const inGate = (x, z) => gates.some((g) => (g.axis === 'z' ? Math.abs(x - g.x) < 3 && Math.abs(z - g.z) < 7 : Math.abs(z - g.z) < 3 && Math.abs(x - g.x) < 7));
   const wallPiece = (x0, x1, z0, z1, lvl) => {
-    B.solid((x0 + x1) / 2, lvl - 1, (z0 + z1) / 2, x1 - x0, WALL_H + 1, z1 - z0, STONE_WALL, { mat: 'stone' });
+    // bis zum Boden der Viertel hinab, auch wo innen eine Terrasse höher liegt
+    B.solid((x0 + x1) / 2, CITY.GROUND - 1, (z0 + z1) / 2, x1 - x0, lvl + WALL_H - CITY.GROUND + 1, z1 - z0, STONE_WALL, { mat: 'stone' });
   };
   for (const side of [-1, 1]) {
     for (const [za, zb, lvl] of wallBands) {
@@ -170,7 +174,7 @@ export function buildCity({ batcher, col, terrain, assets, world, layout, instan
   for (let x = -198; x < 198; x += 2.2) if (!inGate(x, 198.5)) b.box(x, 3 + WALL_H, 199.6, 1.2, 1.1, 0.8, STONE_WALL, { mat: 'stone' });
   // Mauertürme
   const tower = (x, z, lvl, h = 17) => {
-    B.solid(x, lvl - 1, z, 7, h + 1, 7, STONE_WALL, { mat: 'stone' });
+    B.solid(x, CITY.GROUND - 1, z, 7, lvl + h - CITY.GROUND + 1, 7, STONE_WALL, { mat: 'stone' });
     b.addPrim('cone4', x, lvl + h + 3, z, 5.6, 6, 5.6, pick(PAL.slate), { ry: Math.PI / 4, mat: 'slate' });
     for (const [dx, dz] of [[0, 3.52], [0, -3.52], [3.52, 0], [-3.52, 0]]) {
       b.addQuad(...slit(x + dx, lvl + h - 4, z + dz, dx, dz), 0x1d1a17, { shade: false });
@@ -183,7 +187,7 @@ export function buildCity({ batcher, col, terrain, assets, world, layout, instan
     }
   }
   for (let x = -170; x <= 170; x += 42) if (Math.abs(x) > 14) tower(x, 201.5, 3);
-  // Tore (geschlossen, Fallgitter unten)
+  // Tore (offen, das Fallgitter hängt oben im Bogen)
   for (const g of gates) {
     const lvl = 3;
     const along = g.axis === 'z';
@@ -196,22 +200,14 @@ export function buildCity({ batcher, col, terrain, assets, world, layout, instan
     B.solid(g.x, lvl + 7, g.z, along ? 3 : 12, WALL_H - 6, along ? 12 : 3, STONE_WALL, { mat: 'stone' });
     for (let k = -5; k <= 5; k += 0.7) {
       const px = along ? g.x - 0.9 * Math.sign(g.x) : g.x + k, pz = along ? g.z + k : g.z - 0.9;
-      b.box(px, lvl, pz, along ? 0.12 : 0.1, 7, along ? 0.1 : 0.12, 0x2b2724, { mat: 'metal' });
+      b.box(px, lvl + 5.8, pz, along ? 0.12 : 0.1, 1.3, along ? 0.1 : 0.12, 0x2b2724, { mat: 'metal' });
     }
-    for (let yy = 0.6; yy < 7; yy += 0.8) b.box(along ? g.x - 0.9 * Math.sign(g.x) : g.x, lvl + yy, along ? g.z : g.z - 0.9, along ? 0.14 : 11, 0.1, along ? 11 : 0.14, 0x2b2724, { mat: 'metal' });
-    const px0 = along ? g.x - 0.9 * Math.sign(g.x) : g.x, pz0 = along ? g.z : g.z - 0.9;
-    col.addBox(px0 - (along ? 0.2 : 6), lvl, pz0 - (along ? 6 : 0.2), px0 + (along ? 0.2 : 6), lvl + 7, pz0 + (along ? 6 : 0.2));
+    b.box(along ? g.x - 0.9 * Math.sign(g.x) : g.x, lvl + 5.8, along ? g.z : g.z - 0.9, along ? 0.14 : 11, 0.1, along ? 11 : 0.14, 0x2b2724, { mat: 'metal' });
     const inward = along ? -Math.sign(g.x) : -1;
     labels.push({
       text: g.name, x: along ? g.x + inward * 1.7 : g.x, y: lvl + 8.2, z: along ? g.z : g.z + inward * 1.7,
       ry: along ? (inward > 0 ? Math.PI / 2 : -Math.PI / 2) : (inward > 0 ? 0 : Math.PI), w: 8, h: 1.4,
     });
-    // Schutt vor dem Tor
-    for (let i = 0; i < 6; i++) {
-      const s = R(0.6, 1.6);
-      const rx = along ? g.x + inward * R(2, 6) : g.x + R(-5, 5), rz = along ? g.z + R(-5, 5) : g.z + inward * R(2, 6);
-      b.addPrim('ico', rx, lvl + s * 0.3, rz, s * 1.3, s * 0.7, s, pick(PAL.rubble), { mat: 'stone', ry: rnd() * 6 });
-    }
   }
 
   // ---------------------------------------------------------------- Dom mit Erfinderturm
@@ -230,16 +226,13 @@ export function buildCity({ batcher, col, terrain, assets, world, layout, instan
   // ---------------------------------------------------------------- Plätze, Laternen, Kram in den Gassen
   buildStreets();
 
-  // ---------------------------------------------------------------- Kulisse der künftigen Viertel
-  buildBackdrop();
-
   // ---------------------------------------------------------------- Gegner
   const E = (type, x, z, n = 1, spread = 6, extra = {}) => {
     for (let i = 0; i < n; i++) enemySpawns.push({ type, x: x + R(-spread, spread), z: z + R(-spread, spread), ...extra });
   };
   // Gassen-ARC: Zecken und Knaller in Gassen und Höfen
   const alleys = layout.alleys.filter((a) => Math.min(a.x1 - a.x0, a.z1 - a.z0) >= 2);
-  for (let i = 0; i < 26; i++) {
+  for (let i = 0; i < 44; i++) {
     const a = alleys[Math.floor(rnd() * alleys.length)];
     const x = (a.x0 + a.x1) / 2 + (rnd() - 0.5) * (a.x1 - a.x0 - 1), z = (a.z0 + a.z1) / 2 + (rnd() - 0.5) * (a.z1 - a.z0 - 1);
     enemySpawns.push({ type: rnd() < 0.6 ? 'tick' : 'pop', x, z, roam: rnd() < 0.4 });
@@ -255,6 +248,7 @@ export function buildCity({ batcher, col, terrain, assets, world, layout, instan
   E('hornet', -100, -40, 1, 20, { roam: true });
   for (let i = 0; i < 8; i++) enemySpawns.push({ type: 'wasp', x: R(-180, 180), z: R(-150, 180), roam: true });
   for (const t of GIANT_TREES) E('wasp', t.x, t.z, 1, 4, { y: t.deckY + 8, roam: true });
+  buildOuter({ B, lots, barrels, containers, turrets, enemySpawns, labels, lantern, bench, stall, ropeBridge, bridges: outerBridges, E });
 
   // ---------------------------------------------------------------- Ergebnis
   return {
@@ -784,8 +778,10 @@ export function buildCity({ batcher, col, terrain, assets, world, layout, instan
     for (const yard of layout.yards) {
       const w = yard.x1 - yard.x0, d = yard.z1 - yard.z0;
       if (w < 4 || d < 4 || yard.passage) continue;
-      const lvl = levelAt((yard.z0 + yard.z1) / 2);
       const cx = (yard.x0 + yard.x1) / 2, cz = (yard.z0 + yard.z1) / 2;
+      const lvl = levelAt((yard.z0 + yard.z1) / 2, cx);
+      // nichts in die Sonderbauten stellen
+      if (overlap(yard, WHITE_TOWER, 2) || Math.hypot(cx - ENERGY_TOWER.x, cz - ENERGY_TOWER.z) < ENERGY_TOWER.r + w / 2 + d / 2) continue;
       const r = rnd();
       if (r < 0.2) cart(cx + R(-w / 4, w / 4), cz + R(-d / 4, d / 4), lvl, rnd() * 3);
       else if (r < 0.45) rubble(cx, cz, lvl, 5, Math.min(w, d) / 3);
@@ -793,78 +789,5 @@ export function buildCity({ batcher, col, terrain, assets, world, layout, instan
       if (rnd() < 0.12 && nb < 14) { barrels.push({ x: cx + R(-1, 1), z: cz + R(-1, 1) }); nb++; }
       if (pr() < 0.35) yardGoods(yard, lvl);
     }
-  }
-
-  // ---------------------------------------------------------------- Kulisse
-  function buildBackdrop() {
-    const simpleHouse = (x, z, w, d, h, wall, roof, roofMat = 'tile', pitch = 1.1) => {
-      b.box(x, 0, z, w, h, d, wall);
-      const lot = { x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2 };
-      const alongX = w >= d;
-      const P0 = alongX ? lot.x0 : lot.z0, P1 = alongX ? lot.x1 : lot.z1, Q0 = alongX ? lot.z0 : lot.x0, Q1 = alongX ? lot.z1 : lot.x1;
-      const M = (p, yy, q) => (alongX ? [p, yy, q] : [q, yy, p]);
-      const qc = (Q0 + Q1) / 2, yr = h + ((Q1 - Q0) / 2) * pitch;
-      kit.quad([M(P0, h, Q0), M(P1, h, Q0), M(P1, yr, qc), M(P0, yr, qc)], alongX ? [0, 1, -1] : [-1, 1, 0], roof, { mat: roofMat });
-      kit.quad([M(P1, h, Q1), M(P0, h, Q1), M(P0, yr, qc), M(P1, yr, qc)], alongX ? [0, 1, 1] : [1, 1, 0], roof, { mat: roofMat });
-      kit.tri([M(P0, h, Q0), M(P0, h, Q1), M(P0, yr, qc)], alongX ? [-1, 0, 0] : [0, 0, -1], wall);
-      kit.tri([M(P1, h, Q0), M(P1, h, Q1), M(P1, yr, qc)], alongX ? [1, 0, 0] : [0, 0, 1], wall);
-    };
-    // Weiße Stadt (Westen): weiße Häuser, rote Dächer, weißer Turm
-    for (let x = -292; x < -206; x += R(9, 14)) {
-      for (let z = -150; z < 290; z += R(9, 14)) {
-        if (rnd() < 0.12) continue;
-        const h = R(6, 13);
-        simpleHouse(x + R(-1, 1), z, R(6, 10), R(6, 10), terrain.height(x, z) + h, pick([0xeeeae0, 0xe6e1d4, 0xf2efe6]), pick(PAL.tile));
-      }
-    }
-    b.addPrim('cyl16', -250, 24, 40, 6, 48, 6, 0xf0ece2);
-    b.addPrim('cone8', -250, 54, 40, 7, 12, 7, 0xa8452e, { mat: 'tile' });
-    for (let z = -140; z < 280; z += 60) b.box(-226, 0, z, 2, 9, 40, 0xece8dd);
-    // Turmstadt (Osten): Hochhäuser mit Himmelsbrücken
-    const towers = [];
-    for (let x = 212; x < 296; x += R(16, 24)) {
-      for (let z = -140; z < 290; z += R(18, 26)) {
-        const h = R(25, 95) * (1 - Math.abs(z - 60) / 600);
-        const w = R(10, 16), d = R(10, 16);
-        b.box(x, 0, z, w, h, d, pick([0x56606a, 0x6a737a, 0x4a525a, 0x7a6a5a]), { mat: rnd() < 0.3 ? 'brick' : 'world' });
-        // Fensterbänder (leuchtend)
-        for (let yy = 8; yy < h - 4; yy += R(9, 16)) if (rnd() < 0.35) b.box(x - w / 2 - 0.05, yy, z, 0.1, 0.6, d * 0.8, 0xffd59a, { mat: 'glow' });
-        towers.push({ x, z, h });
-      }
-    }
-    for (let i = 0; i < towers.length - 1; i++) {
-      const a = towers[i], c = towers[i + 1];
-      if (Math.abs(a.x - c.x) < 2 && Math.abs(c.z - a.z) < 30) {
-        const yy = Math.min(a.h, c.h) * 0.6;
-        b.box(a.x, yy, (a.z + c.z) / 2, 3, 2.5, Math.abs(c.z - a.z), 0x8a8f94, { mat: 'metal' });
-      }
-    }
-    b.addPrim('cyl16', 252, 75, 70, 9, 150, 9, 0x5c646c, { mat: 'metal' });
-    for (const yy of [60, 100, 140]) b.addPrim('torus', 252, yy, 70, 11, 11, 10, 0x9ff8ff, { mat: 'glow', rx: Math.PI / 2 });
-    b.addPrim('cone8', 252, 158, 70, 6, 16, 6, 0x5c646c, { mat: 'metal' });
-    // Hafenviertel (Süden): Speicher, Kräne, gestrandete Galeone, Leuchtturm
-    for (let x = -190; x < 190; x += R(12, 18)) {
-      for (let z = 206; z < CITY.SEA_Z - 14; z += R(12, 16)) {
-        if (Math.abs(x) < 8) continue;
-        simpleHouse(x, z, R(9, 14), R(10, 16), terrain.height(x, z) + R(8, 16), pick(PAL.brick), pick(PAL.tile), 'tile', 1.0);
-      }
-    }
-    for (let x = -160; x < 170; x += 55) {
-      b.box(x, 0, CITY.SEA_Z - 6, 1.2, 18, 1.2, 0x5a4a3a, { mat: 'wood' });
-      b.box(x + 5, 17, CITY.SEA_Z - 6, 11, 0.8, 0.8, 0x5a4a3a, { mat: 'wood' });
-    }
-    // Galeone (schräg gestrandet)
-    const gx = 70, gz = CITY.SEA_Z + 14;
-    b.box(gx, -2, gz, 46, 8, 12, 0x4a3424, { mat: 'wood', rz: 0.06, ry: 0.15 });
-    b.box(gx - 17, 4, gz + 2.5, 12, 7, 10, 0x5a3e2a, { mat: 'wood', ry: 0.15 });
-    for (const [mx, mh] of [[-6, 34], [8, 40], [20, 28]]) {
-      b.addPrim('cyl8', gx + mx, 4 + mh / 2, gz + mx * 0.15, 0.5, mh, 0.5, 0x3a2a1e, { mat: 'wood', rz: 0.08 });
-      b.box(gx + mx, 4 + mh * 0.7, gz + mx * 0.15, 0.4, 0.4, 13, 0x3a2a1e, { mat: 'wood', ry: 0.15 });
-      b.addQuad([gx + mx + 0.6, 4 + mh * 0.35, gz + mx * 0.15 - 5.5], [gx + mx + 0.6, 4 + mh * 0.35, gz + mx * 0.15 + 5.5], [gx + mx + 0.6, 4 + mh * 0.68, gz + mx * 0.15 + 6], [gx + mx + 0.6, 4 + mh * 0.68, gz + mx * 0.15 - 6], 0xd8ceb6, { double: true });
-    }
-    // Leuchtturm
-    for (let k = 0; k < 6; k++) b.addPrim('cyl16', -150, 1 + k * 5 + 2.5, CITY.SEA_Z + 4, 3.6 - k * 0.25, 5, 3.6 - k * 0.25, k % 2 ? 0xa8392e : 0xece8dd);
-    b.addPrim('cyl16', -150, 33.5, CITY.SEA_Z + 4, 2.0, 3, 2.0, 0xffe7a0, { mat: 'glow' });
-    b.addPrim('cone8', -150, 36.5, CITY.SEA_Z + 4, 2.4, 3, 2.4, 0x2a2a2a, { mat: 'metal' });
   }
 }

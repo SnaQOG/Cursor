@@ -85,9 +85,8 @@ Der Spielstand wird im `localStorage` des Browsers gespeichert.
 ![Kartenentwurf Weltenbrück](docs/weltenbrueck-entwurf.png)
 
 Eine Fantasy-Stadt aus deutscher Architektur: früher eine freie Handelsstadt mit vier Gilden (Seefahrer,
-Schattenläufer, Erfinder, Wächter), heute verlassen, überwuchert und von ARC besetzt. Etappe 1 umfasst
-den **Kreuzmarkt** und die **Waldsiedlung**; Weiße Stadt, Turmstadt und Hafenviertel liegen vorerst als
-Kulisse hinter der Stadtmauer.
+Schattenläufer, Erfinder, Wächter), heute verlassen, überwuchert und von ARC besetzt. Die Karte zeigt noch den
+ersten Entwurf; inzwischen sind auch die Viertel vor der Stadtmauer begehbar, die Tore stehen offen.
 
 - **Kreuzmarkt-Viertel:** Labyrinth aus engen Gassen (2–4 m), Fachwerk-, Stein- und Backsteinhäusern
   mit 2–7 Geschossen, Läden mit Schildern und Markisen, versteckte Innenhöfe, Ruinen
@@ -109,11 +108,18 @@ Kulisse hinter der Stadtmauer.
   bemaltem Kopfteil, grüner Kachelofen mit Ofenbank und Trockenstange, Kuckucksuhr
 - **Wiesen** in Höfen und Gärten: Gräser, Klee, Löwenzahn, Gänseblümchen; Gartenbeete mit Mohn,
   Kornblumen, Margeriten und Ringelblumen
-- Vier Aufzüge, die Stadttore sind vorerst verschlossen
+- **Weiße Stadt** (Westen, durch das Tor am Ende der Weststraße): weiße Putzhäuser mit roten Dächern, breitere
+  Straßen, Gärten, der **Weiße Turm** mit begehbarem Dach
+- **Turmstadt** (Osten): Hochhäuser bis 14 Geschosse mit Dachzugang, **Himmelsbrücken** zwischen den Dächern,
+  Wächter-Geschütze und der **Energieturm** auf seinem Platz
+- **Hafenviertel** (Süden, durch das Hafentor): Backsteinspeicher, Fischmarkt, Kai mit Kränen und Stegen,
+  **gestrandete Galeone** mit begehbarem Deck, **Leuchtturm** auf seiner Insel, Sandstrand zum Herausschwimmen
+- Sieben Aufzüge; der Gründerwald auf dem Felsen ist Kulisse und nicht erreichbar
 
 Die Stadt entsteht bei jedem Laden gleich aus einem Generator (`src/maps/weltenbrueck/`):
 `layout.js` legt Straßen, Gassen, Plätze, Terrassen und Grundstücke fest, `house.js` baut daraus die
-Häuser, `build.js` die Sonderbauten, `index.js` Terrain, Materialien und Vegetation.
+Häuser, `build.js` die Sonderbauten innerhalb der Mauer, `outer.js` die der äußeren Viertel, `index.js` Terrain,
+Materialien und Vegetation.
 
 ## Grafik
 

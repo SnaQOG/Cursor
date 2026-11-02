@@ -95,7 +95,7 @@ const terrain = {
       }
       // Weiße Stadt hell, Turmstadt dunkel
       if (x < -205 && z < 205) c.lerp(C.pale, 0.4);
-      else if (x > 205 && z < 205) c.lerp(C.cobbleDark, 0.5);
+      else if (x > 205 && z < 205) c.lerp(C.cobbleDark, 0.2);
     } else if (z < CITY.CLIFF_Z) {
       const k = smoothstep(CITY.CLIFF_Z, CITY.CLIFF_Z - 4, z) * (1 - smoothstep(CITY.CLIFF_Z - 18, CITY.CLIFF_Z - 24, z));
       c.copy(C.forest).lerp(C.grass, clamp(0.4 + nv, 0, 1) * 0.5);

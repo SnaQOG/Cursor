@@ -207,7 +207,7 @@ export class HouseKit {
     const k = w.side, out = OUTN[k];
     const ry = yawFront(out[0], out[2]);
     const rnd = c.rnd;
-    const stone = lot.style === 'stein' || lot.style === 'backstein' || lot.style === 'weiss' || lot.style === 'speicher';
+    const stone = lot.style === 'stein' || lot.style === 'backstein' || lot.style === 'weiss' || lot.style === 'speicher' || lot.style === 'hochhaus';
     // Sockel aus Naturstein (Putz- und Backsteinhäuser)
     if (f === 0 && stone) {
       for (const [r0, r1] of runs) {
@@ -269,6 +269,21 @@ export class HouseKit {
         this.quad([wp(w, o.a1, Y0, d), wp(w, o.a1 + b, Y0, d), wp(w, o.a1 + b, Y1 + b, d), wp(w, o.a1, Y1 + b, d)], out, gc, { mat: gm });
         this.ledge(w, o.a0 - b, o.a1 + b, Y1, Y1 + b + (stone ? 0.08 : 0), stone ? 0.08 : 0.05, gc, gm);
         if (stone) this.ledge(w, m - 0.13, m + 0.13, Y1 - 0.05, Y1 + b + 0.12, 0.12, darker(gc, 0.92), 'stone');
+        if (f === 0) {
+          // Emailschild mit Hausnummer neben der Tür
+          const na = o.a1 + b + 0.2, ny = Y1 - 0.2, det2 = { layer: 'det', shade: false };
+          if (na + 0.14 < w.a1) {
+            this.quad([wp(w, na - 0.11, ny, -0.035), wp(w, na + 0.11, ny, -0.035), wp(w, na + 0.11, ny + 0.16, -0.035), wp(w, na - 0.11, ny + 0.16, -0.035)], out, 0x24466e, det2);
+            this.quad([wp(w, na - 0.04, ny + 0.03, -0.04), wp(w, na + 0.04, ny + 0.03, -0.04), wp(w, na + 0.04, ny + 0.13, -0.04), wp(w, na - 0.04, ny + 0.13, -0.04)], out, 0xe8e4d8, det2);
+          }
+          // Turmstadt: Betonvordach mit Lichtleiste, liest sich auch in den dunklen Schluchten
+          if (lot.style === 'hochhaus') {
+            this.ledge(w, o.a0 - 0.35, o.a1 + 0.35, Y1 + 0.26, Y1 + 0.38, 0.95, c.fasche, 'wplaster', 'det');
+            const lc = wp(w, m, Y1 + 0.2, -0.5);
+            const al = k === 'n' || k === 's';
+            this.b.box(lc[0], lc[1], lc[2], al ? ow + 0.2 : 0.07, 0.05, al ? 0.07 : ow + 0.2, 0x9ff8ff, { mat: 'glow', layer: 'det' });
+          }
+        }
         if (f === 0) {
           const p0 = wp(w, o.a0 - 0.15, y, -0.45), p1 = wp(w, o.a1 + 0.15, y, 0);
           const bx0 = Math.min(p0[0], p1[0]), bx1 = Math.max(p0[0], p1[0]), bz0 = Math.min(p0[2], p1[2]), bz1 = Math.max(p0[2], p1[2]);
@@ -386,6 +401,7 @@ export class HouseKit {
     const facadeCtx = {
       rnd, timber, plinth: lot.pilot ? pick(rnd, PAL.stone) : darker(pick(rnd, PAL.stone), 0.85), quoin: pick(rnd, PAL.stone),
       fasche: lot.style === 'backstein' ? PAL.frameLight : mix(pick(rnd, PAL.stone), 0xffffff, 0.25), step: pick(rnd, PAL.stone),
+      wall: wallCol,
     };
     const hook = this.styleHook && this.styleHook(lot);
     if (hook) {
@@ -437,7 +453,8 @@ export class HouseKit {
 
     // Schmutz am Sockel und Schatten unter der Traufe, je nach Alter des Hauses
     const yEaves = yG + floors * fh, age = lot.age = (lot.id * 0.618) % 1;
-    const foot = 0.8 - age * 0.14, top = 0.86 - age * 0.06, overall = 1 - age * 0.1;
+    // Hochhäuser stehen fast immer im Schatten der Nachbarn und bekommen etwas mehr Grundhelligkeit
+    const foot = 0.8 - age * 0.14, top = 0.86 - age * 0.06, overall = (1 - age * 0.1) * (lot.style === 'hochhaus' ? 1.28 : 1);
     const wallShade = (yy) => overall * (yy < y + 1.3 ? foot + (1 - foot) * ((yy - y) / 1.3) : yy > yEaves - 0.8 ? 1 - (1 - top) * ((yy - (yEaves - 0.8)) / 0.8) : 1);
     if (lot.pilot) baseMat = upperMat = 'wplaster';
     const shopSide = lot.shop ? doors[0]?.side : null;
@@ -485,6 +502,7 @@ export class HouseKit {
             if (partA != null && (k === sideA || k === sideB) && Math.abs(c - partA) < winW / 2 + 0.3) continue;
             if (a0 < w.a0 + 0.55 || a1 > w.a1 - 0.55) continue;
             const r = rnd();
+            if (isShop) (lot.shopWins ||= []).push([a0, a1]);
             ops.push({
               a0, a1, y0: off + sill, y1: off + sill + winH, kind: 'win',
               frame: true,
@@ -496,6 +514,7 @@ export class HouseKit {
         this.facade(lot, w, f, yw0, hw, fy, ops, runs, facadeCtx);
         const anyOpen = runs.length > 0;
         if (lot.pilot && anyOpen) this.pilotBands(lot, w, runs, f, isTop, yw0, hw, facadeCtx);
+        if (lot.style === 'hochhaus' && anyOpen) this.towerFacade(lot, w, runs, ops, f, isTop, yw0, hw, facadeCtx);
         // Fachwerk auf offenen Seiten der Obergeschosse
         if (lot.style === 'fachwerk' && f > 0 && anyOpen) this.timberFrame(w, yw0, hw, ops, runs, timber, rnd);
         // Gesims bei Steinhäusern
@@ -514,12 +533,11 @@ export class HouseKit {
       if (f === 0 && this.inst) {
         for (const d of doors) {
           if (rnd() < 0.25) continue;
-          const w = sides[d.side], axv = AXIS[d.side];
+          const w = sides[d.side];
           const shop = shopSide === d.side && d === doors[0];
           const dw = shop ? 1.6 : DOOR_W;
-          if (this.model('kc_door', wp(w, d.a - dw / 2, fy, T + 0.05), yawX(-axv[0], -axv[2]), [dw, DOOR_H, 1], { tint: pick(rnd, PAL.door), layer: 'det' })) {
-            (lot.leaves ||= []).push({ side: d.side, a0: d.a - dw / 2 - dw - 0.15, a1: d.a - dw / 2 + 0.1 });
-          }
+          this.doorLeaf(w, d.a - dw / 2, dw, fy, DOOR_H, pick(rnd, PAL.door));
+          (lot.leaves ||= []).push({ side: d.side, a0: d.a - dw / 2 - 0.15, a1: d.a - dw / 2 + 0.8 });
         }
       }
       // Böden
@@ -571,7 +589,8 @@ export class HouseKit {
 
     // Bodenanschluss und Ladenschilder
     if (!lot.pilot) this.plinthGround(lot, sides, yG, y, doors, rnd);
-    if (lot.shop && doors[0]) this.shopSign(sides[doors[0].side], doors[0].a, yG + 2.9, rnd);
+    if (lot.shop && doors[0]) this.shopFront(lot, sides[doors[0].side], doors[0].a, yG, rnd);
+    if (lot.style === 'hochhaus' && floors >= 5 && lot.id % 2 === 0) this.fireEscape(lot, sides, doors, yG, floors, fh);
     this.stats.houses++;
     lot.roofY = yTop;
     lot.flat = st.roof === 'flat';
@@ -689,7 +708,7 @@ export class HouseKit {
       return v < T + 1.4 && Math.abs(aOfU(u) - d.a) < 1.1;
     });
     // offener Türflügel an der Innenwand (Vorderseite oder Seite A) im Weg?
-    const leafAt = (u, v) => f === 0 && (lot.leaves || []).some((l) => (l.side === front && u < T + 0.7 && aOfV(v) > l.a0 && aOfV(v) < l.a1)
+    const leafAt = (u, v) => f === 0 && (lot.leaves || []).some((l) => (l.side === front && u < T + 1.3 && aOfV(v) > l.a0 && aOfV(v) < l.a1)
       || (l.side === lot.sideA && v < T + 0.7 && aOfU(u) > l.a0 && aOfU(u) < l.a1));
     const du = [toX(1, 0) - toX(0, 0), toZ(1, 0) - toZ(0, 0)];
     const dv = [toX(0, 1) - toX(0, 0), toZ(0, 1) - toZ(0, 0)];
@@ -1056,6 +1075,7 @@ export class HouseKit {
     run('e', z0 + 0.3, z1 - 0.3, (a, c) => this.box(x1 - 0.15, ytop, (a + c) / 2, 0.3, ph, c - a, pc));
     // Wassertank auf Stelzen (abseits der Dachluke)
     const W = x1 - x0, D = z1 - z0;
+    if (lot.style === 'hochhaus' && Math.min(W, D) >= 7) this.roofClutter(lot, ytop, rnd, hole);
     if (!lot.noTank && Math.min(W, D) >= 5 && rnd() < 0.85) {
       const r = Math.min(1.7, Math.min(W, D) * 0.22);
       let tx = x0 + r + 0.7, tz = z0 + r + 0.7;
@@ -1081,25 +1101,180 @@ export class HouseKit {
     }
   }
 
-  shopSign(w, a, y, rnd) {
+  // Ladenfront: Schildbrett, gestreifte Markisen über Tür und Schaufenstern, Auslage dahinter, Ausleger
+  shopFront(lot, w, a, yG, rnd) {
     const out = OUTN[w.side];
-    const col = pick(rnd, PAL.awning);
-    if (this.inst && this.inst.has('kc_sign')) {
-      const ry = yawFront(out[0], out[2]);
-      this.model('kc_sign', wp(w, a + 0.9, y - 0.3, 0), ry, 1, { tint: col, layer: 'det' });
-      if (rnd() < 0.55) this.model('kc_awning', wp(w, a, y + 0.1, 0), ry, 1, { tint: pick(rnd, PAL.awning), layer: 'det' });
+    const col = pick(rnd, PAL.awning), yT = yG + 2.78;
+    const dw = 0.8;
+    const spans = [[a - dw, a + dw], ...(lot.shopWins || [])].sort((p, q) => p[0] - q[0]);
+    // Überlappende Spannen zusammenfassen, damit Markisen nicht ineinander stecken
+    const merged = [];
+    for (const [p, q] of spans) {
+      const last = merged[merged.length - 1];
+      if (last && p < last[1] + 0.5) last[1] = Math.max(last[1], q);
+      else merged.push([p, q]);
+    }
+    for (const [p, q] of merged) {
+      const p0 = Math.max(w.a0 + 0.05, p - 0.2), q0 = Math.min(w.a1 - 0.05, q + 0.2);
+      this.ledge(w, p0, q0, yT + 0.03, yT + 0.36, 0.05, darker(pick(rnd, PAL.wood), 1.15), 'wood', 'det');
+      this.awning(w, p0, q0, yT, col, 0xe6dfcc);
+    }
+    for (const [p, q] of lot.shopWins || []) this.shopDisplay(w, p, q, yG, rnd);
+    if (this.inst && this.inst.has('kc_sign')) this.model('kc_sign', wp(w, Math.min(a + 1.1, w.a1 - 0.3), yG + 3.3, 0), yawFront(out[0], out[2]), 1, { tint: col, layer: 'det' });
+  }
+
+  // Markise aus Stoffbahnen: leicht durchhängend, vorne ein Volant mit Zacken, seitlich Eisenarme
+  awning(w, a0, a1, yT, colA, colB) {
+    const opt = { mat: 'cloth', double: true, layer: 'det' };
+    const n = Math.max(3, Math.round((a1 - a0) / 0.32)), s = (a1 - a0) / n;
+    const dFront = -1.25, yF = yT - 0.6, dMid = -0.62, yM = yT - 0.33;
+    for (let i = 0; i < n; i++) {
+      const p = a0 + i * s, q = p + s, c = i % 2 ? colB : colA;
+      this.b.addQuad(wp(w, p, yT, -0.02), wp(w, q, yT, -0.02), wp(w, q, yM, dMid), wp(w, p, yM, dMid), c, opt);
+      this.b.addQuad(wp(w, p, yM, dMid), wp(w, q, yM, dMid), wp(w, q, yF, dFront), wp(w, p, yF, dFront), c, opt);
+      this.b.addQuad(wp(w, p, yF, dFront), wp(w, q, yF, dFront), wp(w, q, yF - 0.13, dFront), wp(w, p, yF - 0.13, dFront), c, opt);
+      this.b.addTri(wp(w, p, yF - 0.13, dFront), wp(w, q, yF - 0.13, dFront), wp(w, p + s / 2, yF - 0.22, dFront), c, opt);
+    }
+    for (const e of [a0, a1]) {
+      this.b.addQuad(wp(w, e, yT - 0.42, -0.02), wp(w, e, yF + 0.0, dFront), wp(w, e, yF + 0.03, dFront), wp(w, e, yT - 0.38, -0.02), 0x2a2724, { mat: 'metal', double: true, layer: 'det' });
+      this.b.addTri(wp(w, e, yT, -0.02), wp(w, e, yM, dMid), wp(w, e, yT - 0.12, -0.02), darker(colA, 0.8), opt);
+    }
+  }
+
+  // Auslage hinter dem Schaufenster
+  shopDisplay(w, a0, a1, yG, rnd) {
+    const al = w.side === 'n' || w.side === 's', m = (a0 + a1) / 2;
+    const c = wp(w, m, yG, T + 0.32);
+    this.b.box(c[0], yG, c[2], al ? a1 - a0 : 0.55, 0.4, al ? 0.55 : a1 - a0, 0x6a5238, { mat: 'wood', layer: 'in' });
+    const WARES = ['d_jug', 'd_ceramic', 'd_basket', 'd_bucket1', 'd_pot', 'd_lantern', 'd_crate1', 'd_watering', 'd_jerrycan'];
+    const n = Math.max(2, Math.floor((a1 - a0) / 0.5));
+    for (let i = 0; i < n; i++) {
+      const t = (i + 0.5) / n, p = wp(w, a0 + (a1 - a0) * t, yG, T + 0.3 + (rnd() - 0.5) * 0.12);
+      this.B.dress(pick(rnd, WARES), p[0], p[2], rnd() * 6, { y: yG + 0.4, layer: 'in', color: 0xd0d0d0, scale: 0.8 + rnd() * 0.2 });
+    }
+  }
+
+  // Offener Türflügel im Raum: Füllungen, Bänder und Griff sind eigene Flächen
+  doorLeaf(w, a0, dw, y, h, col) {
+    const ang = 1.2, ca = Math.cos(ang), sa = Math.sin(ang);
+    const P = (t, yy, off) => wp(w, a0 + ca * dw * t + off * sa, yy, T + 0.03 + sa * dw * t - off * ca);
+    const face = (t0, t1, y0, y1, off, color, mat) => this.b.addQuad(P(t0, y0, off), P(t1, y0, off), P(t1, y1, off), P(t0, y1, off), color, { mat, double: true, layer: 'det' });
+    face(0, 1, y, y + h, 0, col, 'wood');
+    const dark = darker(col, 0.72);
+    for (const off of [-0.012, 0.012]) {
+      for (const [t0, t1] of [[0.1, 0.46], [0.54, 0.9]]) {
+        face(t0, t1, y + 0.14, y + 0.86, off, dark, 'wood');
+        face(t0, t1, y + 1.02, y + h - 0.14, off, dark, 'wood');
+      }
+      for (const yy of [y + 0.28, y + h - 0.32]) face(0, 0.24, yy, yy + 0.04, off * 1.4, 0x2a2724, 'metal');
+      face(0.87, 0.93, y + 0.98, y + 1.13, off * 1.8, 0x2a2724, 'metal');
+    }
+  }
+
+  // Fassade der Hochhäuser in drei verwandten Typen: Bänder, Pfeiler, Balkone
+  towerFacade(lot, w, runs, ops, f, isTop, y, h, c) {
+    const type = lot.id % 3, rnd = c.rnd, al = w.side === 'n' || w.side === 's', out = OUTN[w.side];
+    for (const [r0, r1] of runs) {
+      if (f > 0 && type !== 1) this.ledge(w, r0, r1, y - 0.04, y + 0.1, 0.06, c.fasche, 'wplaster', 'det');
+      if (isTop) {
+        this.ledge(w, r0, r1, y + h - 0.46, y + h - 0.3, 0.12, c.fasche, 'wplaster', 'det');
+        this.ledge(w, r0, r1, y + h - 0.3, y + h, 0.26, c.fasche, 'wplaster', 'det');
+      }
+      if (type === 1 && f > 0) {
+        const wins = ops.filter((o) => o.kind === 'win' && o.a0 >= r0 && o.a1 <= r1).sort((p, q) => p.a0 - q.a0);
+        for (let i = 0; i + 1 < wins.length; i++) {
+          const m = (wins[i].a1 + wins[i + 1].a0) / 2;
+          this.ledge(w, m - 0.17, m + 0.17, y, y + h, 0.12, c.fasche, 'wplaster', 'det');
+        }
+        for (const e of [r0 + 0.18, r1 - 0.18]) this.ledge(w, e - 0.18, e + 0.18, y, y + h, 0.14, c.fasche, 'wplaster', 'det');
+      }
+    }
+    for (const o of ops) {
+      if (o.kind !== 'win' || f === 0) continue;
+      const Y0 = y + o.y0, Y1 = y + o.y1, m = (o.a0 + o.a1) / 2, ow = o.a1 - o.a0;
+      this.ledge(w, o.a0 - 0.06, o.a1 + 0.06, Y1 + 0.02, Y1 + 0.14, 0.03, c.fasche, 'wplaster', 'det');
+      // Regenspuren unter der Fensterbank
+      if (rnd() < 0.45) this.quad([wp(w, o.a0 + 0.08, Y0 - 0.2 - rnd() * 0.75, -0.003), wp(w, o.a1 - 0.08, Y0 - 0.2 - rnd() * 0.75, -0.003), wp(w, o.a1 - 0.03, Y0 - 0.1, -0.003), wp(w, o.a0 + 0.03, Y0 - 0.1, -0.003)], out, darker(c.wall, 0.72), { mat: 'wplaster', layer: 'det' });
+      // Klimageräte, schräg an der Wand hängend
+      if (rnd() < 0.07) {
+        const p = wp(w, m, Y0 - 0.55, -0.24);
+        this.b.box(p[0], p[1], p[2], al ? 0.72 : 0.44, 0.42, al ? 0.44 : 0.72, 0x8d908c, { mat: 'metal', layer: 'det' });
+        const q = wp(w, m, Y0 - 0.5, -0.465);
+        this.b.box(q[0], q[1], q[2], al ? 0.58 : 0.01, 0.3, al ? 0.01 : 0.58, 0x33342f, { mat: 'metal', layer: 'det' });
+      }
+      // Balkon mit Stahlgeländer
+      if (type === 2 && rnd() < 0.38 && ow < 2) {
+        const s = wp(w, m, y - 0.02, -0.55);
+        this.b.box(s[0], s[1], s[2], al ? ow + 0.8 : 1.1, 0.12, al ? 1.1 : ow + 0.8, c.fasche, { mat: 'wplaster', layer: 'det' });
+        const rail = wp(w, m, y + 0.98, -1.05);
+        this.b.box(rail[0], rail[1], rail[2], al ? ow + 0.8 : 0.04, 0.04, al ? 0.04 : ow + 0.8, 0x34322e, { mat: 'metal', layer: 'det' });
+        for (let t = -0.5; t <= 0.5 + 1e-6; t += 0.25) {
+          const b = wp(w, m + t * (ow + 0.76), y + 0.1, -1.05);
+          this.b.box(b[0], b[1], b[2], 0.025, 0.88, 0.025, 0x34322e, { mat: 'metal', layer: 'det' });
+        }
+      }
+    }
+  }
+
+  // Feuertreppe auf einer Seite ohne Tür: nur Ansicht, die Etagen erreicht man durchs Haus
+  fireEscape(lot, sides, doors, yG, floors, fh) {
+    const iron = { mat: 'metal', layer: 'det' }, col = 0x8a6a52, thin = 0x6a584a;
+    for (const k of ['n', 's', 'e', 'w']) {
+      if (doors.some((d) => d.side === k)) continue;
+      const w = sides[k], al = k === 'n' || k === 's';
+      const run = this.openRuns(w, yG + fh, lot.id).find(([p, q]) => q - p >= 5.5);
+      if (!run) continue;
+      lot.escape = { side: k, a: (run[0] + run[1]) / 2 };
+      const m = (run[0] + run[1]) / 2, B = (a, y, d, dx, h, dd, c = col) => {
+        const p = wp(w, a, y, d);
+        this.b.box(p[0], p[1], p[2], al ? dx : dd, h, al ? dd : dx, c, iron);
+      };
+      for (let f = 1; f < floors; f++) {
+        const y = yG + f * fh;
+        B(m, y - 0.05, -0.6, 4.4, 0.05, 1.05);
+        B(m, y + 0.95, -1.1, 4.4, 0.04, 0.04, thin);
+        for (const e of [-2.2, -1.1, 0, 1.1, 2.2]) B(m + e, y, -1.1, 0.04, 0.95, 0.04, thin);
+        for (const e of [-1.9, 1.9]) B(m + e, y - 0.3, -0.25, 0.05, 0.25, 0.5, thin);
+        // Treppenlauf zum nächsten Podest
+        if (f < floors - 1) {
+          const dir = f % 2 ? 1 : -1, a0 = m - dir * 1.8, a1 = m + dir * 1.8;
+          // Zwei Wangen und einzelne Stufen, man sieht die Wand hindurch
+          for (const d of [-0.15, -0.95]) this.b.addQuad(wp(w, a0, y, d), wp(w, a1, y + fh, d), wp(w, a1, y + fh + 0.14, d), wp(w, a0, y + 0.14, d), col, { ...iron, double: true });
+          for (let i = 1; i < 11; i++) B(a0 + (a1 - a0) * i / 11, y + fh * i / 11 + 0.08, -0.55, 0.26, 0.03, 0.8);
+          this.b.addQuad(wp(w, a0, y + 0.85, -0.95), wp(w, a1, y + fh + 0.85, -0.95), wp(w, a1, y + fh + 0.9, -0.95), wp(w, a0, y + 0.9, -0.95), thin, { ...iron, double: true });
+        }
+      }
+      // Hochgezogene Leiter über dem Erdgeschoss
+      const y1 = yG + fh;
+      for (const e of [-0.2, 0.2]) B(m + 1.9 + e, y1 - 1.1, -0.9, 0.035, 1.1, 0.035, thin);
+      for (let i = 0; i < 4; i++) B(m + 1.9, y1 - 1 + i * 0.26, -0.9, 0.42, 0.03, 0.03, thin);
       return;
     }
-    // Ausleger mit Schild quer zur Wand
-    const p0 = wp(w, a + 0.9, y, -0.05), p1 = wp(w, a + 0.9, y, -1.1);
-    this.b.box((p0[0] + p1[0]) / 2, y + 0.55, (p0[2] + p1[2]) / 2, Math.abs(p0[0] - p1[0]) + 0.06, 0.06, Math.abs(p0[2] - p1[2]) + 0.06, 0x2a2622, { mat: 'metal', layer: 'det' });
-    const q = [wp(w, a + 0.9, y - 0.25, -0.25), wp(w, a + 0.9, y - 0.25, -1.0), wp(w, a + 0.9, y + 0.5, -1.0), wp(w, a + 0.9, y + 0.5, -0.25)];
-    this.quad(q, AXIS[w.side], col, { double: true, layer: 'det' });
-    // Markise über dem Schaufenster
-    if (rnd() < 0.55) {
-      const b0 = a - 1.4, b1 = a + 1.4;
-      this.quad([wp(w, b0, y - 0.5, -1.2), wp(w, b1, y - 0.5, -1.2), wp(w, b1, y + 0.1, -0.02), wp(w, b0, y + 0.1, -0.02)], [out[0], 0.7, out[2]], col, { double: true, layer: 'det' });
+  }
+
+  // Dachaufbauten: Lüfter, Rohre, Antennen, abseits von Luke und Geschütz in der Mitte
+  roofClutter(lot, ytop, rnd, hole) {
+    const { x0, x1, z0, z1 } = lot, c = pick(rnd, [0x7a7c78, 0x6c6e6a, 0x85827a]);
+    const spots = [[x1 - 1.7, z1 - 1.7], [x0 + 1.7, z1 - 1.7], [x1 - 1.7, z0 + 1.7]];
+    const free = (x, z) => !hole || x + 1 < hole.x0 || x - 1 > hole.x1 || z + 1 < hole.z0 || z - 1 > hole.z1;
+    for (const [x, z] of spots) {
+      if (!free(x, z)) continue;
+      const r = rnd();
+      if (r < 0.4) {
+        this.box(x, ytop, z, 1.3, 0.8, 1, c, { mat: 'metal' });
+        this.b.addPrim('cyl16', x, ytop + 0.86, z, 0.34, 0.12, 0.34, 0x3c3d3a, { mat: 'metal', layer: 'det' });
+      } else if (r < 0.7) {
+        this.box(x, ytop, z, 0.7, 1.1, 0.7, darker(c, 0.85), { mat: 'metal' });
+        this.b.box(x, ytop + 1.1, z, 0.9, 0.08, 0.9, c, { mat: 'metal', layer: 'det' });
+      } else {
+        this.b.addPrim('cyl8', x, ytop + 2.4, z, 0.03, 4.8, 0.03, 0x34322e, { mat: 'metal' });
+        for (const yy of [3.4, 3.9, 4.4]) this.b.box(x, ytop + yy, z, 1.2 - yy * 0.12, 0.02, 0.02, 0x34322e, { mat: 'metal', layer: 'det' });
+        this.col.addCyl(x, z, 0.05, ytop, ytop + 4.8);
+      }
     }
+    // Rohrstrang über das Dach
+    const pz = (z0 + z1) / 2 + 2.2;
+    if (free((x0 + x1) / 2, pz)) this.b.addPrim('cyl8', (x0 + x1) / 2, ytop + 0.16, pz, 0.08, x1 - x0 - 1.4, 0.08, 0x59544c, { mat: 'metal', rz: Math.PI / 2, layer: 'det' });
   }
 
   // Ruine: Mauerreste ohne Dach, Schutthaufen

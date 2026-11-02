@@ -52,3 +52,14 @@ Helligkeit angepasst (`tools/fetch_textures.py`). Der Fels am Gründerfelsen ist
 `assets/nature.glb`, ebenfalls Poly Haven, CC0: `rock_moss_set_01`, `namaqualand_boulder_05`, `namaqualand_cliff_01`,
 `fir_sapling_medium`, `island_tree_02`, `searsia_lucida`. Felsen sind reduziert und neu gebacken, Pflanzen in Blender
 gerendert und als Bildflächen ausgegeben (`blender/nature_build.py`).
+
+## Kleine Requisiten
+
+`assets/props.glb`, ebenfalls Poly Haven, CC0 (`blender/props_build.py`, reduziert und in einem gemeinsamen Atlas):
+`wine_barrel_01`, `wooden_barrels_01`, `wooden_crate_01`, `wooden_crate_02`, `old_military_crate`, `wooden_bucket_01`,
+`wooden_bucket_02`, `wicker_basket_01`, `wooden_ladder`, `wooden_axe`, `wooden_broom`, `watering_can_metal_01`,
+`planter_pot_clay`, `potted_plant_04`, `wooden_stool_01`, `painted_wooden_bench`, `wooden_picnic_table`, `stone_fire_pit`,
+`wooden_lantern_01`, `jug_01`, `ceramic_pot`, `rusted_spade_01`, `lifebuoy`, `ocean_buoy`, `cannon_01`, `old_tyre`,
+`metal_jerrycan_green`, `propane_tank`, `metal_trash_can`, `concrete_road_barrier_02`, `portable_generator`, `tool_cart`,
+`can_rusted`, `trashbag`, `cement_bag`, `compost_bags`, `worn_metal_rack`, `rusted_wheel_rim_01`, `portable_searchlight`,
+`painted_wooden_chair_01`.

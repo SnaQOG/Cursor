@@ -203,6 +203,13 @@ Felsen und Pflanzen der Stadt (`assets/nature.glb`) entstehen ebenfalls aus CC0-
 lädt sie, `blender/nature_build.py` reduziert die Felsen und rendert Bäume und Sträucher auf gekreuzte Bildflächen
 (6 Dreiecke je Pflanze). Die Karte legt unter `models` fest, welche Modelle sie nutzt. Der Damm hat noch die alten.
 
+## Ausstattung der Welt
+
+`src/dressing.js` verteilt kleine Szenen statt einzelner Objekte: Kistenstapel, Holzlager, Werkstätten, Mülltonnen,
+Wäscheleinen, Banner, Gerüste, verlassene Lager, Barrikaden und Hafenkram. Die 40 Modelle (Poly Haven, CC0) teilen sich
+in `assets/props.glb` einen Atlas und ein Material, deshalb kostet die Ausstattung nur einen Draw-Call je Kachel.
+Die Szenen halten Türen und Durchgänge frei. Prüfbilder: `node tools/tests/ausstattung.mjs <version> [damm]`.
+
 ## SimReady-Requisiten
 
 Fässer, Kisten, Paletten, Maschinen, Rohre und Schilder auf dem Damm sowie Kisten, Körbe, Steinplatten und

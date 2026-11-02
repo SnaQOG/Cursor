@@ -196,6 +196,30 @@ export class Batcher {
     }
   }
 
+  // Modell mit eigener Textur einbacken (Requisiten im gemeinsamen Atlas): UVs bleiben erhalten
+  addModelUV(meshes, matrix, color, mat = 'dress', layer = 'det') {
+    const b = this.bucket(mat, matrix.elements[12], matrix.elements[14], layer);
+    _c.set(color);
+    for (const m of meshes) {
+      const g = m.geometry;
+      _m.multiplyMatrices(matrix, m.matrix);
+      _n.getNormalMatrix(_m);
+      const P = g.attributes.position, N = g.attributes.normal, U = g.attributes.uv, idx = g.index;
+      const count = idx ? idx.count : P.count;
+      for (let k = 0; k < count; k++) {
+        const i = idx ? idx.getX(k) : k;
+        _v.fromBufferAttribute(P, i).applyMatrix4(_m);
+        _nv.fromBufferAttribute(N, i).applyMatrix3(_n).normalize();
+        b.pos.push3(_v.x, _v.y, _v.z);
+        b.nor.push3(_nv.x, _nv.y, _nv.z);
+        b.col.push3(_c.r, _c.g, _c.b);
+        b.uv.push2(U.getX(i), U.getY(i));
+        b.ySum += _v.y;
+        this.vertexCount++;
+      }
+    }
+  }
+
   // Box mit Unterkante bei y
   box(x, y, z, w, h, d, color, opts) {
     this.addPrim('box', x, y + h / 2, z, w, h, d, color, opts);
@@ -214,7 +238,7 @@ export class Batcher {
       const mat = this.materials[b.mat];
       const mesh = new THREE.Mesh(geo, mat);
       const inside = b.layer === 'in';
-      mesh.castShadow = !mat.transparent && b.mat !== 'glow' && !b.layer;
+      mesh.castShadow = !mat.transparent && b.mat !== 'glow' && (!b.layer || b.mat === 'dress');
       mesh.receiveShadow = !mat.transparent;
       mesh.matrixAutoUpdate = false;
       mesh.updateMatrix();

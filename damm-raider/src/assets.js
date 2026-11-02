@@ -51,7 +51,7 @@ export class Assets {
     // Zusätzliche Modelle mit Texturen: SimReady-Requisiten, Felsen und Pflanzen.
     // Fehlen sie, bleiben die Blender-Modelle.
     if (this.ready) {
-      for (const name of ['simready', 'nature']) {
+      for (const name of ['simready', 'nature', 'props']) {
         try {
           let buf;
           if (EMBED) buf = EMBED[name] ? b64ToBuffer(EMBED[name]) : null;
@@ -121,6 +121,20 @@ export class Assets {
 
   has(name) {
     return this.ready && this.roots.has(name);
+  }
+
+  // Gemeinsames Material der Requisiten (Atlas) für die zusammengefassten Meshes
+  dressMaterial() {
+    if (this._dress === undefined) {
+      this._dress = null;
+      const src = this.has('d_crate1') ? this.meshes('d_crate1')[0]?.material : null;
+      if (src) {
+        this._dress = src.clone();
+        this._dress.vertexColors = true;
+        this._dress.metalness = 0;
+      }
+    }
+    return this._dress;
   }
 
   // Tiefe Kopie der Hierarchie (Geometrie und Materialien werden geteilt)

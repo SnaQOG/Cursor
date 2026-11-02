@@ -3,6 +3,7 @@
 import { Builder, COL } from './structures.js';
 import { MAP } from './config.js';
 import { mulberry32 } from './util.js';
+import { dressDamm } from './dressing.js';
 
 export function buildMap(batcher, col, terrain, assets = null, instancer = null) {
   const B = new Builder(batcher, col, terrain, assets);
@@ -499,6 +500,8 @@ export function buildMap(batcher, col, terrain, assets = null, instancer = null)
   // Kiste auf der Palette bei den Wohnblöcken, liegendes Fass am Bunker
   B.prop('sr_crate', 82, 148, 0.45, { y: B.ground(82, 148) + 0.21 });
   B.prop('sr_drum_steel', 157.6, 158.6, 0.8, { y: B.ground(157.6, 158.6) + 0.32, rx: Math.PI / 2, collide: null });
+
+  dressDamm(B);
 
   // Umherstreifende ARC zwischen den Orten
   for (const [x, z] of [[0, 60], [-100, 60], [100, 100], [-200, 100], [200, 80], [0, 150], [-60, -30], [150, -120], [-150, -110]]) {

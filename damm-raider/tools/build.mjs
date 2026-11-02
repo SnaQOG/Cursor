@@ -15,6 +15,8 @@ const fragmentOut = fragIdx >= 0 ? resolve(args[fragIdx + 1]) : null;
 const embed = {
   models: (await readFile(resolve(root, 'assets/models.glb'))).toString('base64'),
   simready: (await readFile(resolve(root, 'assets/simready.glb'))).toString('base64'),
+  nature: (await readFile(resolve(root, 'assets/nature.glb'))).toString('base64'),
+  props: (await readFile(resolve(root, 'assets/props.glb'))).toString('base64'),
   icons: 'data:image/webp;base64,' + (await readFile(resolve(root, 'assets/icons.webp'))).toString('base64'),
   iconMeta: JSON.parse(await readFile(resolve(root, 'assets/icons.json'), 'utf8')),
   tex: {},

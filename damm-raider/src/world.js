@@ -54,6 +54,8 @@ export class World {
       glow: new THREE.MeshBasicMaterial({ vertexColors: true }),
     };
     if (def.materials) Object.assign(mats, def.materials(this));
+    const dress = this.assets?.dressMaterial();
+    if (dress) mats.dress = dress;
     this.batcher = new Batcher(mats);
     this.instancer = new Instancer(this.assets);
     this.mapData = def.build({ batcher: this.batcher, col: this.col, terrain: this.terrain, assets: this.assets, world: this, instancer: this.instancer });

@@ -118,7 +118,7 @@ export class Assets {
       o.receiveShadow = true;
       const m = o.material;
       // Pflanzen sind Bildflächen und werden ausgeschnitten
-      if (/^n_(fir|leaf|bush)/.test(o.name)) {
+      if (/^n_(fir|leaf|lind|birch|bush)/.test(o.name)) {
         m.alphaTest = 0.45;
         // Die Bilder sind neutral beleuchtet und liegen im Spiel im eigenen Schatten: etwas anheben
         m.color.setRGB(1.75, 1.8, 1.55);

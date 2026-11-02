@@ -10,6 +10,7 @@
 import argparse
 import math
 import os
+import random
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -32,6 +33,10 @@ PLANTS = [
     ('n_fir1', 'fir_sapling_medium', 'fir_sapling_medium_b_LOD0', 12, 512),
     ('n_fir2', 'fir_sapling_medium', 'fir_sapling_medium_c_LOD0', 11, 512),
     ('n_leaf0', 'island_tree_02', 'island_tree_02_LOD0', 10, 640),
+    # Poly Haven hat keine mitteleuropäischen Laubbäume: Linde und Birke entstehen hier im Skript (gen_tree)
+    ('n_lind0', 'gen', 'linde:7', 12, 640),
+    ('n_lind1', 'gen', 'linde:19', 10, 640),
+    ('n_birch0', 'gen', 'birke:5', 13, 640),
     ('n_bush0', 'searsia_lucida', 'searsia_lucida_a_LOD0', 2.2, 384),
     ('n_bush1', 'searsia_lucida', 'searsia_lucida_c_LOD0', 1.5, 384),
 ]
@@ -60,6 +65,133 @@ def load_node(dl, src, node):
     return keep, co.min(0), co.max(0)
 
 
+def gen_tree(kind, seed):
+    """Baum per Space Colonization: Äste wachsen auf Zielpunkte in der Krone zu, das ergibt natürliche Silhouetten."""
+    sb.clear_scene()
+    rnd = random.Random(seed)
+    rng = np.random.default_rng(seed)
+    birch = kind == 'birke'
+    H = 13.0 if birch else 12.0
+    base_z = H * (0.3 if birch else 0.26)
+    # Krone: Linde breit und eiförmig, Birke schmal, beide mit unregelmäßigem Rand
+    cz, rz = (base_z + H) / 2, (H - base_z) / 2
+    rxy = H * (0.2 if birch else 0.36)
+    pts = []
+    while len(pts) < (1500 if birch else 2600):
+        p = rng.uniform(-1, 1, 3)
+        if p @ p > 1:
+            continue
+        # eiförmig: unten breiter als oben
+        taper = 1.0 - 0.32 * max(0.0, p[2])
+        # Beulen im Umriss, damit die Krone nicht wie eine Kugel aussieht
+        k = 0.82 + 0.18 * math.sin(p[0] * 5 + seed) * math.cos(p[1] * 4 - seed) * math.sin(p[2] * 3 + seed)
+        pts.append((p[0] * rxy * taper * k, p[1] * rxy * taper * k, cz + p[2] * rz * k))
+    A = np.array(pts)
+    step = 0.3
+    P = [np.array((0.0, 0.0, 0.0))]
+    parent = [-1]
+    # Stamm bis in die Krone
+    lean = rng.uniform(-0.04, 0.04, 2)
+    while P[-1][2] < base_z * 0.9:
+        P.append(P[-1] + np.array((lean[0] * step, lean[1] * step, step)))
+        parent.append(len(P) - 2)
+    infl, kill = 3.2, 0.55
+    gravity = np.array((0, 0, -0.12 if birch else 0.04))
+    for _ in range(90):
+        if not len(A):
+            break
+        Pa = np.array(P)
+        d = np.linalg.norm(A[:, None, :] - Pa[None, :, :], axis=2)
+        near = d.argmin(1)
+        dist = d[np.arange(len(A)), near]
+        keep = dist > kill
+        A = A[keep]
+        near, dist = near[keep], dist[keep]
+        grow = {}
+        for a, n, dd in zip(A, near, dist):
+            if dd < infl:
+                v = (a - P[n]) / max(dd, 1e-4)
+                grow[n] = grow.get(n, 0) + v
+        if not grow:
+            break
+        for n, v in grow.items():
+            v = v / (np.linalg.norm(v) + 1e-6) + gravity + rng.normal(0, 0.1, 3)
+            P.append(P[n] + v / np.linalg.norm(v) * step)
+            parent.append(n)
+    n = len(P)
+    # Rohrmodell: Astdicke aus den Kindern
+    rad = np.full(n, 0.012)
+    child_count = np.zeros(n, int)
+    for i in range(n - 1, 0, -1):
+        rad[parent[i]] = (rad[parent[i]] ** 2.3 + rad[i] ** 2.3) ** (1 / 2.3)
+        child_count[parent[i]] += 1
+    rad *= (0.15 if birch else 0.25) / rad[0]
+    rad = np.maximum(rad, 0.012)
+    verts, faces, cols = [], [], []
+    crown = Vector((0, 0, cz))
+    for i in range(1, n):
+        a, b = Vector(P[parent[i]]), Vector(P[i])
+        if (b - a).length < 1e-4:
+            continue
+        axis = (b - a).normalized()
+        u = axis.orthogonal().normalized()
+        v = axis.cross(u)
+        r0, r1 = float(rad[parent[i]]), float(rad[i])
+        if birch:
+            dark = rnd.random() < 0.14 or a.z < 1.0 or r0 < 0.03
+            col = (0.05, 0.045, 0.04) if dark else (0.6, 0.58, 0.53)
+        else:
+            col = (0.055, 0.042, 0.032)
+        seg = 6 if r0 > 0.05 else 4
+        i0 = len(verts)
+        for k in range(seg):
+            ang = k * math.tau / seg
+            d = u * math.cos(ang) + v * math.sin(ang)
+            verts.append(tuple(a + d * r0))
+            verts.append(tuple(b + d * r1))
+            cols.extend([col, col])
+        for k in range(seg):
+            p, q = i0 + k * 2, i0 + ((k + 1) % seg) * 2
+            faces.append((p, q, q + 1, p + 1))
+    # Blätter an den dünnen Zweigen, in vielen kleinen Büscheln
+    for i in range(1, n):
+        if rad[i] > (0.04 if birch else 0.055):
+            continue
+        c = Vector(P[i])
+        base = (rnd.uniform(0.13, 0.2), rnd.uniform(0.21, 0.27), rnd.uniform(0.045, 0.07)) if birch else (rnd.uniform(0.07, 0.12), rnd.uniform(0.15, 0.2), rnd.uniform(0.03, 0.05))
+        for _ in range(16 if birch else 22):
+            p = c + Vector((rnd.gauss(0, 1), rnd.gauss(0, 1), rnd.gauss(0, 0.8))).normalized() * rnd.random() ** 0.7 * (0.5 if birch else 0.62)
+            if birch:
+                p.z -= rnd.random() * 0.35
+            shade = min(1.45, 0.42 + 0.95 * (Vector((p.x / rxy, p.y / rxy, (p.z - cz) / rz)).length)) * (0.9 + 0.25 * (p.z - base_z) / (H - base_z))
+            size = rnd.uniform(0.05, 0.085) if birch else rnd.uniform(0.075, 0.12)
+            a = Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-0.4, 0.4))).normalized() * size
+            b = a.orthogonal().normalized() * size * 0.7
+            i0 = len(verts)
+            verts.extend([tuple(p - a), tuple(p - b), tuple(p + a), tuple(p + b)])
+            c0 = tuple(x * shade * rnd.uniform(0.82, 1.18) for x in base)
+            cols.extend([c0, c0, c0, c0])
+            faces.append((i0, i0 + 1, i0 + 2, i0 + 3))
+    me = bpy.data.meshes.new(kind)
+    me.from_pydata(verts, [], faces)
+    attr = me.color_attributes.new('Col', 'FLOAT_COLOR', 'POINT')
+    attr.data.foreach_set('color', [v for c in cols for v in (c[0], c[1], c[2], 1)])
+    mat = bpy.data.materials.new(kind)
+    mat.use_nodes = True
+    nt = mat.node_tree
+    bs = sb.principled(mat)
+    vc = nt.nodes.new('ShaderNodeVertexColor')
+    vc.layer_name = 'Col'
+    nt.links.new(vc.outputs['Color'], bs.inputs['Base Color'])
+    bs.inputs['Roughness'].default_value = 0.7
+    me.materials.append(mat)
+    ob = bpy.data.objects.new(kind, me)
+    bpy.context.scene.collection.objects.link(ob)
+    co = np.array(verts)
+    print('  Baum', kind, n, 'Knoten', len(faces), 'Flächen', flush=True)
+    return ob, co.min(0), co.max(0)
+
+
 def build_rock(aid, src, node, tris, dl, work):
     high, lo, hi = load_node(dl, src, node)
     sb.setup_cycles()
@@ -84,7 +216,11 @@ def build_rock(aid, src, node, tris, dl, work):
 
 
 def build_plant(aid, src, node, height, cell, dl, work):
-    ob, lo, hi = load_node(dl, src, node)
+    if src == 'gen':
+        kind, seed = node.split(':')
+        ob, lo, hi = gen_tree(kind, int(seed))
+    else:
+        ob, lo, hi = load_node(dl, src, node)
     s = bpy.context.scene
     sb.setup_cycles()
     s.cycles.samples = 96

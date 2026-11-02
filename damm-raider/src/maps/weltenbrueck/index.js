@@ -179,6 +179,16 @@ function materials(world) {
     for (const x of [t.map, t.normal]) x.repeat.set(rep, rep);
     return photo(t, roughness, ns);
   };
+  // Große helle und dunkle Flecken aus derselben Textur: lange Wände zeigen die Wiederholung nicht mehr so deutlich
+  const macro = (m) => {
+    if (!m) return null;
+    m.onBeforeCompile = (sh) => {
+      sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+        diffuseColor.rgb *= 0.62 + 1.05 * dot(texture2D(map, vMapUv * 0.083).rgb, vec3(0.333)) * (0.7 + 0.6 * texture2D(map, vMapUv.yx * 0.031).g);`);
+    };
+    m.customProgramCacheKey = () => 'wall-macro';
+    return m;
+  };
   const cobble2 = () => {
     if (!tex.cobble) return base;
     const c = { map: tex.cobble.map.clone(), normal: tex.cobble.normal.clone() };
@@ -192,8 +202,8 @@ function materials(world) {
     wtile: tex.rooftile ? photo(tex.rooftile, 0.82, 1.0) : tile,
     wtile90: tex.rooftile ? photo(tex.rooftile, 0.82, 1.0, Math.PI / 2) : tile,
     world: base,
-    brick: scaled(tex.brick, 2, 0.9, 1.0) || mk(makeBrickSet(), 0.9),
-    stone: scaled(tex.ashlar, 1.7, 0.92, 1.0) || mk(makeAshlarSet(), 0.92),
+    brick: macro(scaled(tex.brick, 2, 0.9, 1.0)) || mk(makeBrickSet(), 0.9),
+    stone: macro(scaled(tex.ashlar, 1.7, 0.92, 1.0)) || mk(makeAshlarSet(), 0.92),
     wood: scaled(tex.planks, 1.5, 0.84, 0.9) || mk(makePlankSet(), 0.82),
     timber: scaled(tex.beam, 2.5, 0.82, 0.9) || mk(makeTimberSet(), 0.8, 0, 0.8),
     cobble2: cobble2(),
@@ -295,7 +305,7 @@ function vegetation(world) {
       const x = a.x0 + 2 + rnd() * (w - 4), z = a.z0 + 2 + rnd() * (d - 4);
       // Baumkronen sind Bildflächen und dürfen nicht durch Hauswände ragen
       if (w < 6 || d < 6 || !free(x, z, 3.2, 8)) continue;
-      const it = { x, z, y: T.height(x, z), s: 0.42 + rnd() * 0.3, pine: false, r: rnd() * 6 };
+      const it = { x, z, y: T.height(x, z), s: 0.48 + rnd() * 0.4, pine: false, r: rnd() * 6 };
       const k = rnd();
       if (z < -2 && k < 0.45) birches.push(it);
       else if (z >= -2 && k < 0.55) linden.push(it);
@@ -363,8 +373,8 @@ function vegetation(world) {
   };
   const upright = (it, p, q, sc, e) => { p.set(it.x, it.y - 0.08, it.z); q.setFromEuler(e.set(0, it.r, 0)); sc.setScalar(it.s); };
   const extra = [
-    { name: world.assets?.has('n_leaf0') ? 'n_leaf0' : 'v_linde', list: linden, place: upright, opts: { tint: leaf, wind: 0.0025 } },
-    { name: world.assets?.has('n_leaf0') ? 'n_leaf0' : 'v_birke', list: birches, place: upright, opts: { tint: leaf, wind: 0.004 } },
+    { name: world.assets?.has('n_lind0') ? 'n_lind0' : 'v_linde', list: linden, place: upright, opts: { tint: leaf, wind: 0.0025 } },
+    { name: world.assets?.has('n_birch0') ? 'n_birch0' : 'v_birke', list: birches, place: upright, opts: { tint: leaf, wind: 0.004 } },
     { name: 'v_flowers', list: flowers, place: upright, opts: { shadow: false, doubleSide: true, cull: true, wind: 0.25 } },
     { name: 'v_meadow', list: meadow, place: upright, opts: { shadow: false, doubleSide: true, cull: true, wind: 0.2 } },
     { name: 'v_weed', list: weeds, place: upright, opts: { shadow: false, doubleSide: true, tint: leaf, cull: true, wind: 0.12 } },
@@ -433,7 +443,7 @@ export const WELTENBRUECK = {
   // Fotografische Modelle (blender/nature_build.py)
   models: {
     pine: ['n_fir0', 'n_fir1', 'n_fir2'],
-    tree: ['n_leaf0'],
+    tree: ['n_lind0', 'n_lind1', 'n_birch0'],
     bush: ['n_bush0', 'n_bush1'],
     rock: ['n_rock0', 'n_rock1', 'n_rock2', 'n_rock3', 'n_rock4', 'n_rock5', 'n_rock6', 'n_rock7'],
   },

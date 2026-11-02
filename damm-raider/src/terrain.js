@@ -130,7 +130,8 @@ export class Terrain {
   vec4 cob = texture2D(map, vMapUv);
   float jointL = dot(cob.rgb, vec3(0.333));
   float joint = smoothstep(0.26, 0.1, jointL);
-  cob.rgb = mix(cob.rgb, mix(vec3(0.5, 0.45, 0.35), vec3(0.2, 0.27, 0.11), vWear.y), joint * (0.6 + 0.35 * vWear.y));
+  cob.rgb = mix(cob.rgb, mix(vec3(0.42, 0.38, 0.3), vec3(0.17, 0.24, 0.1), vWear.y), joint * (0.42 + 0.4 * vWear.y));
+  cob.rgb = max(cob.rgb - 0.3, vec3(-0.3)) * 1.22 + 0.3; // Steine plastischer, auch im Schatten
   vec4 gra = texture2D(grassMap, vMapUv * 0.8);
   gra.rgb = mix(gra.rgb, texture2D(pathMap, vMapUv * 0.6).rgb, smoothstep(0.32, 0.68, vWear.x + (macroA - 0.45) * 0.9));
   float gEdge = smoothstep(0.32, 0.68, vGmix + (macroA - 0.45) * 1.4 * vGmix * (1.0 - vGmix) * 4.0);

@@ -35,10 +35,13 @@ const info = await page.evaluate(() => {
     }
   }
   const h = (x, z) => T.height(x, z);
-  return { stats: g.world.coverStats, chunks: pts.length, views, probe: [[-100, -44], [-110, -48], [-120, -58]].map(([x, z]) => [x, z, h(x, z), L.find((l) => x > l.x0 && x < l.x1 && z > l.z0 && z < l.z1)?.style]) };
+  // Ruinen von außen, Lager von schräg vorn
+  const ruins = L.filter((l) => l.kind === 'ruin').filter((_, i) => i % 19 === 0).slice(0, 4).map((l) => [[l.x1 + 2.5, l.level + 1.7, l.z1 + 2.5], [(l.x0 + l.x1) / 2, l.level + 1, (l.z0 + l.z1) / 2]]);
+  const camps = (g.world.mapData.builder.dressSamples?.lager || []).slice(0, 2).map(([x, z, y]) => [[x + 6.5, y + 1.7, z + 6.5], [x, y + 0.8, z + 1]]);
+  return { stats: g.world.coverStats, chunks: pts.length, views, ruins, camps, probe: [[-100, -44], [-110, -48], [-120, -58]].map(([x, z]) => [x, z, h(x, z), L.find((l) => x > l.x0 && x < l.x1 && z > l.z0 && z < l.z1)?.style]) };
 });
 console.log(JSON.stringify(info.stats), 'Kacheln', info.chunks, JSON.stringify(info.probe));
-const VIEWS = [...info.views.map((v, i) => ['hof' + i, ...v]), ...(map === 'damm' ? [['talblick', [20, 30, 60], [90, 2, 150]], ['strasse', [0, 3.5, 70], [40, 1, 110]]] : [['gasse', [-60, 4.7, 96.5], [-74, 3, 96.5]], ['strasse', [0, 4.2, 170], [0, 3, 180]]])];
+const VIEWS = [...info.views.map((v, i) => ['hof' + i, ...v]), ...info.ruins.map((v, i) => ['ruine' + i, ...v]), ...info.camps.map((v, i) => ['lager' + i, ...v]), ...(map === 'damm' ? [['talblick', [20, 30, 60], [90, 2, 150]], ['strasse', [0, 3.5, 70], [40, 1, 110]]] : [['gasse', [-60, 4.7, 96.5], [-74, 3, 96.5]], ['strasse', [0, 4.2, 170], [0, 3, 180]]])];
 for (const [name, pos, tgt] of VIEWS) {
   await page.evaluate(([pos, tgt]) => {
     const g = window.__game, c = g.camera;

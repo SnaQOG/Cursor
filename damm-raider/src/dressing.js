@@ -76,7 +76,7 @@ export function makeDresser(B, seed) {
       const [px, pz] = f.pos(a + u, o + v);
       return [px, f.y + h + (v < 0 ? 0.12 : -0.1) + (u > 0 ? 0.04 : -0.03), pz];
     });
-    b.addQuad(pts[0], pts[1], pts[2], pts[3], color, { mat: CL, double: true, layer: 'det' });
+    b.addQuad(pts[0], pts[1], pts[2], pts[3], color, { mat: 'world', double: true, layer: 'det' });
   };
 
   const SCENES = {
@@ -246,7 +246,15 @@ export function makeDresser(B, seed) {
     // Schlafplatz: Plane auf dem Boden, Sonnensegel darüber
     const tw = 2.2, th = 1.6;
     b.addQuad([x - 3.4, y + 0.04, z + 1], [x - 3.4 + tw, y + 0.04, z + 1], [x - 3.4 + tw, y + 0.04, z + 1 + th], [x - 3.4, y + 0.04, z + 1 + th], pick(CLOTH), { mat: CL, double: true, layer: 'det' });
-    b.addQuad([x + 1.2, y + 1.8, z + 1], [x + 4, y + 1.8, z + 1], [x + 4, y + 1.1, z + 3.2], [x + 1.2, y + 1.1, z + 3.2], 0x5a6048, { mat: CL, double: true, layer: 'det' });
+    // Sonnensegel hängt zwischen den Stangen durch, in Bahnen genäht
+    const CANVAS = pick([0x8f8468, 0x7a7458, 0x9a8a70]);
+    const segU = 6, segV = 4, cell = (u, v) => [x + 1.2 + u * 2.8, y + 1.8 - v * 0.7 - Math.sin(u * Math.PI) * Math.sin(v * Math.PI) * 0.26, z + 1 + v * 2.2];
+    for (let i = 0; i < segU; i++) {
+      for (let j = 0; j < segV; j++) {
+        const u0 = i / segU, u1 = (i + 1) / segU, v0 = j / segV, v1 = (j + 1) / segV;
+        b.addQuad(cell(u0, v0), cell(u1, v0), cell(u1, v1), cell(u0, v1), i % 2 ? CANVAS : mixDark(CANVAS), { mat: 'world', double: true, layer: 'det' });
+      }
+    }
     for (const [px, pz, h] of [[x + 1.2, z + 1, 1.8], [x + 4, z + 1, 1.8], [x + 1.2, z + 3.2, 1.1], [x + 4, z + 3.2, 1.1]]) b.box(px, y, pz, 0.07, h, 0.07, WOOD_DARK, { mat: WD, layer: 'det' });
   };
 
@@ -266,6 +274,8 @@ export function makeDresser(B, seed) {
 
   return { rnd, R, pick, has, frame, SCENES, camp, barricade, logs, freeAt, spot };
 }
+
+const mixDark = (c) => (Math.round(((c >> 16) & 255) * 0.9) << 16) | (Math.round(((c >> 8) & 255) * 0.9) << 8) | Math.round((c & 255) * 0.9);
 
 // ---------------------------------------------------------------- Stadt
 const STREET_SCENES = {

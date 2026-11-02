@@ -79,8 +79,19 @@ Dritte Runde, Wiese und Boden, nach Fotos von Wiesen, Feldwegen und Altstadtpfla
 
 Prüfbilder: `node tools/tests/boden.mjs <version> [damm]`.
 
-Noch offen: Das Bruchsteinfoto wiederholt sich auf langen Wänden erkennbar, Feuertreppen sind nicht begehbar, Ruinen sind
-glatt, Schilder tragen keine Schrift, Stoffe bewegen sich nicht.
+Vierte Runde, Einzelheiten:
+
+| Fehler | Änderung |
+| --- | --- |
+| Laubbaum knorrig und nicht mitteleuropäisch | Linde und Birke, im Skript gewachsen (`gen_tree` in `blender/nature_build.py`, Space Colonization) |
+| Mauern wiederholen sich sichtbar | Große helle und dunkle Flecken im Shader für Bruchstein und Backstein |
+| Ruinen glatt und einfarbig | Offenes Mauerwerk, abgebröckelter Putz, Bruchkante aus Steinen, Ruß, Schutt und Kräuter |
+| Planen flach und zu dunkel | Sonnensegel hängt durch, in Bahnen genäht |
+| Pflaster im Schatten flach | Kräftigere Steine, weniger gefüllte Fugen |
+| Büsche am Damm zu groß | Halb so groß, nehmen nicht mehr die Sicht |
+
+Noch offen: Feuertreppen sind nicht begehbar, Schilder tragen keine Schrift, Stoffe bewegen sich nicht, einzelne Bäume
+sind aus der Nähe flache Bildflächen.
 
 Offen im Abschnitt, jeweils außerhalb der Häuser oder als nächste Runde:
 

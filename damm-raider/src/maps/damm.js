@@ -297,7 +297,7 @@ function vegetation(world) {
     const x = (rnd() * 2 - 1) * 300, z = (rnd() * 2 - 1) * 300;
     if (n.fbm(x * 0.02 + 9, z * 0.02, 2) < -0.1 + rnd() * 0.2) continue;
     if (blocked(x, z, 0.5)) continue;
-    bushes.push({ x, z, y: T.height(x, z), s: 0.6 + rnd() * 1.0, r: rnd() * 6 });
+    bushes.push({ x, z, y: T.height(x, z), s: 0.35 + rnd() * 0.55, r: rnd() * 6 });
   }
   for (let i = 0; i < 4000 && rocks.length < 420; i++) {
     const x = (rnd() * 2 - 1) * 300, z = (rnd() * 2 - 1) * 300;
@@ -347,7 +347,7 @@ export const DAMM = {
   // Fotografische Modelle wie in der Stadt (blender/nature_build.py)
   models: {
     pine: ['n_fir0', 'n_fir1', 'n_fir2'],
-    tree: ['n_leaf0'],
+    tree: ['n_lind0', 'n_lind1', 'n_birch0'],
     bush: ['n_bush0', 'n_bush1'],
     rock: ['n_rock0', 'n_rock1', 'n_rock2', 'n_rock3', 'n_rock4', 'n_rock5', 'n_rock6', 'n_rock7'],
   },

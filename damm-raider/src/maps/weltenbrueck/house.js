@@ -2,6 +2,7 @@
 // echte Fensteröffnungen, Fachwerk, Läden, Möbel, Beuteplätze und Dächer.
 // Wände bestehen aus Flächen (sparsamer als Boxen) plus Kollisionsboxen.
 import { mulberry32 } from '../../util.js';
+import { COVER, COVER_COLS, COVER_ROWS } from '../../groundcover.js';
 
 export const PAL = {
   plaster: [0xe6dcc4, 0xdcc79c, 0xd8ab90, 0xcbbda4, 0xadc0c8, 0xbcc6a4, 0xebe3d3, 0xd6b68c, 0xcaa18a, 0xe0cfa6],
@@ -1277,12 +1278,55 @@ export class HouseKit {
     if (free((x0 + x1) / 2, pz)) this.b.addPrim('cyl8', (x0 + x1) / 2, ytop + 0.16, pz, 0.08, x1 - x0 - 1.4, 0.08, 0x59544c, { mat: 'metal', rz: Math.PI / 2, layer: 'det' });
   }
 
+  // Bruchkante aus einzelnen Steinen, Putzreste auf beiden Seiten, kleiner Schutt am Wandfuß
+  ruinWallDetail(w, a0, a1, y, h, ops, col, mat, plasterCol, pr) {
+    const al = w.side === 'n' || w.side === 's', out = OUTN[w.side], det = { mat, layer: 'det' };
+    for (let a = a0 + 0.1; a < a1 - 0.1; a += 0.22 + pr() * 0.3) {
+      const n = pr() < 0.55 ? 1 : pr() < 0.6 ? 2 : 0;
+      for (let k = 0; k < n; k++) {
+        const c = wp(w, a, y + h + k * 0.14, T / 2 + (pr() - 0.5) * 0.08), bw = 0.16 + pr() * 0.16;
+        this.b.box(c[0], c[1], c[2], al ? bw : T * 0.85, 0.13, al ? T * 0.85 : bw, darker(col, 0.62 + pr() * 0.2), det);
+      }
+    }
+    if (plasterCol != null && h > 1.2) {
+      for (const d of [-0.012, T + 0.012]) {
+        let a = a0;
+        while (a < a1 - 0.3) {
+          const wdt = Math.min(a1 - a, 0.5 + pr() * 1.5);
+          // Offene Stellen und Fensterlöcher bleiben frei
+          if (pr() < 0.6 && !ops.some((o) => a < o.a1 && a + wdt > o.a0)) {
+            const y0 = y + pr() * 0.35, top = y0 + 0.4 + pr() * Math.max(0.2, h * 0.5);
+            const n = d < 0 ? out : neg(out), opt = { mat: 'wplaster', layer: 'det', kf: (yy) => 1 - 0.3 * Math.max(0, (yy - y) / h) };
+            // Abgebröckelte Oberkante aus schmalen, unterschiedlich hohen Streifen
+            const strips = Math.max(2, Math.round(wdt / 0.22));
+            let prev = top - pr() * 0.3;
+            for (let i = 0; i < strips; i++) {
+              const p = a + (wdt * i) / strips, q = a + (wdt * (i + 1)) / strips, next = top - pr() * pr() * 0.75;
+              this.quad([wp(w, p, y0, d), wp(w, q, y0, d), wp(w, q, next, d), wp(w, p, prev, d)], n, plasterCol, opt);
+              prev = next;
+            }
+          }
+          a += wdt;
+        }
+      }
+    }
+    for (let i = 0, m = Math.floor((a1 - a0) * 1.4); i < m; i++) {
+      const p = wp(w, a0 + pr() * (a1 - a0), y, -0.25 - pr() * 0.8), s = 0.1 + pr() * 0.18;
+      this.b.addPrim('ico', p[0], y + s * 0.35, p[2], s * 1.2, s * 0.7, s, darker(col, 0.7 + pr() * 0.3), { mat, ry: pr() * 6, layer: 'det' });
+    }
+  }
+
   // Ruine: Mauerreste ohne Dach, Schutthaufen
   ruin(lot, rnd) {
     const { x0, x1, z0, z1 } = lot;
     const y = lot.level;
-    const col = lot.district === 'wald' ? pick(rnd, PAL.stone) : mix(pick(rnd, PAL.plaster), 0x8a8478, 0.45);
-    const mat = lot.district === 'wald' ? 'stone' : 'wplaster';
+    // Offenes Mauerwerk, der Putz hängt nur noch in Resten daran. Oben verrußt.
+    const brick = lot.district !== 'wald' && lot.id % 3 === 0;
+    const mat = brick ? 'brick' : 'stone';
+    const col = brick ? pick(rnd, PAL.brick) : pick(rnd, PAL.stone);
+    const plasterCol = lot.district === 'wald' ? null : mix(pick(rnd, PAL.plaster), 0x8a8478, 0.45);
+    const pr0 = mulberry32(lot.id + 77);
+    const soot = (top) => (yy) => 1 - 0.45 * Math.max(0, (yy - y - top * 0.45) / (top * 0.55));
     const inner = { x0: x0 + T - 0.02, x1: x1 - T + 0.02, z0: z0 + T - 0.02, z1: z1 - T + 0.02, k: 0.75 };
     const sides = [
       { side: 's', fixed: z1, a0: x0, a1: x1, ia0: x0 + T, ia1: x1 - T },
@@ -1298,7 +1342,8 @@ export class HouseKit {
         if (rnd() < 0.78) {
           const h = 0.8 + rnd() * (rnd() < 0.3 ? 5.5 : 3.0);
           const ops = h > 2 && len > 1.6 && rnd() < 0.5 ? [{ a0: a + len / 2 - 0.45, a1: a + len / 2 + 0.45, y0: 1.05, y1: Math.min(h - 0.2, 2.3), kind: 'win' }] : [];
-          this.wall({ ...w, a0: a, a1: a + len }, y, h, ops, col, { mat, inner });
+          this.wall({ ...w, a0: a, a1: a + len }, y, h, ops, col, { mat, inner, kf: soot(h) });
+          this.ruinWallDetail(w, a, a + len, y, h, ops, col, mat, plasterCol, pr0);
           // Abbruchkante oben
           this.quad([wp(w, a, y + h, 0), wp(w, a + len, y + h, 0), wp(w, a + len, y + h, T), wp(w, a, y + h, T)], [0, 1, 0], darker(col, 0.85));
         }
@@ -1319,6 +1364,14 @@ export class HouseKit {
       this.B.prop('sr_stone', x0 + 1 + pr() * (x1 - x0 - 2), z0 + 1 + pr() * (z1 - z0 - 2), pr() * 6.28, {
         y: y + 0.17, scale: 2.4 + pr() * 1.6, rx: (pr() - 0.5) * 0.14, rz: (pr() - 0.5) * 0.14, collide: null, shadow: false,
       });
+    }
+    // Durch die Ruine wachsen Kräuter und Gras
+    if (this.b.materials.cover) {
+      const kinds = ['kraut', 'klein', 'mittel', 'nessel', 'gross1', 'trocken', 'farn'], sc = { nessel: 8, farn: 0.6, kraut: 1.3 };
+      for (let i = 0, m = Math.floor((x1 - x0) * (z1 - z0) * 0.5); i < m; i++) {
+        const id = kinds[Math.floor(pr() * kinds.length)], c = COVER[id];
+        this.b.addCover(x0 + 0.5 + pr() * (x1 - x0 - 1), y + 0.14, z0 + 0.5 + pr() * (z1 - z0 - 1), c[2] * (sc[id] ?? 2.4) * (0.8 + pr() * 0.5), pr() * 6.28, c, COVER_COLS, COVER_ROWS, 0xd0d8b0);
+      }
     }
     // Balken liegen herum
     for (let i = 0; i < 2; i++) {

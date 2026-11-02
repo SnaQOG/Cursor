@@ -33,7 +33,7 @@ function groundGrid() {
 const C = {
   cobble: new THREE.Color(0xc4baa9), cobbleDark: new THREE.Color(0x9c9383), plaza: new THREE.Color(0xb3a993),
   grass: new THREE.Color(0x5d7337), grassDry: new THREE.Color(0x8a8a4e), garden: new THREE.Color(0x4f6a2f),
-  moss: new THREE.Color(0x5a6a3a), rock: new THREE.Color(0x7a7366), rockDark: new THREE.Color(0x56514a),
+  moss: new THREE.Color(0x5a6a3a), rock: new THREE.Color(0xb9b2a5), rockDark: new THREE.Color(0x938c80),
   forest: new THREE.Color(0x3e4f2c), pale: new THREE.Color(0xc9c1ad), sand: new THREE.Color(0xa8986f), seabed: new THREE.Color(0x4f5a52),
   main: new THREE.Color(0xaea594),
 };
@@ -108,6 +108,12 @@ const terrain = {
 
   mapColor() { return [40, 44, 46]; },
 
+  // Anteil Fels-Textur: Gründerfelsen und steile Hänge
+  rockMix(T, x, z, h, sl) {
+    if (z > CITY.CLIFF_Z + 1) return 0;
+    return clamp(Math.max(smoothstep(CITY.CLIFF_Z + 1, CITY.CLIFF_Z - 1, z) * (1 - smoothstep(CITY.CLIFF_Z - 18, CITY.CLIFF_Z - 26, z)), smoothstep(0.7, 1.3, sl)), 0, 1);
+  },
+
   // Anteil Gras-Textur am Boden (0 = Pflaster)
   grassMix(T, x, z) {
     if (z < CITY.CLIFF_Z - 16) return 1;
@@ -152,7 +158,7 @@ function materials(world) {
 // Boden: Pflaster, in Höfen, Gärten und im Wald Gras
 function groundTexture(world) {
   const c = world.assets?.tex?.cobble || makeCobbleSet(), g = makeGrassSet();
-  return { map: c.map, normal: c.normal, grass: g.map, grassNormal: g.normal };
+  return { map: c.map, normal: c.normal, grass: g.map, grassNormal: g.normal, rock: world.assets?.tex?.cliff?.map };
 }
 
 // Meer, Brunnenwasser
@@ -204,8 +210,9 @@ function vegetation(world) {
     const nt = Math.floor(area / (a.court ? 70 : 110) * (0.6 + rnd()));
     for (let i = 0; i < nt; i++) {
       const x = a.x0 + 2 + rnd() * (w - 4), z = a.z0 + 2 + rnd() * (d - 4);
-      if (w < 4 || d < 4 || !free(x, z, 1.4, 6)) continue;
-      const it = { x, z, y: T.height(x, z), s: 0.7 + rnd() * 0.6, pine: false, r: rnd() * 6 };
+      // Baumkronen sind Bildflächen und dürfen nicht durch Hauswände ragen
+      if (w < 6 || d < 6 || !free(x, z, 3.2, 8)) continue;
+      const it = { x, z, y: T.height(x, z), s: 0.42 + rnd() * 0.3, pine: false, r: rnd() * 6 };
       const k = rnd();
       if (z < -2 && k < 0.45) birches.push(it);
       else if (z >= -2 && k < 0.55) linden.push(it);
@@ -268,8 +275,8 @@ function vegetation(world) {
   };
   const upright = (it, p, q, sc, e) => { p.set(it.x, it.y - 0.08, it.z); q.setFromEuler(e.set(0, it.r, 0)); sc.setScalar(it.s); };
   const extra = [
-    { name: 'v_linde', list: linden, place: upright, opts: { tint: leaf, wind: 0.0025 } },
-    { name: 'v_birke', list: birches, place: upright, opts: { tint: leaf, wind: 0.004 } },
+    { name: world.assets?.has('n_leaf0') ? 'n_leaf0' : 'v_linde', list: linden, place: upright, opts: { tint: leaf, wind: 0.0025 } },
+    { name: world.assets?.has('n_leaf0') ? 'n_leaf0' : 'v_birke', list: birches, place: upright, opts: { tint: leaf, wind: 0.004 } },
     { name: 'v_flowers', list: flowers, place: upright, opts: { shadow: false, doubleSide: true, cull: true, wind: 0.25 } },
     { name: 'v_meadow', list: meadow, place: upright, opts: { shadow: false, doubleSide: true, cull: true, wind: 0.2 } },
     { name: 'v_weed', list: weeds, place: upright, opts: { shadow: false, doubleSide: true, tint: leaf, cull: true, wind: 0.12 } },
@@ -335,6 +342,13 @@ export const WELTENBRUECK = {
   half: CITY.HALF,
   bound: CITY.BOUND,
   mapHalf: 300,
+  // Fotografische Modelle (blender/nature_build.py)
+  models: {
+    pine: ['n_fir0', 'n_fir1', 'n_fir2'],
+    tree: ['n_leaf0'],
+    bush: ['n_bush0', 'n_bush1'],
+    rock: ['n_rock0', 'n_rock1', 'n_rock2', 'n_rock3', 'n_rock4', 'n_rock5', 'n_rock6', 'n_rock7'],
+  },
   enemyDraw: 170, // enge Gassen, Wände verdecken das meiste
   pois: POIS,
   extracts: EXTRACTS,

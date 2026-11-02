@@ -17,6 +17,7 @@ TEXTURES = {
     'plaster': ('white_plaster_02', 768, 80, 0.0, 0.86),
     'rooftile': ('clay_roof_tiles_02', 768, 80, 0.62, 0.42),
     'cobble': ('cobblestone_floor_08', 1024, 78, 0.8, None),
+    'cliff': ('cliff_side', 1024, 78, 0.22, 0.46),
 }
 UA = {'User-Agent': 'damm-raider-texture-fetch'}
 

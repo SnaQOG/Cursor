@@ -643,7 +643,11 @@ export function buildCity({ batcher, col, terrain, assets, world, layout, instan
       const z = CITY.CLIFF_Z - R(3, 14);
       const s = R(4, 9);
       const yy = terrain.height(x, z);
-      if (!inst('v_rock' + (Math.floor(rnd() * 3) % 3), x, yy - s * 0.5, z, rnd() * 6, [s * 1.3, s * 1.1, s * 1.2])) {
+      const kind = Math.floor(rnd() * 8) % 8;
+      const rock = instancer.has(`n_rock${kind}`) ? `n_rock${kind}` : `v_rock${kind % 3}`;
+      // die fotografischen Felsen sind 2,2 m groß, die alten Klötze kleiner
+      const rs = rock.startsWith('n_') ? s * 0.55 : s;
+      if (!inst(rock, x, yy - rs * 0.5, z, rnd() * 6, [rs * 1.3, rs * 1.1, rs * 1.2])) {
         b.addPrim('ico', x, yy + s * 0.2, z, s * 1.2, s * 0.9, s, mix(0x6f685c, 0x8a8274, rnd()), { mat: 'stone', ry: rnd() * 6, rx: rnd() * 0.5 });
       }
     }

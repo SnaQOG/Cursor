@@ -45,4 +45,10 @@ trademark license or endorsement is granted.“ Das Spiel steht in keiner Verbin
 
 Putz (`white_plaster_02`), Dachziegel (`clay_roof_tiles_02`) und Pflaster (`cobblestone_floor_08`) stammen von
 [Poly Haven](https://polyhaven.com/license) und stehen unter CC0. Für das Spiel verkleinert und in Farbe und
-Helligkeit angepasst (`tools/fetch_textures.py`).
+Helligkeit angepasst (`tools/fetch_textures.py`). Der Fels am Gründerfelsen ist `cliff_side`.
+
+## Felsen und Pflanzen
+
+`assets/nature.glb`, ebenfalls Poly Haven, CC0: `rock_moss_set_01`, `namaqualand_boulder_05`, `namaqualand_cliff_01`,
+`fir_sapling_medium`, `island_tree_02`, `searsia_lucida`. Felsen sind reduziert und neu gebacken, Pflanzen in Blender
+gerendert und als Bildflächen ausgegeben (`blender/nature_build.py`).

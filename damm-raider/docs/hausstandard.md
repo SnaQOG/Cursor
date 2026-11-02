@@ -35,11 +35,16 @@ Ein Ergebnis wird nie als fotorealistisch bezeichnet, solange es sichtbar ein 3D
 | v01 | Form und Licht besteht | Putz beige statt weiß, Dach zu orange, Ziegel zu klein, Cartoon-Büsche, Pflaster zu dunkel, alter Putz hinter offenen Türen |
 | v02 | Material besteht | schwarze Giebelfenster, Putz zu fleckig, Erker nicht geprüft |
 | v03 | Giebelfenster und Putz bestanden | Erker ist flacher Kasten mit schwarzem Loch, Efeu wirkt wie schwarze Silhouette |
-| v04 | Erker mit echten Öffnungen, Efeu vorerst entfernt, im Spiel geprüft | offen, siehe unten |
+| v04 | Erker mit echten Öffnungen, Efeu vorerst entfernt, im Spiel geprüft | Cartoon-Bäume und Felsen, Hang mit Pflastertextur |
+| v05 | Fotografische Felsen und Pflanzen, Fels-Textur am Hang | Fels zu orange, Bäume zu dunkel, Kronen ragen durch Hauswände |
+| v06 | Farben stimmen, Kronen frei | Felsen am Hangfuß zu groß und unscharf |
+| v07 | Felsen kleiner, auf „mittel“ und „hoch“ geprüft | offen, siehe unten |
 
 Offen im Abschnitt, jeweils außerhalb der Häuser oder als nächste Runde:
 
-- Low-Poly-Felsen am Gründerfelsen und Cartoon-Bäume brechen den Stil. Sie sind der nächste große Hebel.
+- Pflanzen sind gekreuzte Bildflächen: aus der Nähe flach, Stämme ohne Volumen. Der Laubbaum ist knorrig und nicht
+  mitteleuropäisch, die Tannen sind eher schlank. Riesenbäume und Gras sind noch die alten Modelle.
+- In engen Höfen stehen wegen der großen Kronen nur noch wenige Bäume.
 - Fensterläden sind flach und kräftig gefärbt, Türen noch schlicht.
 - Innenräume sind unverändert dunkel.
 - Bäume, Häuser und Fenster wiederholen sich weiterhin erkennbar. Kein fertiger Fotorealismus.

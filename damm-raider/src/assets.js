@@ -21,7 +21,7 @@ export function materialClass(m) {
 }
 
 // CC0-Texturen unter assets/tex/ (Ablauf in tools/fetch_textures.py)
-const TEXTURES = ['plaster', 'rooftile', 'cobble'];
+const TEXTURES = ['plaster', 'rooftile', 'cobble', 'cliff'];
 
 export class Assets {
   constructor() {
@@ -48,18 +48,21 @@ export class Assets {
       console.warn('3D-Modelle nicht geladen, nutze einfache Formen:', err.message || err);
     }
     await this.loadTextures();
-    // SimReady-Requisiten mit Texturen (assets/simready.glb); fehlen sie, bleiben die Blender-Modelle
+    // Zusätzliche Modelle mit Texturen: SimReady-Requisiten, Felsen und Pflanzen.
+    // Fehlen sie, bleiben die Blender-Modelle.
     if (this.ready) {
-      try {
-        let buf;
-        if (EMBED) buf = EMBED.simready ? b64ToBuffer(EMBED.simready) : null;
-        else {
-          const r = await fetch('assets/simready.glb');
-          buf = r.ok ? await r.arrayBuffer() : null;
+      for (const name of ['simready', 'nature']) {
+        try {
+          let buf;
+          if (EMBED) buf = EMBED[name] ? b64ToBuffer(EMBED[name]) : null;
+          else {
+            const r = await fetch(`assets/${name}.glb`);
+            buf = r.ok ? await r.arrayBuffer() : null;
+          }
+          if (buf) await this.parse(buf);
+        } catch (err) {
+          console.warn(`${name}.glb nicht geladen:`, err.message || err);
         }
-        if (buf) await this.parse(buf);
-      } catch (err) {
-        console.warn('SimReady-Modelle nicht geladen:', err.message || err);
       }
     }
     try {
@@ -105,7 +108,14 @@ export class Assets {
       o.castShadow = true;
       o.receiveShadow = true;
       const m = o.material;
-      if (m.transparent) m.depthWrite = false;
+      // Pflanzen sind Bildflächen und werden ausgeschnitten
+      if (/^n_(fir|leaf|bush)/.test(o.name)) {
+        m.alphaTest = 0.45;
+        // Die Bilder sind neutral beleuchtet und liegen im Spiel im eigenen Schatten: etwas anheben
+        m.color.setRGB(1.75, 1.8, 1.55);
+        m.transparent = false;
+        m.side = THREE.DoubleSide;
+      } else if (m.transparent) m.depthWrite = false;
     });
   }
 

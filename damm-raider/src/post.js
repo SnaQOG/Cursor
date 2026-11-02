@@ -82,6 +82,17 @@ export class Post {
     if (quality === 'hoch') {
       const ao = new GTAOPass(scene, camera, w, h);
       ao.output = GTAOPass.OUTPUT.Default;
+      // Pflanzen sind ausgeschnittene Bildflächen; im Normalen-Durchgang wären sie volle Dreiecke
+      const hide = ao._overrideVisibility.bind(ao);
+      ao._overrideVisibility = () => {
+        hide();
+        scene.traverse((o) => {
+          if (o.isMesh && o.visible && o.material?.alphaTest > 0) {
+            o.visible = false;
+            ao._visibilityCache.push(o);
+          }
+        });
+      };
       ao.blendIntensity = 0.85;
       ao.updateGtaoMaterial({ radius: 0.9, distanceExponent: 1.6, thickness: 2.0, scale: 1.1, samples: 12, distanceFallOff: 1.0 });
       ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, radiusExponent: 1, rings: 2, samples: 12 });

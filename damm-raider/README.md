@@ -199,6 +199,10 @@ Häuser werden abschnittsweise nach festem Ablauf verbessert: [docs/hausstandard
 Musterabschnitt ist die Weiße Stadt Nord (`lot.pilot`). Putz, Ziegel und Pflaster sind CC0-Texturen von
 [Poly Haven](https://polyhaven.com/license) (`tools/fetch_textures.py`, abgelegt in `assets/tex/`).
 
+Felsen und Pflanzen der Stadt (`assets/nature.glb`) entstehen ebenfalls aus CC0-Modellen: `blender/nature_fetch.py`
+lädt sie, `blender/nature_build.py` reduziert die Felsen und rendert Bäume und Sträucher auf gekreuzte Bildflächen
+(6 Dreiecke je Pflanze). Die Karte legt unter `models` fest, welche Modelle sie nutzt. Der Damm hat noch die alten.
+
 ## SimReady-Requisiten
 
 Fässer, Kisten, Paletten, Maschinen, Rohre und Schilder auf dem Damm sowie Kisten, Körbe, Steinplatten und

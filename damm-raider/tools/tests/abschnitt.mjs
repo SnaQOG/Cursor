@@ -7,6 +7,12 @@ const grey = process.argv[3] === 'grau';
 const ROW = { x0: -292, x1: -211, z0: -160, z1: -94 }; // Weiße Stadt Nord
 
 const { browser, page, errors } = await open();
+// QUALITY=hoch prüft die Ansichten auf einer anderen Grafikstufe
+if (process.env.QUALITY) {
+  await page.evaluate((q) => { const g = window.__game; localStorage.setItem('damm-raider.save.v1', JSON.stringify({ ...g.save, settings: { ...g.save.settings, quality: q } })); }, process.env.QUALITY);
+  await page.reload();
+  await page.waitForFunction(() => window.__game && window.__game.state === 'hub', null, { timeout: 300000 });
+}
 await page.evaluate(() => window.__game.selectMap('weltenbrueck'));
 await page.waitForFunction(() => window.__game.mapId === 'weltenbrueck' && !window.__game.loadingMap, null, { timeout: 300000 });
 const info = await page.evaluate(([R, grey]) => {
@@ -46,6 +52,8 @@ const VIEWS = [
   ['hof', [-232, 4.7, -118], [-226, 8, -127], 70],
   ['erker', [-205.6, 4.7, -121], [-212, 9.5, -130], 72],
   ['ringstrasse', [-207, 4.7, -96], [-209, 8, -150], 62],
+  ['felsen', [-233, 4.8, -163.5], [-225, 24, -190], 74],
+  ['baeume', [-232, 4.7, -118], [-222, 7, -118], 70],
 ];
 for (const [name, pos, tgt, fov] of VIEWS) {
   await page.evaluate(([pos, tgt, fov]) => {

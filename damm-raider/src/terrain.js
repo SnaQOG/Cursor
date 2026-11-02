@@ -60,6 +60,7 @@ export class Terrain {
     const uvScale = this.def.uvScale ?? 6;
     const set = detailTex && !detailTex.isTexture ? detailTex : null;
     const gmix = set && this.def.grassMix ? new Float32Array(N * N) : null;
+    const rmix = set && set.rock && this.def.rockMix ? new Float32Array(N * N) : null;
 
     for (let iz = 0; iz < N; iz++) {
       for (let ix = 0; ix < N; ix++) {
@@ -71,6 +72,7 @@ export class Terrain {
         this.def.groundColor(this, x, z, h, this.slope(x, z), c);
         col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
         if (gmix) gmix[i] = this.def.grassMix(this, x, z, h);
+        if (rmix) rmix[i] = this.def.rockMix(this, x, z, h, this.slope(x, z));
       }
     }
 
@@ -88,6 +90,7 @@ export class Terrain {
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     if (gmix) geo.setAttribute('gmix', new THREE.BufferAttribute(gmix, 1));
+    if (rmix) geo.setAttribute('rmix', new THREE.BufferAttribute(rmix, 1));
     geo.setIndex(new THREE.BufferAttribute(idx, 1));
     geo.computeVertexNormals();
     geo.computeBoundingSphere();
@@ -106,20 +109,25 @@ export class Terrain {
         mat.onBeforeCompile = (sh) => {
           sh.uniforms.grassMap = { value: set.grass };
           sh.uniforms.grassNormal = { value: set.grassNormal };
+          if (rmix) sh.uniforms.rockMap = { value: set.rock };
           sh.vertexShader = sh.vertexShader
-            .replace('#include <common>', '#include <common>\nattribute float gmix;\nvarying float vGmix;')
-            .replace('#include <uv_vertex>', '#include <uv_vertex>\nvGmix = gmix;');
+            .replace('#include <common>', `#include <common>\nattribute float gmix;\nvarying float vGmix;${rmix ? '\nattribute float rmix;\nvarying float vRmix;\nvarying vec3 vWPos;\nvarying vec3 vWNrm;' : ''}`)
+            .replace('#include <uv_vertex>', `#include <uv_vertex>\nvGmix = gmix;${rmix ? '\nvRmix = rmix; vWPos = position; vWNrm = normal;' : ''}`);
           sh.fragmentShader = sh.fragmentShader
-            .replace('#include <common>', '#include <common>\nuniform sampler2D grassMap;\nuniform sampler2D grassNormal;\nvarying float vGmix;')
+            .replace('#include <common>', `#include <common>\nuniform sampler2D grassMap;\nuniform sampler2D grassNormal;\nvarying float vGmix;${rmix ? '\nuniform sampler2D rockMap;\nvarying float vRmix;\nvarying vec3 vWPos;\nvarying vec3 vWNrm;' : ''}`)
             .replace('#include <map_fragment>', `#ifdef USE_MAP
   vec4 sampledDiffuseColor = mix(texture2D(map, vMapUv), texture2D(grassMap, vMapUv * 0.8), vGmix);
+  ${rmix ? `// Fels: von der Seite projiziert, sonst wäre die Textur auf steilen Hängen verzerrt
+  vec3 rw = abs(normalize(vWNrm)); rw = pow(rw, vec3(4.0)); rw /= rw.x + rw.y + rw.z;
+  vec4 rockCol = texture2D(rockMap, vWPos.zy / 14.0) * rw.x + texture2D(rockMap, vWPos.xz / 14.0) * rw.y + texture2D(rockMap, vWPos.xy / 14.0) * rw.z;
+  sampledDiffuseColor = mix(sampledDiffuseColor, rockCol, vRmix);` : ''}
   diffuseColor *= sampledDiffuseColor;
 #endif`)
             .replace('#include <normal_fragment_maps>', THREE.ShaderChunk.normal_fragment_maps.replace(
               'vec3 mapN = texture2D( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0;',
               'vec3 mapN = mix(texture2D( normalMap, vNormalMapUv ).xyz, texture2D( grassNormal, vNormalMapUv * 0.8 ).xyz, vGmix) * 2.0 - 1.0;'));
         };
-        mat.customProgramCacheKey = () => 'terrain-grass';
+        mat.customProgramCacheKey = () => (rmix ? 'terrain-grass-rock' : 'terrain-grass');
       }
     }
     const mesh = new THREE.Mesh(geo, mat);

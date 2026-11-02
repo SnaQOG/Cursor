@@ -323,7 +323,7 @@ export class World {
           const im = new THREE.InstancedMesh(geo, mat, list.length);
           im.name = name;
           im.castShadow = shadow;
-          im.receiveShadow = true;
+          im.receiveShadow = !name.startsWith('n_'); // Bildflächen würden sich selbst verschatten
           list.forEach((it, i) => {
             place(it);
             im.setMatrixAt(i, m.compose(p, q, sc));
@@ -349,12 +349,21 @@ export class World {
     };
     const pines = trees.filter((t) => t.pine), leafy = trees.filter((t) => !t.pine);
     for (const t of trees) this.col.addCyl(t.x, t.z, 0.3 * t.s, t.y - 1, t.y + 7 * t.s, { tree: true });
-    inst('v_pine', pines, (t) => { p.set(t.x, t.y - 0.1, t.z); q.setFromEuler(e.set(0, t.r, 0)); sc.set(t.s, t.s * (0.9 + (t.r % 0.4)), t.s); }, { tint: leafTint, wind: 0.0018 });
-    inst('v_tree', leafy, (t) => { p.set(t.x, t.y - 0.1, t.z); q.setFromEuler(e.set(0, t.r, 0)); sc.setScalar(t.s); }, { tint: leafTint, wind: 0.003 });
-    inst('v_bush', bushes, (b) => { p.set(b.x, b.y - 0.05, b.z); q.setFromEuler(e.set(0, b.r * 3, 0)); sc.set(b.s, b.s * 0.9, b.s); }, { shadow: false, tint: leafTint, wind: 0.03 });
-    for (let k = 0; k < 3; k++) {
-      const list = rocks.filter((_, i) => i % 3 === k);
-      inst(`v_rock${k}`, list, (r) => { p.set(r.x, r.y - r.s * (0.15 + Math.min(0.6, T.slope(r.x, r.z) * 0.45)), r.z); q.setFromEuler(e.set(0, r.r, 0)); sc.setScalar(r.s * 0.8); }, {
+    // Die Karte kann eigene Modelle festlegen; mehrere Namen werden gleichmäßig verteilt
+    const M = this.def.models || {};
+    const each = (key, fallback, list, fn) => {
+      const names = (M[key] || []).filter((n) => this.assets.has(n));
+      if (!names.length) return fn(fallback, list);
+      names.forEach((n, k) => fn(n, list.filter((_, i) => i % names.length === k)));
+    };
+    each('pine', 'v_pine', pines, (nm, ls) => inst(nm, ls, (t) => { p.set(t.x, t.y - 0.1, t.z); q.setFromEuler(e.set(0, t.r, 0)); sc.set(t.s, t.s * (0.9 + (t.r % 0.4)), t.s); }, { tint: leafTint, wind: 0.0018 }));
+    each('tree', 'v_tree', leafy, (nm, ls) => inst(nm, ls, (t) => { p.set(t.x, t.y - 0.1, t.z); q.setFromEuler(e.set(0, t.r, 0)); sc.setScalar(t.s); }, { tint: leafTint, wind: 0.003 }));
+    each('bush', 'v_bush', bushes, (nm, ls) => inst(nm, ls, (b) => { p.set(b.x, b.y - 0.05, b.z); q.setFromEuler(e.set(0, b.r * 3, 0)); sc.set(b.s, b.s * 0.9, b.s); }, { shadow: false, tint: leafTint, wind: 0.03 }));
+    const rockNames = (M.rock || []).filter((n) => this.assets.has(n));
+    const rockSet = rockNames.length ? rockNames : ['v_rock0', 'v_rock1', 'v_rock2'];
+    for (let k = 0; k < rockSet.length; k++) {
+      const list = rocks.filter((_, i) => i % rockSet.length === k);
+      inst(rockSet[k], list, (r) => { p.set(r.x, r.y - r.s * (0.15 + Math.min(0.6, T.slope(r.x, r.z) * 0.45)), r.z); q.setFromEuler(e.set(0, r.r, 0)); sc.setScalar(r.s * 0.8); }, {
         tint: (r, col) => { const v = 0.85 + (r.t % 1) * 0.3; return col.setRGB(v, v, v); },
       });
     }

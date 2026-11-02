@@ -24,7 +24,8 @@ const res = await page.evaluate(() => {
     const [ox, oz] = OUT[d.side];
     const fx = d.side === 'e' || d.side === 'w' ? (d.side === 'e' ? l.x1 : l.x0) : d.a;
     const fz = d.side === 'n' || d.side === 's' ? (d.side === 's' ? l.z1 : l.z0) : d.a;
-    const r = walk(fx + ox * 1.6, l.level + 0.05, fz + oz * 1.6, yawFor(-ox, -oz), 2.2);
+    // Nur kurz laufen: in flachen Häusern käme man sonst durch die Hintertür wieder hinaus
+    const r = walk(fx + ox * 1.6, l.level + 0.05, fz + oz * 1.6, yawFor(-ox, -oz), 1.1);
     const inside = r.x > l.x0 + 0.3 && r.x < l.x1 - 0.3 && r.z > l.z0 + 0.3 && r.z < l.z1 - 0.3;
     out.doors.push([l.id, l.style, d.side, inside]);
     n++;

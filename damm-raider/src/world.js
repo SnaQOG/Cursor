@@ -22,6 +22,9 @@ const CONDITION_LOOK = {
   },
 };
 
+// Sichtweiten: Innenräume sieht man nur durch Fenster, Details nur in der Nähe
+const INTERIOR_RANGE = 60, DETAIL_RANGE = 90, PROP_RANGE = 200;
+
 export class World {
   constructor(renderer, quality, assets = null, def) {
     this.def = def;
@@ -57,14 +60,19 @@ export class World {
     const dress = this.assets?.dressMaterial();
     if (dress) mats.dress = dress;
     this.batcher = new Batcher(mats);
+    this.farMeshes = [];
     this.instancer = new Instancer(this.assets);
     this.mapData = def.build({ batcher: this.batcher, col: this.col, terrain: this.terrain, assets: this.assets, world: this, instancer: this.instancer });
     this.plantVegetation();
     this.staticMeshes = [...this.batcher.build(this.scene), ...this.instancer.build(this.scene)];
+    // Kleine Modelle ohne Layer (Laternen, Karren, Tanks) brauchen nicht bis zum Horizont gezeichnet werden
+    for (const m of this.staticMeshes) if (m.isInstancedMesh && !m.userData.layer) { m.userData.far = PROP_RANGE; this.farMeshes.push(m); }
     // Innenräume (Treppen, Möbel …) nur in der Nähe zeichnen
     this.interiorMeshes = this.staticMeshes.filter((m) => m.userData.layer === 'in');
     // Kleinkram (Rahmen, Läden, Efeu …) nur bis mittlere Entfernung
     this.detailMeshes = [...this.staticMeshes.filter((m) => m.userData.layer === 'det'), ...(this.vegDetail || [])];
+    // Statische Meshes bewegen sich nie: die Matrixprüfung je Bild entfällt
+    for (const m of [...this.staticMeshes, ...this.farMeshes, ...(this.vegDetail || [])]) { m.matrixAutoUpdate = false; m.matrixWorldAutoUpdate = false; }
     this.waterMats = [];
     this.waterNormal = makeWaterNormal();
     this.waterNormal.wrapS = this.waterNormal.wrapT = THREE.RepeatWrapping;
@@ -305,9 +313,10 @@ export class World {
     // In Kacheln aufteilen, damit Frustum- und Schatten-Culling greifen
     // Bodendecker (Gras, Blumen) in kleineren Kacheln, die ab mittlerer Entfernung ausgeblendet werden
     this.vegDetail = [];
-    const inst = (name, all, place, { shadow = true, tint = null, doubleSide = false, cull = false, wind = 0 } = {}) => {
+    const inst = (name, all, place, { shadow = true, tint = null, doubleSide = false, cull = false, wind = 0, far = 0 } = {}) => {
       if (!all.length) return;
-      const CH = cull ? 40 : 110;
+      // Große Kacheln sparen Draw-Calls, die Bildflächen und Felsen kosten kaum Dreiecke
+      const CH = cull ? 40 : 220;
       const chunks = new Map();
       for (const it of all) {
         const key = `${Math.floor((it.x + 1000) / CH)}|${Math.floor((it.z + 1000) / CH)}`;
@@ -334,12 +343,17 @@ export class World {
           im.instanceMatrix.needsUpdate = true;
           if (im.instanceColor) im.instanceColor.needsUpdate = true;
           im.computeBoundingSphere();
-          if (cull) {
+          if (cull || far) {
             let cx = 0, cy = 0, cz = 0;
             for (const it of list) { cx += it.x; cy += it.y; cz += it.z; }
-            im.userData.layer = 'det';
             im.userData.center = new THREE.Vector3(cx / list.length, cy / list.length, cz / list.length);
-            this.vegDetail.push(im);
+            if (cull) {
+              im.userData.layer = 'det';
+              this.vegDetail.push(im);
+            } else {
+              im.userData.far = far;
+              this.farMeshes.push(im);
+            }
           }
           this.scene.add(im);
         }
@@ -360,13 +374,14 @@ export class World {
     };
     each('pine', 'v_pine', pines, (nm, ls) => inst(nm, ls, (t) => { p.set(t.x, t.y - 0.1, t.z); q.setFromEuler(e.set(0, t.r, 0)); sc.set(t.s, t.s * (0.9 + (t.r % 0.4)), t.s); }, { tint: leafTint, wind: 0.0018 }));
     each('tree', 'v_tree', leafy, (nm, ls) => inst(nm, ls, (t) => { p.set(t.x, t.y - 0.1, t.z); q.setFromEuler(e.set(0, t.r, 0)); sc.setScalar(t.s); }, { tint: leafTint, wind: 0.003 }));
-    each('bush', 'v_bush', bushes, (nm, ls) => inst(nm, ls, (b) => { p.set(b.x, b.y - 0.05, b.z); q.setFromEuler(e.set(0, b.r * 3, 0)); sc.set(b.s, b.s * 0.9, b.s); }, { shadow: false, tint: leafTint, wind: 0.03 }));
+    each('bush', 'v_bush', bushes, (nm, ls) => inst(nm, ls, (b) => { p.set(b.x, b.y - 0.05, b.z); q.setFromEuler(e.set(0, b.r * 3, 0)); sc.set(b.s, b.s * 0.9, b.s); }, { shadow: false, tint: leafTint, wind: 0.03, far: 280 }));
     const rockNames = (M.rock || []).filter((n) => this.assets.has(n));
     const rockSet = rockNames.length ? rockNames : ['v_rock0', 'v_rock1', 'v_rock2'];
     for (let k = 0; k < rockSet.length; k++) {
       const list = rocks.filter((_, i) => i % rockSet.length === k);
       inst(rockSet[k], list, (r) => { p.set(r.x, r.y - r.s * (0.15 + Math.min(0.6, T.slope(r.x, r.z) * 0.45)), r.z); q.setFromEuler(e.set(0, r.r, 0)); sc.setScalar(r.s * 0.8); }, {
         tint: (r, col) => { const v = 0.85 + (r.t % 1) * 0.3; return col.setRGB(v, v, v); },
+        far: 340,
       });
     }
     for (const r of rocks) if (r.s > 1.1) this.col.addCyl(r.x, r.z, r.s * 0.95, r.y - 2, r.y + r.s * 0.8, { rock: true });
@@ -437,12 +452,17 @@ export class World {
     for (const m of this.interiorMeshes) {
       const c = m.userData.center;
       const dx = c.x - focus.x, dz = c.z - focus.z;
-      m.visible = near && dx * dx + dz * dz < 95 * 95 && Math.abs(c.y - focus.y) < 80;
+      m.visible = near && dx * dx + dz * dz < INTERIOR_RANGE * INTERIOR_RANGE && Math.abs(c.y - focus.y) < 80;
     }
     for (const m of this.detailMeshes) {
       const c = m.userData.center;
       const dx = c.x - focus.x, dz = c.z - focus.z;
-      m.visible = near && dx * dx + dz * dz < 105 * 105;
+      m.visible = near && dx * dx + dz * dz < DETAIL_RANGE * DETAIL_RANGE;
+    }
+    for (const m of this.farMeshes) {
+      const c = m.userData.center, r = m.userData.far;
+      const dx = c.x - focus.x, dz = c.z - focus.z;
+      m.visible = !near || dx * dx + dz * dz < r * r;
     }
     if (this.rain.visible) {
       this.rainOffset = (this.rainOffset + dt * 30) % 40;

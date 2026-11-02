@@ -363,7 +363,7 @@ export const WELTENBRUECK = {
     bush: ['n_bush0', 'n_bush1'],
     rock: ['n_rock0', 'n_rock1', 'n_rock2', 'n_rock3', 'n_rock4', 'n_rock5', 'n_rock6', 'n_rock7'],
   },
-  enemyDraw: 170, // enge Gassen, Wände verdecken das meiste
+  enemyDraw: 130, // enge Gassen, Wände verdecken das meiste
   pois: POIS,
   extracts: EXTRACTS,
   spawns: PLAYER_SPAWNS,

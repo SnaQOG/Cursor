@@ -533,6 +533,13 @@ export class Game {
 
   // Ein Bild zeichnen, mit Nachbearbeitung, wenn die Qualität sie vorsieht
   renderFrame(dt = 0) {
+    // Schatten nur jedes zweite Bild und nie doppelt: GTAO zeichnet die Szene ein weiteres Mal,
+    // ohne diese Sperre würde three.js dabei auch die Schattenkarte neu zeichnen
+    const sm = this.renderer.shadowMap;
+    sm.autoUpdate = false;
+    this.shadowFrame = (this.shadowFrame || 0) + 1;
+    // Ohne fertige Karte (neue Welt, andere Qualität) darf kein Bild ohne Schatten gezeichnet werden
+    if (this.shadowFrame % 2 || !this.world?.sun.shadow.map) sm.needsUpdate = true;
     if (this.post.active) {
       this.post.setLook(this.world.condition);
       this.post.render(dt);

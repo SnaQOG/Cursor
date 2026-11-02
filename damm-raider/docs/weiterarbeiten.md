@@ -86,11 +86,11 @@ Richtwerte aus `simready.mjs` (Apple M1, feste Kamera, vorher → nachher SimRea
 
 | Gerät | Stufe | Damm | Stadt |
 | --- | --- | --- | --- |
-| RTX 4080, 1920 × 1080 | mittel | 119–159 fps | 92–103 fps |
-| RTX 4080, 1920 × 1080 | hoch | nicht neu gemessen | 50–66 fps |
-| Apple M1, 1440 × 900 Retina | niedrig | 65–91 fps | 34–53 fps |
-| Apple M1, 1440 × 900 Retina | mittel | 21–27 fps | 16–21 fps |
-| Apple M1, 1440 × 900 Retina | hoch | 5–9 fps | 6–7 fps |
+| RTX 4080, 1920 × 1080 | mittel | 106–135 fps | 80–93 fps |
+| RTX 4080, 1920 × 1080 | hoch | nicht neu gemessen | 52–61 fps |
+| Apple M1, 1440 × 900 Retina | niedrig (vor der Wiese) | 65–91 fps | 34–53 fps |
+| Apple M1, 1440 × 900 Retina | mittel | 15–23 fps | 13–18 fps |
+| Apple M1, 1440 × 900 Retina | hoch (vor der Wiese) | 5–9 fps | 6–7 fps |
 
 Woher die Draw-Calls kommen, zeigt `tools/tests/drawcalls.mjs`. Die Schattenkarte wird nur jedes zweite Bild gezeichnet
 und nie doppelt (`Game.renderFrame`), Sichtweiten stehen oben in `src/world.js`. Auf dem M1 begrenzt die Pixelmenge, die

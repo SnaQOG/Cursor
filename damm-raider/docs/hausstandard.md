@@ -34,7 +34,8 @@ Ein Ergebnis wird nie als fotorealistisch bezeichnet, solange es sichtbar ein 3D
 | v00 | Ausgangsstand | glatte Fassaden, dünnes Dach, blaue Schatten, Putz mit Kreisen und Rechtecken, Riesenpflaster, Gras auf der Straße, Fenster ohne Rahmen, nur ein Haustyp |
 | v01 | Form und Licht besteht | Putz beige statt weiß, Dach zu orange, Ziegel zu klein, Cartoon-Büsche, Pflaster zu dunkel, alter Putz hinter offenen Türen |
 | v02 | Material besteht | schwarze Giebelfenster, Putz zu fleckig, Erker nicht geprüft |
-| v03 | im Spiel geprüft | offen, siehe unten |
+| v03 | Giebelfenster und Putz bestanden | Erker ist flacher Kasten mit schwarzem Loch, Efeu wirkt wie schwarze Silhouette |
+| v04 | Erker mit echten Öffnungen, Efeu vorerst entfernt, im Spiel geprüft | offen, siehe unten |
 
 Offen im Abschnitt, jeweils außerhalb der Häuser oder als nächste Runde:
 

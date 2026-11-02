@@ -549,7 +549,7 @@ export class HouseKit {
     else this.flatRoof(lot, yTop, rnd, roofAccess ? rectUV(uS0 - 0.05, L - T, (floors - 1) % 2 === 0 ? T : S - T - sw - 0.05, (floors - 1) % 2 === 0 ? T + sw + 0.05 : S - T) : null);
 
     // Efeu und Ladenschilder
-    if (rnd() < 0.3) this.ivy(sides[front], y, Math.min(floors, 1 + Math.floor(rnd() * 3)) * fh, rnd);
+    if (!lot.pilot && rnd() < 0.3) this.ivy(sides[front], y, Math.min(floors, 1 + Math.floor(rnd() * 3)) * fh, rnd);
     if (lot.shop && doors[0]) this.shopSign(sides[doors[0].side], doors[0].a, yG + 2.9, rnd);
     this.stats.houses++;
     lot.roofY = yTop;
@@ -905,9 +905,15 @@ export class HouseKit {
     if (!best || best[1] - best[0] < 4) return;
     lot.orielAt = wp(w, (best[0] + best[1]) / 2, yG, -8);
     const m = (best[0] + best[1]) / 2, hw = 1.25, D = 0.62, y0 = yG + fh - 0.1, y1 = yG + floors * fh - 0.45;
-    const o = OUTN[w.side], ax = AXIS[w.side], ry = yawFront(o[0], o[2]);
+    const o = OUTN[w.side], ax = AXIS[w.side];
     const mat = { mat: 'wplaster' };
-    this.quad([wp(w, m - hw, y0, -D), wp(w, m + hw, y0, -D), wp(w, m + hw, y1, -D), wp(w, m - hw, y1, -D)], o, color, mat);
+    // Vorderwand mit echten Öffnungen, davor liegt nur die dunkle Rückwand
+    const front = { side: w.side, fixed: w.side === 's' || w.side === 'e' ? w.fixed + D : w.fixed - D, a0: m - hw, a1: m + hw, ia0: m - hw, ia1: m + hw };
+    const ops = [];
+    for (let f = 1; f < floors; f++) ops.push({ a0: m - 0.72, a1: m + 0.72, y0: yG + f * fh + 0.85 - y0, y1: yG + f * fh + 2.4 - y0, frame: true, kind: 'win' });
+    this.quad([wp(w, m - hw, y0, -0.02), wp(w, m + hw, y0, -0.02), wp(w, m + hw, y1, -0.02), wp(w, m - hw, y1, -0.02)], o, 0x1c2022, { shade: false });
+    this.wall(front, y0, y1 - y0, ops, color, { mat: 'wplaster', frameCol, inset: 0.13 });
+    for (const op of ops) this.ledge(front, op.a0 - 0.12, op.a1 + 0.12, y0 + op.y0 - 0.12, y0 + op.y0 - 0.03, 0.13, 0xb9b09c, 'stone', 'det');
     this.quad([wp(w, m - hw, y0, 0), wp(w, m - hw, y0, -D), wp(w, m - hw, y1, -D), wp(w, m - hw, y1, 0)], neg(ax), color, mat);
     this.quad([wp(w, m + hw, y0, 0), wp(w, m + hw, y0, -D), wp(w, m + hw, y1, -D), wp(w, m + hw, y1, 0)], ax, color, mat);
     // Konsole und Dach
@@ -915,13 +921,6 @@ export class HouseKit {
     const roofMat = { mat: w.side === 'n' || w.side === 's' ? 'wtile' : 'wtile90' };
     this.quad([wp(w, m - hw - 0.12, y1, -D - 0.14), wp(w, m + hw + 0.12, y1, -D - 0.14), wp(w, m + hw, y1 + 0.55, 0), wp(w, m - hw, y1 + 0.55, 0)], [o[0], 1, o[2]], 0xd8c8b4, roofMat);
     for (const s of [-1, 1]) this.tri([wp(w, m + s * (hw + 0.12), y1, -D - 0.14), wp(w, m + s * hw, y1, 0), wp(w, m + s * hw, y1 + 0.55, 0)], [ax[0] * s, 0.6, ax[2] * s], 0xd8c8b4, roofMat);
-    // Fenster im Erker
-    for (let f = 1; f < floors; f++) {
-      const fy = yG + f * fh + 0.85;
-      this.quad([wp(w, m - 0.75, fy, -D - 0.005), wp(w, m + 0.75, fy, -D - 0.005), wp(w, m + 0.75, fy + 1.55, -D - 0.005), wp(w, m - 0.75, fy + 1.55, -D - 0.005)], o, 0x20262a, { shade: false });
-      this.model('kc_window', wp(w, m, fy, -D - 0.07), ry, [1.5, 1.55, 1], { tint: frameCol, layer: 'det', double: true });
-      this.ledge(w, m - 0.9, m + 0.9, fy - 0.12, fy - 0.03, D + 0.12, 0xb9b09c, 'stone', 'det');
-    }
   }
 
   // Bodenanschluss: Steinstreifen am Sockel, Pflanzen an geschützten Stellen, Eingänge bleiben frei

@@ -58,7 +58,7 @@ node tools/tests/stats.mjs                  # Ladezeit, Draw-Calls, Dreiecke
 node tools/tests/bewegung.mjs               # Türen, Treppen, Brücken, Spawns
 node tools/tests/raid.mjs                   # Raids auf beiden Karten
 node tools/tests/welt.mjs                   # Tore, äußere Viertel, Himmelsbrücken, Galeone, Strand
-node tools/tests/abschnitt.mjs v04 [grau]   # Prüfansichten des Musterabschnitts, grau = nur Form
+node tools/tests/abschnitt.mjs v05 [grau]   # Prüfansichten des Musterabschnitts, grau = nur Form
 node tools/tests/details-stadt.mjs          # Detailbilder -> tools/tests/shots/
 node tools/tests/details-damm.mjs
 node tools/tests/simready.mjs nachher      # feste Kameras für Vergleichsbilder, Draw-Calls, Dreiecke

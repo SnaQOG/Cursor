@@ -86,17 +86,19 @@ Richtwerte aus `simready.mjs` (Apple M1, feste Kamera, vorher → nachher SimRea
 
 | Gerät | Stufe | Damm | Stadt |
 | --- | --- | --- | --- |
-| RTX 4080, 1920 × 1080 | mittel | 99–145 fps | 57–75 fps |
-| RTX 4080, 1920 × 1080 | hoch | nicht neu gemessen | 35–49 fps |
-| Apple M1, 1440 × 900 Retina | niedrig | 65–93 fps | 33–55 fps |
-| Apple M1, 1440 × 900 Retina | mittel | 21–27 fps | 14–20 fps |
-| Apple M1, 1440 × 900 Retina | hoch | 5–7 fps | 5–6 fps |
+| RTX 4080, 1920 × 1080 | mittel | 119–159 fps | 96–112 fps |
+| RTX 4080, 1920 × 1080 | hoch | nicht neu gemessen | 56–67 fps |
+| Apple M1, 1440 × 900 Retina | niedrig | 65–91 fps | 34–53 fps |
+| Apple M1, 1440 × 900 Retina | mittel | 21–27 fps | 16–21 fps |
+| Apple M1, 1440 × 900 Retina | hoch | 5–9 fps | 6–7 fps |
 
-Stadt auf der 4080 nach der Detailrunde (`docs/hausstandard.md`), davor mit Ausstattung mittel 61–88 und hoch 41–56 fps, ohne Ausstattung mittel 68–90 und hoch 41–63 fps. Damm auf der 4080 mit Ausstattung, vor der Detailrunde, die ihn kaum betrifft. M1 noch ohne Ausstattung und Detailrunde gemessen. Im Raid mit Gegnern, auf Bodenhöhe. M1 mit `tools/tests/fps.mjs` im normalen Spieltakt ohne Vsync, vor dem Ausblenden
+Woher die Draw-Calls kommen, zeigt `tools/tests/drawcalls.mjs`. Die Schattenkarte wird nur jedes zweite Bild gezeichnet
+und nie doppelt (`Game.renderFrame`), Sichtweiten stehen oben in `src/world.js`. Auf dem M1 begrenzt die Pixelmenge, die
+Einsparungen helfen dort kaum. Im Raid mit Gegnern, auf Bodenhöhe. M1 mit `tools/tests/fps.mjs` im normalen Spieltakt ohne Vsync, vor dem Ausblenden
 ferner ARC. Die 4080 lief über die Chrome-Erweiterung in einem verdeckten Fenster: Bild für Bild warten, bis die GPU
 fertig ist, ohne Bildausgabe. Dabei gab es Ausreißer nach oben (ein Durchlauf auf „hoch“ mit 85–114 fps), die Werte
-schwanken also je nach Auslastung des PCs. Die Stadt ist CPU-lastig: rund 10 ms Hauptthread gegen 5 ms GPU auf „mittel“,
-weil es noch rund 1.100 Draw-Calls sind. GTAO auf „hoch“ zeichnet die Szene ein weiteres Mal. Die Bildrate im echten
+schwanken also je nach Auslastung des PCs. Die Stadt ist weiter eher CPU-lastig: rund 7 ms Hauptthread gegen 3 ms GPU auf „mittel“, im Mittel rund 700 Draw-Calls und
+in Bildern mit Schatten rund 1.000. GTAO auf „hoch“ zeichnet die Szene ein weiteres Mal. Die Bildrate im echten
 Fenster ist noch nicht geprüft. GTAO 0,85 und die Bloom-Werte in `LOOKS` wurden an Vergleichsbildern geprüft und bleiben.
 
 ## Nächste Schritte

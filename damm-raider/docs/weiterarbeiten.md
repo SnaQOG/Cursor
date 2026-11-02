@@ -97,8 +97,8 @@ und nie doppelt (`Game.renderFrame`), Sichtweiten stehen oben in `src/world.js`.
 Einsparungen helfen dort kaum. Im Raid mit Gegnern, auf Bodenhöhe. M1 mit `tools/tests/fps.mjs` im normalen Spieltakt ohne Vsync, vor dem Ausblenden
 ferner ARC. Die 4080 lief über die Chrome-Erweiterung in einem verdeckten Fenster: Bild für Bild warten, bis die GPU
 fertig ist, ohne Bildausgabe. Dabei gab es Ausreißer nach oben (ein Durchlauf auf „hoch“ mit 85–114 fps), die Werte
-schwanken also je nach Auslastung des PCs. Die Stadt ist weiter eher CPU-lastig: rund 7 ms Hauptthread gegen 3 ms GPU auf „mittel“, im Mittel rund 700 Draw-Calls und
-in Bildern mit Schatten rund 1.000. GTAO auf „hoch“ zeichnet die Szene ein weiteres Mal. Die Bildrate im echten
+schwanken also je nach Auslastung des PCs. Die Stadt ist weiter eher CPU-lastig: rund 7 ms Hauptthread gegen 3 ms GPU auf „mittel“, rund 700 Draw-Calls in Bildern ohne
+und rund 1.000 in Bildern mit Schattenpass. GTAO auf „hoch“ zeichnet die Szene ein weiteres Mal. Die Bildrate im echten
 Fenster ist noch nicht geprüft. GTAO 0,85 und die Bloom-Werte in `LOOKS` wurden an Vergleichsbildern geprüft und bleiben.
 
 ## Nächste Schritte

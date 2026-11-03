@@ -31,6 +31,8 @@ export function coverMaterial(world) {
           transformed.x += (sin(t * 1.7 + ph) + 0.4 * sin(t * 4.1 + ph * 2.1)) * bend;
           transformed.z += cos(t * 1.3 + ph * 1.3) * bend * 0.7;
         }`);
+    // Beidseitige Flächen drehen sonst die Normale auf der Rückseite um: eine der gekreuzten Flächen würde fast schwarz
+    sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal = normalize(vNormal);');
   };
   m.customProgramCacheKey = () => 'cover-wind';
   return m;

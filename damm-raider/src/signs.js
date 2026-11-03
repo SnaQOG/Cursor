@@ -49,7 +49,7 @@ function board(g, x, y, w, h, text, paintName, rnd) {
   let size = h * 0.62;
   const face = font === 's' ? 'Georgia, "Times New Roman", serif' : 'Arial, Helvetica, sans-serif';
   g.font = `bold ${size}px ${face}`;
-  const max = w - pad * 6, tw = g.measureText(text).width;
+  const max = w - pad * 9, tw = g.measureText(text).width;
   if (tw > max) { size *= max / tw; g.font = `bold ${size}px ${face}`; }
   g.textAlign = 'center';
   g.textBaseline = 'middle';

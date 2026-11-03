@@ -2,6 +2,7 @@
 // Werkstatt, Holzlager, Wäscheleine, verlassenes Lager, Barrikade, Müll, Hafenkram ...
 // Die Requisiten teilen sich Atlas und Material (assets/props.glb) und kosten pro Kachel einen Draw-Call.
 import { mulberry32 } from './util.js';
+import { addSign, roadName, SIGN_ASPECT } from './signs.js';
 
 // Kartenmaterial, falls vorhanden (der Damm hat keine eigenen Holz- und Stoffmaterialien)
 let CL = 'world', WD = 'world';
@@ -390,8 +391,14 @@ function streetDetail(B, D, { lots, streets, squares, occ }) {
       const x = x0 + 0.7, z = z0 + 0.7, y = g(x, z);
       if (!open(x, z) || !freeAt(x, z, y, 0.3)) continue;
       b.box(x, y, z, 0.12, 3, 0.12, 0x4a3524, det(WD));
-      b.box(x + 0.75, y + 2.6, z, 1.5, 0.22, 0.04, 0x8a7458, det(WD));
-      b.box(x, y + 2.25, z + 0.7, 0.04, 0.22, 1.4, 0x7a6448, det(WD));
+      b.box(x + 0.75, y + 2.6, z, 1.5, 0.26, 0.04, 0x8a7458, det(WD));
+      b.box(x, y + 2.25, z + 0.7, 0.04, 0.26, 1.4, 0x7a6448, det(WD));
+      // Beschriftung auf beiden Seiten
+      const sw = 0.24 * SIGN_ASPECT, ka = roadName(stats.signs * 2), kb = roadName(stats.signs * 2 + 1);
+      for (const s of [1, -1]) {
+        addSign(b, ka, x + 0.75, y + 2.61, z + s * 0.022, 0, s, sw, 0.24);
+        addSign(b, kb, x + s * 0.022, y + 2.26, z + 0.7, s, 0, sw, 0.24);
+      }
       B.col.addCyl(x, z, 0.09, y, y + 3);
       stats.signs++;
     }
@@ -604,5 +611,21 @@ export function dressDamm(B) {
     if (!p) continue;
     SCENES[name](dir ? frame(p[0], p[1], p[2], 0, 1, 1, 0) : frame(p[0], p[1], p[2], 1, 0, 0, 1));
     note(name, p[0], p[1], p[2], dir ? 1 : 0, dir ? 0 : 1);
+  }
+  // Tafeln an den Werken: [Text, x, z, Blickrichtung]
+  const plates = [
+    ['KRAFTWERK', 60, -24, 0, 1], ['HOCHSPANNUNG', 40, -24, 0, 1], ['AUFBEREITUNG', 150, 22, 0, -1], ['EINSTURZGEFAHR', 165, 22, 0, -1],
+    ['UMSPANNWERK', -60, 112, 0, -1], ['HOCHSPANNUNG', -48, 112, 0, -1], ['BETRETEN VERBOTEN', 70, 140, 0, -1], ['BETRETEN VERBOTEN', -150, 50, 0, 1],
+  ];
+  for (const [text, x, z, nx, nz] of plates) {
+    const p = spot(x, z, 1.1);
+    if (!p) continue;
+    const h = 0.42, w = h * SIGN_ASPECT, rx = nz * (w / 2 - 0.1), rz = -nx * (w / 2 - 0.1);
+    for (const s of [-1, 1]) {
+      B.b.addPrim('cyl8', p[0] + s * rx, p[2] + 0.95, p[1] + s * rz, 0.04, 1.9, 0.04, 0x5a5a56, { mat: 'metal', layer: 'det' });
+      B.col.addCyl(p[0] + s * rx, p[1] + s * rz, 0.05, p[2], p[2] + 1.9);
+    }
+    B.b.box(p[0], p[2] + 1.4, p[1], nx ? 0.03 : w + 0.06, h + 0.06, nx ? w + 0.06 : 0.03, 0x4a4a46, { mat: 'metal', layer: 'det' });
+    addSign(B.b, text, p[0] + nx * 0.02, p[2] + 1.43, p[1] + nz * 0.02, nx, nz, w, h);
   }
 }

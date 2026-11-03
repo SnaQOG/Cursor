@@ -64,7 +64,7 @@ Zweite Runde, Läden, Türen und Hochhäuser:
 | Laden ohne Front | Schildbrett über Tür und Schaufenster, Auslage hinter dem Fenster (`shopFront`, `shopDisplay`) |
 | Tür ist ein leeres Loch | Offener Flügel mit Füllungen, Bändern und Griff im Raum (`doorLeaf`), Hausnummernschild |
 | Hochhäuser glatt | Drei Fassadentypen aus Bändern, Pfeilern und Balkonen, Stürze, Regenspuren, Klimageräte (`towerFacade`) |
-| Dächer der Turmstadt leer | Lüfter, Schächte, Antennen, Rohre (`roofClutter`), Feuertreppen als reine Ansicht (`fireEscape`) |
+| Dächer der Turmstadt leer | Lüfter, Schächte, Antennen, Rohre (`roofClutter`), Feuertreppen (`fireEscape`) |
 | Turmstadt zu dunkel | Mehr Grundhelligkeit der Wände, helleres Pflaster, Vordach mit Lichtleiste über den Türen |
 
 Dritte Runde, Wiese und Boden, nach Fotos von Wiesen, Feldwegen und Altstadtpflaster (Wikimedia Commons):
@@ -90,8 +90,16 @@ Vierte Runde, Einzelheiten:
 | Pflaster im Schatten flach | Kräftigere Steine, weniger gefüllte Fugen |
 | Büsche am Damm zu groß | Halb so groß, nehmen nicht mehr die Sicht |
 
-Noch offen: Feuertreppen sind nicht begehbar, Schilder tragen keine Schrift, Stoffe bewegen sich nicht, einzelne Bäume
-sind aus der Nähe flache Bildflächen.
+### Fünfte Runde, Schrift und Feuertreppen
+
+| Befund | Lösung |
+| --- | --- |
+| Schilder ohne Schrift | Atlas auf einer Leinwand, beim Start gezeichnet, keine zusätzliche Datei (`src/signs.js`): Ladennamen je Stadtteil, Wegweiser, Hausnummern, Tafeln am Damm |
+| Ladenschild an der Wand vom Obergeschoss verdeckt | Schild steht auf der Vorderkante der Markise |
+| Feuertreppe nur Ansicht | Begehbar vom Boden bis aufs Dach: Laufsteg an der Wand, Läufe außen, Lücke in der Brüstung (`planEscape`, `fireEscape`), geprüft mit `tools/tests/feinheiten.mjs` |
+
+Noch offen: Stoffe bewegen sich nicht, einzelne Bäume sind aus der Nähe flache Bildflächen. Von den Laufstegen führt keine
+Tür in die Geschosse.
 
 Offen im Abschnitt, jeweils außerhalb der Häuser oder als nächste Runde:
 

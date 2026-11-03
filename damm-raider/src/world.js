@@ -5,6 +5,7 @@ import { CollisionWorld } from './collision.js';
 import { Batcher } from './batcher.js';
 import { Instancer } from './instancer.js';
 import { coverMaterial } from './groundcover.js';
+import { signMaterial } from './signs.js';
 import { makeGrungeTexture, makeSignTexture } from './textures.js';
 import { Noise2D, clamp } from './util.js';
 
@@ -62,6 +63,7 @@ export class World {
     if (dress) mats.dress = dress;
     const cover = coverMaterial(this);
     if (cover) mats.cover = cover;
+    mats.sign = signMaterial();
     this.batcher = new Batcher(mats);
     this.farMeshes = [];
     this.instancer = new Instancer(this.assets);

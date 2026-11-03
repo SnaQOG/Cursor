@@ -3,6 +3,7 @@
 // Wände bestehen aus Flächen (sparsamer als Boxen) plus Kollisionsboxen.
 import { mulberry32 } from '../../util.js';
 import { COVER, COVER_COLS, COVER_ROWS } from '../../groundcover.js';
+import { addSign, houseNumber, shopName, SIGN_ASPECT } from '../../signs.js';
 
 export const PAL = {
   plaster: [0xe6dcc4, 0xdcc79c, 0xd8ab90, 0xcbbda4, 0xadc0c8, 0xbcc6a4, 0xebe3d3, 0xd6b68c, 0xcaa18a, 0xe0cfa6],
@@ -45,6 +46,7 @@ export const STYLE = {
 const T = 0.3; // Wandstärke
 const DOOR_W = 1.15, DOOR_H = 2.2;
 const STEP_D = 0.34;
+const ESC_LEN = 5.2, ESC_PAD = 0.8, ESC_BAND = 0.98; // Feuertreppe: Länge, Podest, Breite von Laufsteg und Lauf
 
 const pick = (rnd, arr) => arr[Math.floor(rnd() * arr.length) % arr.length];
 
@@ -57,6 +59,7 @@ function wp(w, a, y, d) {
     default: return [w.fixed + d, y, a];
   }
 }
+const cityPart = (x, z) => (Math.abs(x) > 205 && z < 205 ? (x < 0 ? 'weiss' : 'turm') : z > 205 ? 'hafen' : z < -2 ? 'wald' : 'markt');
 const OUTN = { s: [0, 0, 1], n: [0, 0, -1], e: [1, 0, 0], w: [-1, 0, 0] };
 const AXIS = { s: [1, 0, 0], n: [1, 0, 0], e: [0, 0, 1], w: [0, 0, 1] };
 const neg = (v) => [-v[0], -v[1], -v[2]];
@@ -274,8 +277,9 @@ export class HouseKit {
           // Emailschild mit Hausnummer neben der Tür
           const na = o.a1 + b + 0.2, ny = Y1 - 0.2, det2 = { layer: 'det', shade: false };
           if (na + 0.14 < w.a1) {
-            this.quad([wp(w, na - 0.11, ny, -0.035), wp(w, na + 0.11, ny, -0.035), wp(w, na + 0.11, ny + 0.16, -0.035), wp(w, na - 0.11, ny + 0.16, -0.035)], out, 0x24466e, det2);
-            this.quad([wp(w, na - 0.04, ny + 0.03, -0.04), wp(w, na + 0.04, ny + 0.03, -0.04), wp(w, na + 0.04, ny + 0.13, -0.04), wp(w, na - 0.04, ny + 0.13, -0.04)], out, 0xe8e4d8, det2);
+            this.quad([wp(w, na - 0.13, ny - 0.01, -0.03), wp(w, na + 0.13, ny - 0.01, -0.03), wp(w, na + 0.13, ny + 0.19, -0.03), wp(w, na - 0.13, ny + 0.19, -0.03)], out, 0x24466e, det2);
+            const pn = wp(w, na, ny, -0.036);
+            addSign(this.b, houseNumber(lot.id), pn[0], ny, pn[2], out[0], out[2], 0.24, 0.18);
           }
           // Turmstadt: Betonvordach mit Lichtleiste, liest sich auch in den dunklen Schluchten
           if (lot.style === 'hochhaus') {
@@ -573,6 +577,7 @@ export class HouseKit {
     const roofCol = st.roofMat === 'slate' ? pick(rnd, PAL.slate) : st.roofMat === 'wood' ? pick(rnd, PAL.wood) : pick(rnd, PAL.tile);
     const mossy = rnd() < 0.45;
     const rc = mossy ? mix(roofCol, PAL.moss, 0.18 + rnd() * 0.2) : roofCol;
+    const escape = lot.style === 'hochhaus' && floors >= 5 && lot.id % 2 === 0 ? this.planEscape(lot, sides, doors, yG, fh, st.roof === 'flat') : null;
     if (lot.pilot && st.roof === 'gable') {
       // Giebelhaus: First quer zur langen Seite, wenn der Grundriss es erlaubt
       const giebel = lot.id % 3 === 1 && S / L > 0.68;
@@ -591,7 +596,7 @@ export class HouseKit {
     // Bodenanschluss und Ladenschilder
     if (!lot.pilot) this.plinthGround(lot, sides, yG, y, doors, rnd);
     if (lot.shop && doors[0]) this.shopFront(lot, sides[doors[0].side], doors[0].a, yG, rnd);
-    if (lot.style === 'hochhaus' && floors >= 5 && lot.id % 2 === 0) this.fireEscape(lot, sides, doors, yG, floors, fh);
+    if (escape) this.fireEscape(escape, sides, yG, floors, fh, yTop);
     this.stats.houses++;
     lot.roofY = yTop;
     lot.flat = st.roof === 'flat';
@@ -1105,7 +1110,7 @@ export class HouseKit {
   // Ladenfront: Schildbrett, gestreifte Markisen über Tür und Schaufenstern, Auslage dahinter, Ausleger
   shopFront(lot, w, a, yG, rnd) {
     const out = OUTN[w.side];
-    const col = pick(rnd, PAL.awning), yT = yG + 2.78;
+    const col = pick(rnd, PAL.awning), yT = yG + 2.78, al = w.side === 'n' || w.side === 's';
     const dw = 0.8;
     const spans = [[a - dw, a + dw], ...(lot.shopWins || [])].sort((p, q) => p[0] - q[0]);
     // Überlappende Spannen zusammenfassen, damit Markisen nicht ineinander stecken
@@ -1120,6 +1125,12 @@ export class HouseKit {
       this.ledge(w, p0, q0, yT + 0.03, yT + 0.36, 0.05, darker(pick(rnd, PAL.wood), 1.15), 'wood', 'det');
       this.awning(w, p0, q0, yT, col, 0xe6dfcc);
     }
+    // Ladenname auf dem breitesten Schildbrett
+    const wide = merged.reduce((p, q) => (q[1] - q[0] > p[1] - p[0] ? q : p));
+    // Über dem Vordach steht es frei, an der Wand verdeckt es oft der Überstand des Obergeschosses
+    const sw = Math.min(wide[1] - wide[0] + 0.3, 1.95), sh = sw / SIGN_ASPECT, yS = yT - 0.58, sm = (wide[0] + wide[1]) / 2, sc = wp(w, sm, yS, -1.29), sb = wp(w, sm, yS - 0.02, -1.27);
+    this.b.box(sb[0], yS - 0.02, sb[2], al ? sw + 0.05 : 0.03, sh + 0.04, al ? 0.03 : sw + 0.05, 0x2e2419, { mat: 'wood', layer: 'det' });
+    addSign(this.b, shopName(lot.id, cityPart((lot.x0 + lot.x1) / 2, (lot.z0 + lot.z1) / 2)), sc[0], yS, sc[2], out[0], out[2], sw, sh);
     for (const [p, q] of lot.shopWins || []) this.shopDisplay(w, p, q, yG, rnd);
     if (this.inst && this.inst.has('kc_sign')) this.model('kc_sign', wp(w, Math.min(a + 1.1, w.a1 - 0.3), yG + 3.3, 0), yawFront(out[0], out[2]), 1, { tint: col, layer: 'det' });
   }
@@ -1217,39 +1228,98 @@ export class HouseKit {
     }
   }
 
-  // Feuertreppe auf einer Seite ohne Tür: nur Ansicht, die Etagen erreicht man durchs Haus
-  fireEscape(lot, sides, doors, yG, floors, fh) {
-    const iron = { mat: 'metal', layer: 'det' }, col = 0x8a6a52, thin = 0x6a584a;
+  // Platz für die Feuertreppe suchen: fensterlose Wand ohne Tür, davor bleibt die Gasse frei. Auf Flachdächern führt sie durch eine Lücke in der Brüstung aufs Dach
+  planEscape(lot, sides, doors, yG, fh, toRoof) {
+    const need = ESC_LEN + 0.5;
     for (const k of ['n', 's', 'e', 'w']) {
       if (doors.some((d) => d.side === k)) continue;
-      const w = sides[k], al = k === 'n' || k === 's';
-      const run = this.openRuns(w, yG + fh, lot.id).find(([p, q]) => q - p >= 5.5);
-      if (!run) continue;
-      lot.escape = { side: k, a: (run[0] + run[1]) / 2 };
-      const m = (run[0] + run[1]) / 2, B = (a, y, d, dx, h, dd, c = col) => {
-        const p = wp(w, a, y, d);
-        this.b.box(p[0], p[1], p[2], al ? dx : dd, h, al ? dd : dx, c, iron);
-      };
-      for (let f = 1; f < floors; f++) {
-        const y = yG + f * fh;
-        B(m, y - 0.05, -0.6, 4.4, 0.05, 1.05);
-        B(m, y + 0.95, -1.1, 4.4, 0.04, 0.04, thin);
-        for (const e of [-2.2, -1.1, 0, 1.1, 2.2]) B(m + e, y, -1.1, 0.04, 0.95, 0.04, thin);
-        for (const e of [-1.9, 1.9]) B(m + e, y - 0.3, -0.25, 0.05, 0.25, 0.5, thin);
-        // Treppenlauf zum nächsten Podest
-        if (f < floors - 1) {
-          const dir = f % 2 ? 1 : -1, a0 = m - dir * 1.8, a1 = m + dir * 1.8;
-          // Zwei Wangen und einzelne Stufen, man sieht die Wand hindurch
-          for (const d of [-0.15, -0.95]) this.b.addQuad(wp(w, a0, y, d), wp(w, a1, y + fh, d), wp(w, a1, y + fh + 0.14, d), wp(w, a0, y + 0.14, d), col, { ...iron, double: true });
-          for (let i = 1; i < 11; i++) B(a0 + (a1 - a0) * i / 11, y + fh * i / 11 + 0.08, -0.55, 0.26, 0.03, 0.8);
-          this.b.addQuad(wp(w, a0, y + 0.85, -0.95), wp(w, a1, y + fh + 0.85, -0.95), wp(w, a1, y + fh + 0.9, -0.95), wp(w, a0, y + 0.9, -0.95), thin, { ...iron, double: true });
+      const w = sides[k];
+      for (const [p, q] of this.openRuns(w, yG + fh, lot.id)) {
+        if (q - p < need) continue;
+        const m = (p + q) / 2;
+        // Brücken docken in Lücken der Brüstung an und würden die Treppe kreuzen
+        let clear = !(lot.gaps || []).some((g) => g.side === k && g.a0 < m + ESC_LEN / 2 + 0.5 && g.a1 > m - ESC_LEN / 2 - 0.5);
+        for (let a = m - ESC_LEN / 2; a <= m + ESC_LEN / 2 && clear; a += 0.5) {
+          for (const d of [-1, -2, -3, -4]) {
+            const c = wp(w, a, 0, d);
+            if (!this.openAt(c[0], c[2], yG, lot.id)) { clear = false; break; }
+          }
+        }
+        if (!clear) continue;
+        const end = m + ESC_LEN / 2;
+        if (toRoof) lot.gaps = [...(lot.gaps || []), { side: k, a0: end - 1.5, a1: end - 0.15 }];
+        lot.escape = { side: k, a: m, y: yG };
+        return { side: k, m, toRoof };
+      }
+    }
+    return null;
+  }
+
+  // Begehbare Feuertreppe: innen ein durchgehender Laufsteg, außen die Läufe, alle steigen in dieselbe Richtung
+  fireEscape({ side, m, toRoof }, sides, yG, floors, fh, yTop) {
+    const w = sides[side], al = side === 'n' || side === 's';
+    const iron = { mat: 'metal', layer: 'det' }, col = 0x8a6a52, thin = 0x6a584a;
+    const a0 = m - ESC_LEN / 2, a1 = m + ESC_LEN / 2, as = a0 + ESC_PAD, ae = a1 - ESC_PAD;
+    const dI = -ESC_BAND, dO = -2 * ESC_BAND - 0.02, RAIL = 1;
+    // Quader von (a, d) bis (a, d) mit Unterkante y; solid = auch Kollision
+    const B = (pa, pb, y, h, da, db, c, solid = true) => {
+      const p = wp(w, pa, y, da), q = wp(w, pb, y, db);
+      const x0 = Math.min(p[0], q[0]), x1 = Math.max(p[0], q[0]), z0 = Math.min(p[2], q[2]), z1 = Math.max(p[2], q[2]);
+      this.b.box((x0 + x1) / 2, y, (z0 + z1) / 2, x1 - x0, h, z1 - z0, c, iron);
+      if (solid) this.col.addBox(x0, y, z0, x1, y + h, z1);
+    };
+    const railA = (pa, pb, y, d) => {
+      B(pa, pb, y + RAIL - 0.04, 0.04, d - 0.02, d + 0.02, thin, false);
+      B(pa, pb, y, RAIL, d - 0.015, d + 0.015, thin, false);
+      const p = wp(w, pa, y, d - 0.03), q = wp(w, pb, y, d + 0.03);
+      this.col.addBox(Math.min(p[0], q[0]), y, Math.min(p[2], q[2]), Math.max(p[0], q[0]), y + RAIL, Math.max(p[2], q[2]));
+    };
+    const railD = (a, da, db, y) => {
+      B(a - 0.02, a + 0.02, y + RAIL - 0.04, 0.04, da, db, thin, false);
+      const p = wp(w, a - 0.03, y, da), q = wp(w, a + 0.03, y, db);
+      this.col.addBox(Math.min(p[0], q[0]), y, Math.min(p[2], q[2]), Math.max(p[0], q[0]), y + RAIL, Math.max(p[2], q[2]));
+      for (const d of [da, (da + db) / 2, db]) B(a - 0.015, a + 0.015, y, RAIL, d - 0.015, d + 0.015, thin, false);
+    };
+    const levels = toRoof ? floors : floors - 1;
+    const n = Math.round(fh / 0.27), run = (ae - as) / n;
+    for (let f = 0; f <= levels; f++) {
+      const y = yG + f * fh;
+      // Laufsteg an der Wand und die beiden Podeste am Treppenlauf
+      if (f > 0) {
+        const lv = f === floors ? yTop : y;
+        B(a0, a1, lv - 0.06, 0.06, -0.02, dI, col);
+        if (f < levels) B(a0, as, lv - 0.06, 0.06, dI, dO, col);
+        B(ae, a1, lv - 0.06, 0.06, dI, dO, col);
+        railA(as, ae, lv, dI);
+        railA(f < levels ? a0 : ae, a1, lv, dO);
+        railD(a1, dO, -0.02, lv);
+        if (f < levels) railD(a0, dO, -0.02, lv);
+        else railD(a0, dI, -0.02, lv);
+        // Konsolen und Hänger
+        for (const e of [a0 + 0.3, a1 - 0.3]) B(e - 0.03, e + 0.03, lv - 0.3, 0.24, -0.02, dI, thin, false);
+        for (const e of [a0, a1]) B(e - 0.025, e + 0.025, lv - fh, fh, dO - 0.025, dO + 0.025, thin, false);
+      }
+      if (f >= levels) continue;
+      // Treppenlauf zum nächsten Geschoss
+      const yEnd = f + 1 === floors ? yTop : y + fh, r = (yEnd - y) / n;
+      for (let i = 0; i < n; i++) {
+        const t0 = as + i * run, top = y + r * (i + 1);
+        B(t0, t0 + run, top - 0.05, 0.05, dI - 0.03, dO + 0.03, col);
+        const p = wp(w, t0, top - 0.3, dI), q = wp(w, t0 + run, top - 0.3, dO);
+        this.col.addBox(Math.min(p[0], q[0]), top - 0.3, Math.min(p[2], q[2]), Math.max(p[0], q[0]), top, Math.max(p[2], q[2]));
+        // Seitenschutz je Stufe
+        for (const d of [dI, dO]) {
+          const c0 = wp(w, t0, top, d - 0.03), c1 = wp(w, t0 + run, top, d + 0.03);
+          this.col.addBox(Math.min(c0[0], c1[0]), top, Math.min(c0[2], c1[2]), Math.max(c0[0], c1[0]), top + RAIL, Math.max(c0[2], c1[2]));
+          if (i % 3 === 1) B(t0 - 0.015, t0 + 0.015, top, RAIL, d - 0.015, d + 0.015, thin, false);
         }
       }
-      // Hochgezogene Leiter über dem Erdgeschoss
-      const y1 = yG + fh;
-      for (const e of [-0.2, 0.2]) B(m + 1.9 + e, y1 - 1.1, -0.9, 0.035, 1.1, 0.035, thin);
-      for (let i = 0; i < 4; i++) B(m + 1.9, y1 - 1 + i * 0.26, -0.9, 0.42, 0.03, 0.03, thin);
-      return;
+      for (const d of [dI, dO]) {
+        const yy = yEnd - y;
+        // Wangen und Handlauf
+        this.b.addQuad(wp(w, as, y - 0.12, d), wp(w, ae, y + yy - 0.12, d), wp(w, ae, y + yy + 0.02, d), wp(w, as, y + 0.02, d), col, { ...iron, double: true });
+        this.b.addQuad(wp(w, as, y + RAIL, d), wp(w, ae, y + yy + RAIL, d), wp(w, ae, y + yy + RAIL + 0.05, d), wp(w, as, y + RAIL + 0.05, d), thin, { ...iron, double: true });
+      }
     }
   }
 

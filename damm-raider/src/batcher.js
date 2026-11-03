@@ -242,6 +242,21 @@ export class Batcher {
     }
   }
 
+  // Viereck mit festem Bildausschnitt (Schilder): r = [u0, v0, u1, v1], a unten links, gegen den Uhrzeigersinn
+  addUVQuad(a, b, c, d, n, r, mat, layer = 'det') {
+    const bk = this.bucket(mat, (a[0] + c[0]) / 2, (a[2] + c[2]) / 2, layer);
+    const uv = [[r[0], r[1]], [r[2], r[1]], [r[2], r[3]], [r[0], r[3]]], pts = [a, b, c, d];
+    for (const i of [0, 1, 2, 0, 2, 3]) {
+      const p = pts[i];
+      bk.pos.push3(p[0], p[1], p[2]);
+      bk.nor.push3(n[0], n[1], n[2]);
+      bk.col.push3(1, 1, 1);
+      bk.uv.push2(uv[i][0], uv[i][1]);
+      bk.ySum += p[1];
+      this.vertexCount++;
+    }
+  }
+
   // Box mit Unterkante bei y
   box(x, y, z, w, h, d, color, opts) {
     this.addPrim('box', x, y + h / 2, z, w, h, d, color, opts);

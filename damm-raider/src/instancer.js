@@ -2,6 +2,7 @@
 // Kachel ein Mesh (damit Frustum- und Entfernungs-Culling greifen).
 // Teile namens "...__Paint" werden pro Instanz eingefärbt.
 import * as THREE from 'three';
+import { weather } from './weather.js';
 
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
@@ -58,7 +59,9 @@ export class Instancer {
       for (const part of this.assets.bakedMeshes(g.name)) {
         const paint = part.name.includes('__Paint');
         const lamp = part.name.includes('__Lamp');
-        const im = new THREE.InstancedMesh(part.geometry, g.double ? this.doubleSided(part.material) : part.material, n);
+        const mat = g.double ? this.doubleSided(part.material) : part.material;
+        if (!lamp && !/^[nv]_/.test(g.name)) weather(mat, { desat: paint ? 0.22 : 0.32, rough: 0.7 });
+        const im = new THREE.InstancedMesh(part.geometry, mat, n);
         im.name = g.name;
         g.items.forEach((it, i) => {
           _e.set(it.rx, it.ry, it.rz, 'YXZ');

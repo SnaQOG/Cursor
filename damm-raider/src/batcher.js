@@ -257,6 +257,21 @@ export class Batcher {
     }
   }
 
+  // Weicher Kontaktschatten am Boden: verbindet ein Objekt mit dem Untergrund, auch außerhalb der Schattenkarte
+  addContact(x, y, z, sx, sz, ry = 0, layer = 'det') {
+    const c = Math.cos(ry), s = Math.sin(ry), P = (u, v) => [x + u * sx * c + v * sz * s, y + 0.025, z - u * sx * s + v * sz * c];
+    const a = P(-1, 1), b = P(1, 1), cc = P(1, -1), d = P(-1, -1);
+    const bk = this.bucket('contact', x, z, layer), uv = [[0, 0], [1, 0], [1, 1], [0, 1]], pts = [a, b, cc, d];
+    for (const i of [0, 1, 2, 0, 2, 3]) {
+      bk.pos.push3(pts[i][0], pts[i][1], pts[i][2]);
+      bk.nor.push3(0, 1, 0);
+      bk.col.push3(0, 0, 0);
+      bk.uv.push2(uv[i][0], uv[i][1]);
+      bk.ySum += y;
+      this.vertexCount++;
+    }
+  }
+
   // Box mit Unterkante bei y
   box(x, y, z, w, h, d, color, opts) {
     this.addPrim('box', x, y + h / 2, z, w, h, d, color, opts);

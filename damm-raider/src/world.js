@@ -6,12 +6,13 @@ import { Batcher } from './batcher.js';
 import { Instancer } from './instancer.js';
 import { coverMaterial } from './groundcover.js';
 import { signMaterial } from './signs.js';
-import { makeGrungeTexture, makeSignTexture } from './textures.js';
+import { setGrimeTexture, weather } from './weather.js';
+import { makeGrungeTexture, makeSignTexture, makeSoftDot } from './textures.js';
 import { Noise2D, clamp } from './util.js';
 
 const CONDITION_LOOK = {
   tag: {
-    sunElev: 0.72, sunAz: 2.3, sun: 0xffe8c8, sunI: 3.1, hemiSky: 0xe2e6e8, hemiGround: 0x7d6e58, hemiI: 0.72, envI: 0.38,
+    sunElev: 0.72, sunAz: 2.3, sun: 0xffe8c8, sunI: 2.7, hemiSky: 0xe2e6e8, hemiGround: 0x7d6e58, hemiI: 0.92, envI: 0.44,
     top: 0x4f86c2, horizon: 0xd6dccf, fog: 0xc6d0cc, fogNear: 90, fogFar: 620, exposure: 1.0,
   },
   daemmerung: {
@@ -64,6 +65,12 @@ export class World {
     const cover = coverMaterial(this);
     if (cover) mats.cover = cover;
     mats.sign = signMaterial();
+    mats.contact = new THREE.MeshBasicMaterial({ map: makeSoftDot(64), vertexColors: true, transparent: true, opacity: 0.62, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    setGrimeTexture(this.grunge);
+    for (const [k, m] of Object.entries(mats)) {
+      if (['cover', 'sign', 'contact', 'cobble2'].includes(k)) continue;
+      weather(m, k === 'dress' ? { desat: 0.32, rough: 0.72 } : { desat: k === 'metal' ? 0.3 : 0.14, dust: 0.6 });
+    }
     this.batcher = new Batcher(mats);
     this.farMeshes = [];
     this.instancer = new Instancer(this.assets);

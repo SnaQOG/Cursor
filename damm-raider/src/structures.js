@@ -90,8 +90,10 @@ export class Builder {
     const sc = typeof scale === 'number' ? [scale, scale, scale] : scale;
     const m = new THREE.Matrix4().compose(new THREE.Vector3(x, gy, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz, 'YXZ')), new THREE.Vector3(...sc));
     this.b.addModelUV(this.assets.meshes(name), m, color, 'dress', layer, bright);
+    const bb = this.assets.bounds(name);
+    // Nur auf dem Boden, nicht auf Tischen und in Regalen
+    if (this.b.materials.contact && Math.abs(gy - this.ground(x, z)) < 0.12) this.b.addContact(x, gy, z, (bb.max.x - bb.min.x) * sc[0] * 0.72 + 0.08, (bb.max.z - bb.min.z) * sc[2] * 0.72 + 0.08, ry, layer);
     if (collide) {
-      const bb = this.assets.bounds(name);
       const w = (bb.max.x - bb.min.x) * sc[0], d = (bb.max.z - bb.min.z) * sc[2], h = (bb.max.y - bb.min.y) * sc[1];
       if (collide === 'box') this.solidCol(x, gy, z, w, h, d, ry, shrink);
       else this.col.addCyl(x, z, (Math.max(w, d) / 2) * shrink, gy, gy + h);

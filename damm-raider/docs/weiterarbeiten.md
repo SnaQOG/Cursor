@@ -89,7 +89,7 @@ Richtwerte aus `simready.mjs` (Apple M1, feste Kamera, vorher → nachher SimRea
 | RTX 4080, 1920 × 1080 | mittel | 106–135 fps | 80–93 fps |
 | RTX 4080, 1920 × 1080 | hoch | nicht neu gemessen | 52–61 fps |
 | Apple M1, 1440 × 900 Retina | niedrig (vor der Wiese) | 65–91 fps | 34–53 fps |
-| Apple M1, 1440 × 900 Retina | mittel | 15–23 fps | 13–18 fps |
+| Apple M1, 1440 × 900 Retina | mittel | 20–26 fps | 16–21 fps |
 | Apple M1, 1440 × 900 Retina | hoch (vor der Wiese) | 5–9 fps | 6–7 fps |
 
 Die 4080-Werte stammen von vor Linde, Birke, Ruinen und Mauerflecken und sind danach noch nicht nachgemessen.
